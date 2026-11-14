@@ -217,7 +217,13 @@ def has_token(src, profile=None):
     key = src.get("need_token")
     if not key:
         return True
-    return bool(str(tokens(profile).get(key) or "").strip())
+    # 令牌分两类，绝不能混：
+    #   · trem / eqsc / seedlink —— 机器级，抓的是「谁跑都一样的公开数据」，
+    #     存在 data/tokens.json，跟账号无关；
+    #   · jian —— 账号级个人授权，存在 data/users/<账号>/tokens.json，
+    #     换号就换密钥，不会沿用上一个账号的。
+    p = (profile if key == "jian" else "")
+    return bool(str(tokens(p).get(key) or "").strip())
 
 JST = 9
 CST = 8

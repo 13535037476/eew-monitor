@@ -5343,13 +5343,13 @@
       const st = $('#myTokState');
       if (!st) return;
       if (d.own) {
-        st.textContent = '已用自己的密钥 · ' + (d.jian || '');
+        st.textContent = '本账号已配密钥 · ' + (d.jian || '');
         st.className = 'hint mono mytok-state-on';
         $('#myTokInput').placeholder = '已保存 ' + d.jian + '，填新的可替换';
       } else {
-        st.textContent = d.shared ? '跟随本机共享密钥' : '共享密钥也未配置';
+        st.textContent = '本账号还没配密钥（不会借用别人的）';
         st.className = 'hint mono mytok-state-off';
-        $('#myTokInput').placeholder = 'rt_…（留空则用本机共享密钥）';
+        $('#myTokInput').placeholder = 'rt_…（填了才有 Jian 预警）';
       }
     } catch (e) { }
   }
@@ -5549,14 +5549,15 @@
 
   function renderAdmin() {
     if (!adminData) return;
-    const sh = adminData.shared || {};
-    const st = $('#adminSharedState');
-    st.textContent = sh.set ? ('已配置 · ' + sh.jian) : '未配置（这些账号收不到 Jian 预警）';
-    st.className = 'hint mono ' + (sh.set ? 'mytok-state-on' : 'mytok-state-off');
     $('#adminCount').textContent = adminData.users.length + ' 个';
     const box = $('#adminList');
     box.textContent = '';
     for (const u of adminData.users) box.appendChild(acctCard(u));
+    const m = adminData.machine || {};
+    const lack = Object.keys(m).filter(k => !m[k]);
+    $('#adminNote').textContent = lack.length
+      ? ('机器级公开源令牌未配置：' + lack.join(' / '))
+      : '机器级公开源令牌齐全';
   }
 
   async function loadAdmin() {
@@ -5591,26 +5592,6 @@
       await loadAdmin();
     } catch (e) { toast(e.message || '创建失败'); }
   });
-  if ($('#btnAdminSharedSave')) $('#btnAdminSharedSave').addEventListener('click', async () => {
-    const v = ($('#adminSharedInput').value || '').trim();
-    if (!v) { toast('先填入 rt_ 开头的密钥'); return; }
-    try {
-      await adminApi('/api/admin/tokens', { username: '', jian: v });
-      $('#adminSharedInput').value = '';
-      toast('共享密钥已更新');
-      await loadAdmin();
-      loadMyTokens();
-    } catch (e) { toast(e.message || '保存失败'); }
-  });
-  if ($('#btnAdminSharedClear')) $('#btnAdminSharedClear').addEventListener('click', async () => {
-    try {
-      await adminApi('/api/admin/tokens', { username: '', jian: '' });
-      toast('共享密钥已清除');
-      await loadAdmin();
-      loadMyTokens();
-    } catch (e) { toast(e.message || '操作失败'); }
-  });
-
   $('#btnSettings').addEventListener('click', () => {
     paintFocus(); dlg.showModal(); loadMyTokens();
   });

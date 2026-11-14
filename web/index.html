@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>震线 EEW · 中日地震预警</title>
-<link rel="stylesheet" href="style.css?v=228">
+<link rel="stylesheet" href="style.css?v=229">
 </head>
 <body>
 
@@ -357,9 +357,10 @@
             <button type="button" class="btn" id="btnMyTokSave">保存</button>
             <button type="button" class="btn" id="btnMyTokClear">清除</button>
           </div>
-          <p class="hint" id="myTokHint">填了自己的密钥，就单独连一条 Jian 预警流，
-            这条流的数据只进你自己的界面：别人登录看不到你的预警，你这边断了也不影响别人。
-            留空 / 清除则回落到本机共享密钥。</p>
+          <p class="hint" id="myTokHint">这是<b>你这个账号自己</b>的 Jian 密钥，存在你这个账号名下：
+            在任意设备登录都用同一把，改一处全端生效；换别的账号登录用的就是那个账号的，
+            不会沿用你这一把。清除后这个账号就没有 Jian 那一路预警（其余 17 个公开源不受影响），
+            也不会去借用别人的。</p>
         </div>
 
         <div class="mytok" id="adminEntry" hidden>
@@ -367,8 +368,9 @@
             <label>账号与密钥总览</label>
             <button type="button" class="btn" id="btnAdmin">打开管理…</button>
           </div>
-          <p class="hint">只有管理员看得到。一个页面看清每个账号用的是哪把密钥、在线几台设备，
-            可建号 / 改密码 / 踢下线 / 删号，也能替别人配密钥。</p>
+          <p class="hint">只有管理员看得到。能看清每个账号配没配密钥、在线几台设备，
+            可建号 / 改密码 / 踢下线 / 删号，也能替别人配密钥。
+            <b>密钥原文谁都看不到</b>，只显示前 6 位和后 4 位。</p>
         </div>
       </div>
 
@@ -476,18 +478,10 @@
     </div>
     <div class="dlg-body">
       <div class="atshared">
-        <div class="row between">
-          <label>本机共享 Jian 密钥</label>
-          <span class="hint mono" id="adminSharedState">—</span>
-        </div>
-        <div class="row">
-          <input id="adminSharedInput" class="input mono" placeholder="rt_…"
-            autocomplete="off" spellcheck="false">
-          <button type="button" class="btn" id="btnAdminSharedSave">保存</button>
-          <button type="button" class="btn" id="btnAdminSharedClear">清除</button>
-        </div>
-        <p class="hint">所有没有专属密钥的账号都走这一条流。清除后，这些账号将收不到 Jian 预警
-          （其余 17 个公开源不受影响）。</p>
+        <p class="hint" style="margin:0">密钥<b>跟着账号走</b>：同一账号在手机、电脑上登录都用它自己那把，
+          换账号登录就用那个账号的，绝不会沿用上一个的。所以这里没有「机器共享密钥」——
+          每个账号要么有自己的一把，要么没有 Jian 预警。<br>
+          密钥原文任何人都看不到（含管理员），只显示前 6 位 + 后 4 位。</p>
       </div>
 
       <div class="admin-sec">
@@ -523,6 +517,6 @@
 <script src="geo.js?v=207"></script>
 <script src="geo_jp.js?v=176"></script>
 <script src="geo_world.js?v=207"></script>
-<script src="app.js?v=277"></script>
+<script src="app.js?v=278"></script>
 </body>
 </html>

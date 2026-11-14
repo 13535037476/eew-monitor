@@ -79,7 +79,7 @@ def user_dir(name):
 
 def user_file(name, fn):
     return os.path.join(user_dir(name), fn)
-VERSION = "1.13.0"
+VERSION = "1.14.0"
 
 # ---------------- 可调阈值（settings.json 里的 gqMag） ----------------
 # 前端设置面板改「全球检测最小震级」后会 POST /api/settings 落盘，
@@ -499,21 +499,22 @@ def bucket_state(name=None):
 
 
 def bucket_names():
+    """所有「账号」桶。空名那个是服务端自己的落脚桶（未登录、登录页、
+    心跳线程初始态都用它），不参与公开源的 fanout——多写一份没人看。"""
     with _BUCKET_LOCK:
-        names = list(BUCKETS.keys())
+        names = [n for n in BUCKETS if n]
     return names or [""]
 
 
 def bucket_of(user):
-    """这个账号用哪个桶。
+    """这个账号用哪个桶 —— 永远用自己的，一个账号一个桶。
 
-    只有「自己的令牌文件里真的填了 jian 密钥」才单独开桶；文件存在但没填
-    （或者只填了别的键）就回落到共享桶——否则那个账号会莫名其妙少一路数据源。
+    这里曾经允许「没有专属密钥就回落到共享桶」，结果是：甲在这台机器上
+    填了密钥，退出、乙登录，乙用的是同一把——正是「换了号却延续上一个号
+    的密钥」。现在密钥跟账号走，账号没配就是没有，宁可不显示 Jian 那一路，
+    也不把别人的授权偷偷借给它。
     """
-    name = (user or {}).get("name") or ""
-    if name and name in OWN_TOKENS:
-        return name
-    return ""
+    return (user or {}).get("name") or ""
 
 
 def refresh_own_tokens():
@@ -1446,6 +1447,10 @@ def _apply_payload_one(src, payload):
 
 def build_state():
     now = time.time()
+    # 账号的桶是懒创建的：新账号第一次进来时 sources 还是空数组，要等下一轮
+    # 心跳（最多 4 秒）才填上，面板会空白一下。首帧自己补一次。
+    if not STATE["sources"]:
+        refresh_sources_meta()
     minmag = _gq_min_mag()   # 全球检测最小震级（设置面板可调，M1~M8）
     with LOCK:
         gqev = gq_client.recent_events(min_mag=minmag, limit=40) if gq_client else []
@@ -2035,14 +2040,10 @@ class Handler(SimpleHTTPRequestHandler):
             if path == "/api/mytokens":
                 u = self._user() or {}
                 name = u.get("name") or ""
-                own = name in OWN_TOKENS
-                own_tok = ""
-                if own:
-                    own_tok = str(_read_tokens(user_file(name, "tokens.json")).get("jian") or "")
-                shared_tok = str(sources.tokens("").get("jian") or "")
-                self._json({"ok": True, "own": own, "jian": _mask(own_tok),
-                            "shared": bool(shared_tok),
-                            "state": (_jian_rt(name) if own else {}).get("ok")})
+                tok = str(_read_tokens(user_file(name, "tokens.json")).get("jian") or "")
+                self._json({"ok": True, "own": bool(tok), "jian": _mask(tok),
+                            "shared": False,
+                            "state": _jian_rt(name).get("ok")})
                 return
             if path == "/api/admin/users":
                 me = self._user() or {}
@@ -2242,11 +2243,9 @@ class Handler(SimpleHTTPRequestHandler):
                 if len(tok) > 400:
                     return self._json({"ok": False, "error": "密钥过长"}, 400)
                 if not who:
-                    try:
-                        apply_shared_tokens(tok)
-                    except OSError as exc:
-                        return self._json({"ok": False, "error": "写入失败：%s" % exc}, 500)
-                    return self._json({"ok": True, "scope": "shared", "jian": _mask(tok)})
+                    return self._json(
+                        {"ok": False,
+                         "error": "Jian 密钥按账号存，必须指定用户名"}, 400)
                 if not auth.exists(who):
                     return self._json({"ok": False, "error": "账号不存在"}, 404)
                 try:
@@ -2443,26 +2442,76 @@ def _read_tokens(path):
 
 
 def load_tokens():
-    """加载令牌，分两级：
+    """加载令牌。两类分开，各归各的：
 
-    1. 机器级 `data/tokens.json` —— 共享档，所有没有专属令牌的账号都用它
-    2. 账号级 `data/users/<账号>/tokens.json` —— 谁填了谁用自己那份
+    1. 机器级 `data/tokens.json` —— 只放 trem / eqsc / seedlink 这类
+       「抓的是公开数据、谁跑都一样」的令牌，改一次全机生效。
+    2. 账号级 `data/users/<账号>/tokens.json` —— 只放 jian 这种个人授权。
+       密钥跟着账号走：同一账号在手机、电脑上登录用的都是它；换一个账号
+       登录，用的就是那个账号自己的，绝不会沿用上一个的。
 
-    账号自带令牌时会单独起一条 Jian 流、单独一套界面状态，别人的界面
-    看不到他的预警，他断线也不会影响别人。没填的账号回落到共享档，
-    所以新注册的号开箱就有数据，不会白屏。
+    老版本把 jian 放在机器级文件里，所有账号共用。启动时 migrated 会把
+    那份 jian 分发给每个已有账号，再从机器级文件里删掉——否则以后新建的
+    账号还会继承它。
 
     打包版：随 exe 内嵌的那份 tokens.json 会先复制到 exe 旁边再读，
     用户改旁边这份就能换令牌，不用重新打包。"""
-    sources.set_tokens(_read_tokens(_data_file("tokens.json")), "")
+    shared = _read_tokens(_data_file("tokens.json"))
+    shared.pop("jian", None)          # jian 不属于这台机器，只属于账号
+    sources.set_tokens(shared, "")
     with _BUCKET_LOCK:
         BUCKETS.setdefault("", _blank_state())
-    refresh_own_tokens()
-    for name in list(OWN_TOKENS):
-        p = user_file(name, "tokens.json")
-        sources.set_tokens(_read_tokens(p), name)
+    # 每个账号都有自己的一桶，不管有没有配密钥——桶是它的界面状态，
+    # 不是「有密钥才给」的奖励。
+    try:
+        names = auth.usernames()
+    except Exception:
+        names = []
+    for name in names:
+        sources.set_tokens(_read_tokens(user_file(name, "tokens.json")), name)
         with _BUCKET_LOCK:
             BUCKETS.setdefault(name, _blank_state())
+    refresh_own_tokens()
+
+
+def migrate_shared_jian():
+    """一次性迁移：把机器级文件里的 jian 分发给每个已有账号。
+
+    为什么要迁：v1.13 之前所有账号共用机器级那一把 jian，直接删掉会让
+    所有人当场收不到预警。分发之后它们各自持有一份副本，从此各改各的；
+    机器级文件里的 jian 立刻删掉，避免以后新建账号又继承。
+
+    返回受影响的账号数。
+    """
+    path = _data_file("tokens.json")
+    cur = _read_tokens(path)
+    tok = str(cur.get("jian") or "").strip()
+    if not tok:
+        return 0
+    n = 0
+    try:
+        names = auth.usernames()
+    except Exception:
+        names = []
+    for name in names:
+        p = user_file(name, "tokens.json")
+        if os.path.exists(p):
+            continue
+        try:
+            with open(p, "w", encoding="utf-8") as f:
+                json.dump({"jian": tok}, f, ensure_ascii=False)
+            n += 1
+        except OSError:
+            pass
+    cur.pop("jian", None)
+    try:
+        tmp = path + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(cur, f, ensure_ascii=False, indent=2)
+        os.replace(tmp, path)
+    except OSError:
+        pass
+    return n
 
 
 def _jian_rt(profile=""):
@@ -2548,10 +2597,11 @@ def restart_jian(profile=""):
 
 
 def apply_own_tokens(name, tok):
-    """保存 / 清除某账号的专属 Jian 密钥，让连接和状态桶立刻跟上，不用重启。
+    """保存 / 清除某个账号的 Jian 密钥，让连接和界面立刻跟上，不用重启。
 
-    tok 为空表示删掉专属密钥，回落到机器级共享档；那个账号的状态桶
-    也一起丢掉，避免内存里留一份永远不会再更新的旧状态。
+    清除（tok 为空）只删这个账号自己那份密钥，**不会回落到别处**——
+    既不用别的账号的，也不用这台机器上曾经配过的那把。代价是这个账号
+    从此没有 Jian 那一路预警，换来的是「换号绝不沿用上一个号的密钥」。
     """
     p = user_file(name, "tokens.json")
     if tok:
@@ -2568,8 +2618,21 @@ def apply_own_tokens(name, tok):
         restart_jian(name)
     else:
         stop_jian(name)
+        # 内存里那份也要清掉，否则 has_token 还认为「有密钥」，
+        # 面板会一直显示「初始化中」而不是「待授权」。
+        sources.set_tokens({}, name)
+        SRC_RUNTIME.pop("jian@" + name, None)
+        # 桶留着（公开源还往这里写），但里面来自 Jian 的旧预警要清掉，
+        # 否则会出现「密钥已经删了，界面上还挂着那条预警」。
         with _BUCKET_LOCK:
-            BUCKETS.pop(name, None)
+            BUCKETS[name] = _blank_state()
+    prev = current_bucket()
+    try:
+        enter(name)
+        refresh_sources_meta()
+        publish(only=name)
+    finally:
+        enter(prev)
 
 
 def _mask(tok):
@@ -2596,51 +2659,30 @@ def purge_user(name):
     shutil.rmtree(_user_path(name), ignore_errors=True)
 
 
-def apply_shared_tokens(tok):
-    """改机器级共享密钥（data/tokens.json），并让共享那条 Jian 流立刻跟上。"""
-    path = _data_file("tokens.json")
-    tok = str(tok or "").strip()
-    cur = _read_tokens(path)
-    if tok:
-        cur["jian"] = tok
-    else:
-        cur.pop("jian", None)
-    d = os.path.dirname(path)
-    if d:
-        os.makedirs(d, exist_ok=True)
-    tmp = path + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(cur, f, ensure_ascii=False, indent=2)
-    os.replace(tmp, path)
-    restart_jian("")
-    return cur
-
-
 def admin_overview():
     """账号面板的数据：每个账号是谁、用什么密钥、在线几台设备。"""
-    shared = str(sources.tokens("").get("jian") or "")
     rows = []
     for u in auth.list_all():
         name = u["name"]
-        own = name in OWN_TOKENS
-        own_tok = ""
-        if own:
-            own_tok = str(_read_tokens(user_file(name, "tokens.json")).get("jian") or "")
-        prof = name if own else ""
-        rt = _jian_rt(prof)
+        tok = str(_read_tokens(user_file(name, "tokens.json")).get("jian") or "")
+        rt = _jian_rt(name)
         rows.append({
             "name": name,
             "admin": bool(u["admin"]),
             "created": u["created"],
             "last_login": u["last_login"],
             "sessions": u["sessions"],
-            "token": _mask(own_tok),
-            "source": "own" if own else ("shared" if shared else "none"),
+            "token": _mask(tok),
+            "source": "own" if tok else "none",
             "jian_ok": rt.get("ok"),
             "jian_err": (rt.get("err") or "")[:160],
         })
+    # 每个账号各持一把，所以这里没有「机器共享密钥」可汇报；
+    # 只带一条机器级令牌的存在性，方便面板提示「这三路公开源还能不能用」。
+    machine = _read_tokens(_data_file("tokens.json"))
     return {"ok": True, "users": rows,
-            "shared": {"jian": _mask(shared), "set": bool(shared)},
+            "machine": {k: bool(str(machine.get(k) or "").strip())
+                        for k in ("trem", "eqsc", "seedlink")},
             "version": VERSION}
 
 
@@ -2684,6 +2726,9 @@ def boot(host="127.0.0.1", port=8765, tls_cert=None, tls_key=None):
     """起数据源线程 + HTTP(S) 服务，返回 server 对象（不阻塞）"""
     auth.init(os.path.join(DATA_DIR, "users.db"))
     os.makedirs(DATA_DIR, exist_ok=True)
+    migrated = migrate_shared_jian()
+    if migrated:
+        print("[eew] 已把机器级 Jian 密钥分发给 %d 个账号（此后各账号独立）" % migrated)
     load_tokens()
     # 每个桶的数据源面板状态不一样（取决于该账号有没有自己的令牌），逐个初始化
     for name in bucket_names():
