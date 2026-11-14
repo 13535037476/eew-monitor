@@ -363,6 +363,19 @@
             也不会去借用别人的。</p>
         </div>
 
+        <div class="mytok" id="srcTokBox">
+          <div class="row between">
+            <label>本机公开数据源令牌</label>
+            <span class="hint mono" id="srcTokState">—</span>
+          </div>
+          <p class="hint">这三路抓的都是<b>公开数据</b>（谁跑都一样），属于<b>这台机器</b>，
+            一台机器只跑一份，所有账号共用：EQSC 日本气象厅速报、TREM-Net 台湾即时震度、
+            SeedLink 波形服务器（填 <code>host:port</code>）。
+            <b>谁改都对本机所有账号生效</b>，改完立刻生效、不用重启。
+            没配的源在数据源表里显示「待授权」，补上令牌就会自动起来。</p>
+          <div id="srcTokList"></div>
+        </div>
+
         <div class="mytok" id="adminEntry" hidden>
           <div class="row between">
             <label>账号与密钥总览</label>
@@ -504,9 +517,9 @@
 
       <div class="admin-sec">
         <h3>本机公开数据源令牌</h3>
-        <p class="hint">这三路抓的是公开数据（谁跑都一样），属于这台机器，所有账号共用一份；
-          改完立刻生效，不用重启。</p>
-        <div id="adminMachine"></div>
+        <p class="hint">EQSC / TREM-Net / SeedLink 这三路属于这台机器、所有账号共用一份，
+          编辑入口统一放在<b>设置 → 数据源 → 本机公开数据源令牌</b>，谁登录都能改，
+          改动全机生效。这里不再重复一份，免得两处入口看到的不是同一个状态。</p>
       </div>
     </div>
     <div class="dlg-ft">
@@ -522,6 +535,6 @@
 <script src="geo.js?v=207"></script>
 <script src="geo_jp.js?v=176"></script>
 <script src="geo_world.js?v=207"></script>
-<script src="app.js?v=280"></script>
+<script src="app.js?v=281"></script>
 </body>
 </html>

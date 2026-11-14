@@ -81,7 +81,7 @@ def user_dir(name):
 
 def user_file(name, fn):
     return os.path.join(user_dir(name), fn)
-VERSION = "1.16.0"
+VERSION = "1.17.0"
 
 # ---------------- 站点所有者 ----------------
 # 这套东西默认是本机一家人用，账号管理（建号/改密/踢设备/替人配密钥）
@@ -2141,6 +2141,13 @@ class Handler(SimpleHTTPRequestHandler):
                             "shared": False,
                             "state": _jian_rt(name).get("ok")})
                 return
+            if path == "/api/srctokens":
+                # 本机公开数据源令牌：任何登录账号都能看状态、都能补全。
+                # 这三路抓的是「谁跑都一样」的公开数据，一台机器只该跑一份，
+                # 所以按机器存、所有账号共用；改了全机生效，这一点在面板上写明。
+                self._json({"ok": True, "machine": machine_tokens_state(),
+                            "source": "machine"})
+                return
             if path in ("/api/admin/users", "/api/admin/machine"):
                 me = self._user() or {}
                 if not is_owner(me):
@@ -2336,6 +2343,34 @@ class Handler(SimpleHTTPRequestHandler):
             publish()
             self._json({"ok": True, "own": bool(tok), "jian": _mask(tok)})
             return
+        if path == "/api/srctokens":
+            u = self._user() or {}
+            if not u:
+                return self._json({"ok": False, "error": "未登录"}, 401)
+            patch = {k: body.get(k) for k in MACHINE_KEYS if k in body}
+            if not patch:
+                if "jian" in body:
+                    return self._json(
+                        {"ok": False,
+                         "error": "Jian 密钥按账号存，请填在上面的「我的 Jian 密钥」那一栏"}, 400)
+                return self._json({"ok": False, "error": "没有要改的项"}, 400)
+            for k, v in patch.items():
+                if len(str(v or "")) > 400:
+                    return self._json({"ok": False, "error": "令牌过长"}, 400)
+                if k == "seedlink" and v and ":" not in str(v):
+                    return self._json(
+                        {"ok": False, "error": "SeedLink 要填 host:port，例如 geofon.gfz-potsdam.de:18000"},
+                        400)
+            try:
+                started = save_machine_tokens(patch)
+            except OSError as exc:
+                return self._json({"ok": False, "error": "写入失败：%s" % exc}, 500)
+            # 共享令牌被非所有者改动要留痕：只打日志，不推给前端。
+            who = u.get("name") or "?"
+            for k, v in patch.items():
+                print("[tokens] %s %s %s" % (who, "设置" if str(v or "") else "清除", k))
+            return self._json({"ok": True, "machine": machine_tokens_state(),
+                               "started": started})
         if path in ("/api/admin/users", "/api/admin/tokens",
                     "/api/admin/device", "/api/admin/machine"):
             me = self._user() or {}

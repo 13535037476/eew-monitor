@@ -5383,6 +5383,76 @@
     if (await saveMyTokens('')) { toast('已清除，回落到共享密钥'); loadMyTokens(); }
   });
 
+  // ---- 本机公开数据源令牌（机器级，所有账号共用，谁登录都能补） ----
+  // 这三路（EQSC / TREM-Net / SeedLink）抓的是公开数据，一台机器只跑一份连接，
+  // 所以按机器存。普通账号也能填——否则「没配的那个源」在别人的账号里永远配不了。
+  let srcTokData = null;
+
+  function srcTokRow(key, info) {
+    const card = el('div', 'mach');
+    const hd = el('div', 'mach-hd');
+    hd.appendChild(el('b', '', info.label || key));
+    hd.appendChild(el('span', 'hint mono ' + (info.set ? 'mytok-state-on' : 'mytok-state-off'),
+      info.set ? ('已配置 · ' + info.mask) : '未配置'));
+    card.appendChild(hd);
+    const row = el('div', 'acct-tok');
+    const inp = el('input', 'input mono');
+    inp.autocomplete = 'off';
+    inp.spellcheck = false;
+    inp.placeholder = key === 'seedlink'
+      ? (info.set ? 'host:port（填新的替换）' : 'host:port，例如 geofon.gfz-potsdam.de:18000')
+      : (info.set ? '填新的替换' : '粘贴令牌…');
+    const bSave = el('button', 'btn sm', '保存');
+    const bClear = el('button', 'btn sm', '清除');
+    bClear.disabled = !info.set;
+    const push = async (val) => {
+      try {
+        const r = await fetch('/api/srctokens', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ [key]: val }),
+        });
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok || !d.ok) { toast(d.error || '保存失败'); return; }
+        if (d.machine) srcTokData = d.machine;
+        toast(val ? ('已保存 ' + (info.label || key) + '，全机生效')
+          : ('已清除 ' + (info.label || key) + '，全机生效'));
+        renderSrcTokens();
+      } catch (e) { toast('保存失败：网络异常'); }
+    };
+    bSave.addEventListener('click', () => {
+      const v = (inp.value || '').trim();
+      if (!v) { toast('先填入内容'); return; }
+      push(v);
+    });
+    bClear.addEventListener('click', () => push(''));
+    row.appendChild(inp);
+    row.appendChild(bSave);
+    row.appendChild(bClear);
+    card.appendChild(row);
+    return card;
+  }
+
+  function renderSrcTokens() {
+    const box = $('#srcTokList');
+    if (!box || !srcTokData) return;
+    box.textContent = '';
+    const keys = Object.keys(srcTokData);
+    for (const k of keys) box.appendChild(srcTokRow(k, srcTokData[k]));
+    const lack = keys.filter(k => !(srcTokData[k] || {}).set);
+    const st = $('#srcTokState');
+    if (st) {
+      st.textContent = lack.length ? ('未配置：' + lack.join(' / ')) : '三路都已配置';
+      st.className = 'hint mono ' + (lack.length ? 'mytok-state-off' : 'mytok-state-on');
+    }
+  }
+
+  async function loadSrcTokens() {
+    try {
+      const d = await (await fetch('/api/srctokens', { cache: 'no-store' })).json();
+      if (d && d.machine) { srcTokData = d.machine; renderSrcTokens(); }
+    } catch (e) { }
+  }
+
   // ---------------- 账号与密钥管理（仅站点所有者） ----------------
   const adminDlg = $('#adminDlg');
   let adminData = null;
@@ -5469,43 +5539,6 @@
     return box;
   }
 
-  function machineRow(key, info) {
-    const card = el('div', 'mach');
-    const hd = el('div', 'mach-hd');
-    hd.appendChild(el('b', '', info.label || key));
-    hd.appendChild(el('span', 'hint mono ' + (info.set ? 'mytok-state-on' : 'mytok-state-off'),
-      info.set ? ('已配置 · ' + info.mask) : '未配置'));
-    card.appendChild(hd);
-    const row = el('div', 'acct-tok');
-    const inp = el('input', 'input mono');
-    inp.autocomplete = 'off';
-    inp.spellcheck = false;
-    inp.placeholder = key === 'seedlink'
-      ? (info.set ? 'host:port（填新的替换）' : 'host:port')
-      : (info.set ? '填新的替换' : '粘贴令牌…');
-    const bSave = el('button', 'btn sm', '保存');
-    const bClear = el('button', 'btn sm', '清除');
-    bClear.disabled = !info.set;
-    const save = async (val) => {
-      try {
-        const r = await adminApi('/api/admin/machine', { [key]: val });
-        if (r && r.machine) adminData.machine = r.machine;
-        toast(val ? ('已保存 ' + (info.label || key)) : ('已清除 ' + (info.label || key)));
-        renderAdmin();
-      } catch (e) { toast(e.message || '操作失败'); }
-    };
-    bSave.addEventListener('click', () => {
-      const v = (inp.value || '').trim();
-      if (!v) { toast('先填入内容'); return; }
-      save(v);
-    });
-    bClear.addEventListener('click', () => save(''));
-    row.appendChild(inp);
-    row.appendChild(bSave);
-    row.appendChild(bClear);
-    card.appendChild(row);
-    return card;
-  }
 
   function acctCard(u) {
     const myName = state.me || '';
@@ -5635,16 +5668,8 @@
     const box = $('#adminList');
     box.textContent = '';
     for (const u of adminData.users) box.appendChild(acctCard(u));
-
-    const m = adminData.machine || {};
-    const mbox = $('#adminMachine');
-    mbox.textContent = '';
-    const keys = Object.keys(m);
-    for (const k of keys) mbox.appendChild(machineRow(k, m[k]));
-    const lack = keys.filter(k => !m[k] || !m[k].set);
-    $('#adminNote').textContent = lack.length
-      ? ('机器级令牌未配置：' + lack.join(' / '))
-      : '机器级令牌已齐全';
+    // 机器级令牌不在这里改：设置 → 数据源 里人人可改，那边一份入口就够。
+    $('#adminNote').textContent = '账号管理仅 ' + (adminData.owner || '所有者') + ' 可用';
   }
 
   async function loadAdmin() {
@@ -5679,7 +5704,7 @@
     } catch (e) { toast(e.message || '创建失败'); }
   });
   $('#btnSettings').addEventListener('click', () => {
-    paintFocus(); dlg.showModal(); loadMyTokens();
+    paintFocus(); dlg.showModal(); loadMyTokens(); loadSrcTokens();
   });
 
   $('#btnImport').addEventListener('click', async () => {
