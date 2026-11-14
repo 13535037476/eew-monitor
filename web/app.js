@@ -3552,6 +3552,28 @@
   const sokSeen = new Set();
   let sokTimer = 0, sokEl = null;
 
+  // 底色跟着「报过来的震度」走，用气象厅震度分布图那套标准配色：
+  // 1 近白 → 2 蓝 → 3 深蓝 → 4 米黄 → 5弱 黄 → 5強 橙 → 6弱 红 → 6強 暗红 → 7 紫。
+  // 深底（3、6弱以上）文字转白，浅底保持黑字，别出现黑字压暗红看不见的情况。
+  const SOK_BG = {
+    '1': ['#f2f2ff', '#141414'],
+    '2': ['#00aaff', '#141414'],
+    '3': ['#0041ff', '#ffffff'],
+    '4': ['#fae696', '#141414'],
+    '5弱': ['#ffe600', '#141414'],
+    '5強': ['#ff9900', '#141414'],
+    '6弱': ['#ff2800', '#ffffff'],
+    '6強': ['#a50021', '#ffffff'],
+    '7': ['#b40068', '#ffffff'],
+  };
+
+  // 「震度速報」是气象厅的产品：只有 jma_* 的官报才配这张卡。
+  // 中国/台湾/全球台网的速报不套它——那边根本没有「震度速報」这回事。
+  function isJmaReport(it) {
+    const s = String((it && it.source) || '').toLowerCase();
+    return !!s && s.indexOf('jma') === 0;
+  }
+
   function sokHide() {
     if (sokTimer) { clearTimeout(sokTimer); sokTimer = 0; }
     const el = sokEl; sokEl = null;
@@ -3569,11 +3591,13 @@
   }
 
   function showSokuho(it) {
-    if (!it || it.cancel || it.isSim || it.auto) return;
+    if (!it || it.cancel || it.isSim || it.auto || it.sim) return;
     // 电文慢的话第一报可能迟到一会儿；超过 90 秒的就不补闪了，免得吓人
     if (nowSec() - (it.report_ts || it.origin_ts || 0) > 90) return;
     const isObs = it.max_intensity === undefined && it.max_scale !== undefined;
     let label = isObs ? (GRADE[SCALE_RISK[it.max_scale]] || '') : (String(it.max_intensity || ''));
+    // 有的源写 5- / 5+，气象厅写成 5弱 / 5強，先统一，不然配色表匹配不上
+    label = label.replace(/\s+/g, '').replace(/-$/, '弱').replace(/\+$/, '強');
     if (!label || label === '0') label = '?';
     const place = String(it.place || '').trim();
     const mag = Number(it.mag) || 0;
@@ -3594,6 +3618,10 @@
     if (!el) return;
     el.hidden = false;
     el.classList.remove('out');
+    // 整张卡的底色 / 字色由这一报的震度决定，认不出的震度回落原来的黄底
+    const pal = SOK_BG[label] || ['#ffd60a', '#141414'];
+    el.style.setProperty('--sok-bg', pal[0]);
+    el.style.setProperty('--sok-fg', pal[1]);
     $('#sokInt').textContent = label;
     // 5弱/6強 三个字，大字号塞不下就缩一档
     $('#sokInt').parentNode.classList.toggle('small', label.length > 1);
@@ -3604,15 +3632,17 @@
     sokTimer = setTimeout(sokHide, SOK_HOLD);
   }
   window.__sokTest = showSokuho;   // 测试钩子：截图脚本直接喂一条假报看效果
+  window.__sokIsJma = isJmaReport; // 同上：验证「只有气象厅官报才弹」
 
   function maybeSokuho() {
     if (state.historyEvent) return;
-    // 优先级和主卡一致：正在进行的正式速报第一，其次震度速報电文
+    // 只认气象厅官报：EEW 速报要日本的，震度速報电文本身就来自 jma_sokuho / jma_obs。
+    // 气象厅没发的（中国/台湾/全球台网）不弹这张卡。
     const cands = [];
     const ev = primaryEvent();
-    if (ev && !ev.isSim && !ev.auto) cands.push(ev);
+    if (ev && !ev.isSim && !ev.auto && isJmaReport(ev)) cands.push(ev);
     const o = state.obs;
-    if (o) cands.push(o);
+    if (o && isJmaReport(o)) cands.push(o);
     for (const it of cands) {
       // 同一场地震不同来源（EEW 速报 / 震度速報电文）发震时刻差几秒，
       // 按分钟取整当身份，速報闪过之后詳細电文就不会再闪一次

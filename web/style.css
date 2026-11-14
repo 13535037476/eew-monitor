@@ -797,8 +797,10 @@ body.obs-on .quiet{display:none}
 .mach .acct-tok{margin-top:0}
 
 /* ===== JMA 风格「震度速報」闪现卡 =====
-   气象厅推特上那种黄黑卡：黑标签 + 黄底 + 大震度数字 + 黑色調査中条。
-   配色固定，不跟主题走——它本身就是「官方电文」的样子。 */
+   气象厅推特上那种卡：黑标签 + 大震度数字 + 黑色調査中条。
+   卡片底色不是写死的黄，而是跟着这一报的震度走（--sok-bg / --sok-fg 由 JS 注入，
+   用的是气象厅震度分布图那套标准色）；没有震度可认时回落到原来的黄底。
+   配色不跟深浅主题变——它本身就是「官方电文」的样子。 */
 .sok{position:fixed;top:78px;left:50%;transform:translateX(-50%);z-index:270;
   width:min(360px,calc(100vw - 28px));cursor:pointer;user-select:none;
   filter:drop-shadow(0 12px 26px rgba(0,0,0,.42));
@@ -811,18 +813,21 @@ body.obs-on .quiet{display:none}
 .sok-tag{position:relative;z-index:1;display:table;background:#141414;color:#fff;
   font-size:13px;font-weight:800;letter-spacing:3px;padding:5px 14px 4px;
   border-radius:9px 9px 0 0;margin-left:8px}
-.sok-card{background:#ffd60a;border:3px solid #141414;border-radius:0 12px 12px 12px;
-  padding:9px 10px 8px}
+.sok-card{background:var(--sok-bg,#ffd60a);border:3px solid #141414;
+  border-radius:0 12px 12px 12px;padding:9px 10px 8px;transition:background .18s ease}
+.sok-card .sok-strip{background:#141414;color:#fff}
 .sok-row{display:flex;align-items:center;gap:10px;min-width:0}
 .sok-int{flex:none;min-width:78px;height:78px;display:flex;align-items:center;
-  justify-content:center;background:#ffd60a;border:3px solid #141414;border-radius:8px}
-.sok-int b{font-size:44px;font-weight:900;color:#141414;line-height:1;white-space:nowrap}
+  justify-content:center;background:transparent;
+  border:3px solid var(--sok-fg,#141414);border-radius:8px}
+.sok-int b{font-size:44px;font-weight:900;color:var(--sok-fg,#141414);
+  line-height:1;white-space:nowrap}
 .sok-int.small b{font-size:26px}
 .sok-info{flex:1;min-width:0}
-.sok-info b{display:block;font-size:19px;font-weight:900;color:#141414;
+.sok-info b{display:block;font-size:19px;font-weight:900;color:var(--sok-fg,#141414);
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sok-info span{display:block;margin-top:2px;font-size:12.5px;font-weight:700;
-  color:#141414;opacity:.85}
+  color:var(--sok-fg,#141414);opacity:.85}
 .sok-strip{margin-top:8px;background:#141414;color:#fff;font-size:13.5px;font-weight:800;
   padding:5px 10px;border-radius:6px;text-align:center;letter-spacing:1px;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}

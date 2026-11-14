@@ -1,6 +1,8 @@
 """截一张「震度速報」闪现卡的图，验证 JMA 风格渲染。
 
-    python tools/shot_sok.py [調査中|已知|小屏]
+    python tools/shot_sok.py [eggy 密码 模式]
+
+模式：調査中（默认，震度 3）/ 已知 / 1 / 2 / 4 / 5弱 / 5強 / 6弱 / 6強 / 7 / ？
 
 流程：登录 API 拿 session → Edge 带 cookie 打开首页 → 调 window.__sokTest 喂假报 → 截图
 """
@@ -90,17 +92,35 @@ def main():
         call("Network.setCookie", {"name": "eew_session", "value": token,
                                    "domain": "127.0.0.1", "path": "/"})
         call("Page.navigate", {"url": BASE + "/"})
-        time.sleep(7)
+        # app.js 有 240KB，还要等状态接口；脚本没就位就喂假报会静默失败
+        for _ in range(60):
+            time.sleep(0.5)
+            if js("typeof window.__sokTest") == "function":
+                break
+        time.sleep(1.0)
         import time as _t
         now = _t.time()
         if MODE == "已知":
             ev = {"uid": "TEST-KNOWN", "country": "JP", "origin_ts": now - 3,
                   "report_ts": now - 2, "place": "茨城県北部", "mag": 5.1,
-                  "depth": 40, "max_intensity": "5弱"}
+                  "depth": 40, "max_intensity": "5弱", "source": "jma_eew"}
+        elif MODE in ("1", "2", "4", "5弱", "5強", "6弱", "6強", "7", "?"):
+            ev = {"uid": "TEST-COLOR", "country": "JP", "origin_ts": now - 4,
+                  "report_ts": now - 3, "max_intensity": MODE, "source": "jma_eew"}
         else:
             ev = {"uid": "TEST-SOKUHO", "country": "JP", "origin_ts": now - 4,
-                  "report_ts": now - 3, "max_intensity": "3"}
-        js("window.__sokTest(%s)" % json.dumps(ev, ensure_ascii=False))
+                  "report_ts": now - 3, "max_intensity": "3", "source": "jma_eew"}
+        # 先验「只有气象厅官报才弹」：别的来源必须为 false
+        print("isJma:", js(
+            "JSON.stringify({jma_eew:__sokIsJma({source:'jma_eew'}),"
+            "jma_sokuho:__sokIsJma({source:'jma_sokuho'}),"
+            "cn_eew:__sokIsJma({source:'cn_eew'}),cwa:__sokIsJma({source:'cwa_eew'}),"
+            "sim:__sokIsJma({source:'sim'}),none:__sokIsJma({})})"))
+        r = call("Runtime.evaluate",
+                 {"expression": "window.__sokTest(%s)" % json.dumps(ev, ensure_ascii=False),
+                  "returnByValue": True})
+        if r.get("exceptionDetails"):
+            print("EXC:", json.dumps(r["exceptionDetails"], ensure_ascii=False)[:400])
         time.sleep(1.2)
         print("probe:", js(
             "JSON.stringify({shown:!document.querySelector('#sokuhoFlash').hidden,"
@@ -108,9 +128,12 @@ def main():
             "place:document.querySelector('#sokPlace').textContent,"
             "time:document.querySelector('#sokTime').textContent,"
             "strip:document.querySelector('#sokStrip').textContent,"
-            "small:document.querySelector('.sok-int').classList.contains('small')})"))
+            "small:document.querySelector('.sok-int').classList.contains('small'),"
+            "bg:getComputedStyle(document.querySelector('.sok-card')).backgroundColor,"
+            "fg:getComputedStyle(document.querySelector('#sokInt')).color})"))
         png = call("Page.captureScreenshot", {"format": "png"})
-        path = os.path.join(OUT, "sokuho_%s.png" % ("known" if MODE == "已知" else "chosa"))
+        tag = {"調査中": "chosa", "已知": "known"}.get(MODE, "c" + str(MODE).replace("弱", "w").replace("強", "s").replace("?", "q"))
+        path = os.path.join(OUT, "sokuho_%s.png" % tag)
         with open(path, "wb") as f:
             f.write(base64.b64decode(png["data"]))
         print("saved", path)
