@@ -1,0 +1,228 @@
+{
+ "items": [
+  {
+   "key": "cancel",
+   "label": "JMA 取消",
+   "group": "event",
+   "file": "cancel.wav",
+   "dur": 1.0,
+   "voice": false
+  },
+  {
+   "key": "cancel",
+   "label": "JMA 取消",
+   "group": "event",
+   "file": "cancel-v.wav",
+   "dur": 3.85,
+   "voice": true
+  },
+  {
+   "key": "quake",
+   "label": "地震发生",
+   "group": "event",
+   "file": "quake.wav",
+   "dur": 1.5,
+   "voice": false
+  },
+  {
+   "key": "exp2",
+   "label": "预想最大震度 2",
+   "group": "exp",
+   "file": "exp2-v.wav",
+   "dur": 2.73,
+   "voice": true
+  },
+  {
+   "key": "exp3",
+   "label": "预想最大震度 3",
+   "group": "exp",
+   "file": "exp3.wav",
+   "dur": 2.51,
+   "voice": false
+  },
+  {
+   "key": "exp3",
+   "label": "预想最大震度 3",
+   "group": "exp",
+   "file": "exp3-v.wav",
+   "dur": 2.76,
+   "voice": true
+  },
+  {
+   "key": "exp4",
+   "label": "预想最大震度 4",
+   "group": "exp",
+   "file": "exp4-v.wav",
+   "dur": 2.74,
+   "voice": true
+  },
+  {
+   "key": "exp5m",
+   "label": "预想最大震度 5弱",
+   "group": "exp",
+   "file": "exp5m.wav",
+   "dur": 2.73,
+   "voice": false
+  },
+  {
+   "key": "exp5m",
+   "label": "预想最大震度 5弱",
+   "group": "exp",
+   "file": "exp5m-v.wav",
+   "dur": 5.67,
+   "voice": true
+  },
+  {
+   "key": "update",
+   "label": "更新报",
+   "group": "event",
+   "file": "update.wav",
+   "dur": 1.2,
+   "voice": false
+  },
+  {
+   "key": "final",
+   "label": "最终报",
+   "group": "event",
+   "file": "final.wav",
+   "dur": 1.2,
+   "voice": false
+  },
+  {
+   "key": "st0",
+   "label": "震度 0 · 检测到测站反应",
+   "group": "station",
+   "file": "st0.wav",
+   "dur": 1.0,
+   "voice": false
+  },
+  {
+   "key": "st1",
+   "label": "震度 1",
+   "group": "station",
+   "file": "st1.wav",
+   "dur": 0.82,
+   "voice": false
+  },
+  {
+   "key": "st1",
+   "label": "震度 1",
+   "group": "station",
+   "file": "st1-v.wav",
+   "dur": 1.7,
+   "voice": true
+  },
+  {
+   "key": "st2",
+   "label": "震度 2",
+   "group": "station",
+   "file": "st2.wav",
+   "dur": 2.4,
+   "voice": false
+  },
+  {
+   "key": "st2",
+   "label": "震度 2",
+   "group": "station",
+   "file": "st2-v.wav",
+   "dur": 1.58,
+   "voice": true
+  },
+  {
+   "key": "st3",
+   "label": "震度 3",
+   "group": "station",
+   "file": "st3.wav",
+   "dur": 2.4,
+   "voice": false
+  },
+  {
+   "key": "st3",
+   "label": "震度 3",
+   "group": "station",
+   "file": "st3-v.wav",
+   "dur": 1.61,
+   "voice": true
+  },
+  {
+   "key": "st4",
+   "label": "震度 4",
+   "group": "station",
+   "file": "st4.wav",
+   "dur": 2.4,
+   "voice": false
+  },
+  {
+   "key": "st5p",
+   "label": "震度 5強",
+   "group": "station",
+   "file": "st5p-v.wav",
+   "dur": 1.79,
+   "voice": true
+  },
+  {
+   "key": "st5m",
+   "label": "震度 5弱",
+   "group": "station",
+   "file": "st5m.wav",
+   "dur": 2.4,
+   "voice": false
+  },
+  {
+   "key": "st5m",
+   "label": "震度 5弱",
+   "group": "station",
+   "file": "st5m-v.wav",
+   "dur": 1.78,
+   "voice": true
+  },
+  {
+   "key": "st6p",
+   "label": "震度 6強",
+   "group": "station",
+   "file": "st6p-v.wav",
+   "dur": 1.87,
+   "voice": true
+  },
+  {
+   "key": "st6m",
+   "label": "震度 6弱",
+   "group": "station",
+   "file": "st6m.wav",
+   "dur": 2.6,
+   "voice": false
+  },
+  {
+   "key": "st6m",
+   "label": "震度 6弱",
+   "group": "station",
+   "file": "st6m-v.wav",
+   "dur": 1.89,
+   "voice": true
+  },
+  {
+   "key": "st7",
+   "label": "震度 7",
+   "group": "station",
+   "file": "st7.wav",
+   "dur": 2.6,
+   "voice": false
+  },
+  {
+   "key": "st7",
+   "label": "震度 7",
+   "group": "station",
+   "file": "st7-v.wav",
+   "dur": 1.64,
+   "voice": true
+  },
+  {
+   "key": "st4",
+   "label": "震度 4",
+   "group": "station",
+   "file": "st4-v.wav",
+   "dur": 1.59,
+   "voice": true
+  }
+ ]
+}

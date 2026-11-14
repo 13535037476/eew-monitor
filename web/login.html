@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>登录 · 震线 EEW</title>
+<style>
+  :root{
+    --bg:#070a0f; --glass:rgba(16,21,29,.82); --line:rgba(255,255,255,.10);
+    --txt:#f4f7fb; --dim:#8b95a5; --accent:#6ea8fe; --err:#ff6b6b;
+    --mono:ui-monospace,"Cascadia Mono",Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;background:var(--bg);color:var(--txt);overflow:hidden;
+    font:14px/1.5 system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    display:flex;align-items:center;justify-content:center;
+  }
+  /* 背景：同心圆 + 网格，像一张雷达图 */
+  body::before{
+    content:"";position:fixed;inset:0;pointer-events:none;
+    background:
+      radial-gradient(circle at 50% 42%,rgba(110,168,254,.10),transparent 42%),
+      repeating-radial-gradient(circle at 50% 42%,rgba(110,168,254,.055) 0 1px,transparent 1px 96px),
+      linear-gradient(rgba(255,255,255,.022) 1px,transparent 1px),
+      linear-gradient(90deg,rgba(255,255,255,.022) 1px,transparent 1px);
+    background-size:auto,auto,42px 42px,42px 42px;
+  }
+  .card{
+    position:relative;z-index:1;width:min(92vw,380px);padding:26px 26px 22px;
+    border-radius:20px;border:1px solid var(--line);
+    background:linear-gradient(180deg,rgba(20,25,34,.92),rgba(10,14,20,.95));
+    box-shadow:0 24px 70px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.05);
+    backdrop-filter:blur(22px) saturate(140%);
+  }
+  .brand{display:flex;align-items:center;gap:10px;margin-bottom:4px}
+  .mark{width:30px;height:30px;color:var(--accent)}
+  .brand b{font-size:17px;letter-spacing:.01em}
+  .brand b em{font-style:normal;font-weight:600;color:var(--dim);font-size:10px;letter-spacing:.18em;margin-left:5px}
+  .sub{color:var(--dim);font-size:11.5px;margin:6px 0 20px;letter-spacing:.02em}
+  .tabs{display:flex;gap:4px;background:rgba(255,255,255,.045);padding:3px;border-radius:10px;margin-bottom:16px}
+  .tabs button{
+    flex:1;border:0;background:none;color:var(--dim);font:inherit;font-size:12px;
+    padding:7px 0;border-radius:8px;cursor:pointer;transition:.18s;
+  }
+  .tabs button.on{background:rgba(110,168,254,.16);color:#dce9ff;box-shadow:0 0 0 1px rgba(110,168,254,.22) inset}
+  label{display:block;font-size:10.5px;color:var(--dim);letter-spacing:.08em;margin:12px 0 5px}
+  input{
+    width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--line);
+    background:rgba(8,12,18,.72);color:var(--txt);font:inherit;outline:none;
+    transition:border-color .18s,box-shadow .18s;
+  }
+  input:focus{border-color:rgba(110,168,254,.55);box-shadow:0 0 0 3px rgba(110,168,254,.12)}
+  input::placeholder{color:#5d6a7c}
+  .hint{font-size:10.5px;color:var(--dim);margin-top:8px;line-height:1.5}
+  .err{min-height:17px;margin-top:10px;font-size:11.5px;color:var(--err)}
+  .go{
+    width:100%;margin-top:10px;padding:11px 0;border:0;border-radius:10px;cursor:pointer;
+    font:600 13px/1 inherit;color:#06101f;
+    background:linear-gradient(180deg,#8fc0ff,#6ea8fe);
+    box-shadow:0 8px 24px rgba(110,168,254,.28);
+    transition:transform .12s,filter .18s;
+  }
+  .go:hover{filter:brightness(1.06)}
+  .go:active{transform:translateY(1px)}
+  .go[disabled]{filter:grayscale(.4);opacity:.6;cursor:default}
+  .foot{margin-top:16px;display:flex;justify-content:space-between;font-size:10px;color:#647082}
+  .foot span{font-family:var(--mono)}
+  @media (max-width:420px){ .card{padding:22px 18px 18px} }
+</style>
+</head>
+<body>
+<main class="card">
+  <div class="brand">
+    <svg class="mark" viewBox="0 0 40 40" aria-hidden="true">
+      <circle cx="20" cy="20" r="17" fill="none" stroke="currentColor" stroke-width="1.1" opacity=".28"/>
+      <circle cx="20" cy="20" r="10.5" fill="none" stroke="currentColor" stroke-width="1.1" opacity=".45"/>
+      <circle cx="20" cy="20" r="4" fill="currentColor"/>
+      <path d="M3 22h8l3.4-7.6 4.8 14.6 4-9.6 2.8 2.6h11" fill="none" stroke="currentColor"
+            stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"/>
+    </svg>
+    <b>震线<em>EEW</em></b>
+  </div>
+  <p class="sub">登录后才能查看实时地震、测站与预警数据</p>
+
+  <div class="tabs">
+    <button id="tabLogin" class="on" type="button">登录</button>
+    <button id="tabReg" type="button">注册</button>
+  </div>
+
+  <form id="form" autocomplete="on">
+    <label for="u">用户名</label>
+    <input id="u" name="username" placeholder="2~24 位，中英文/数字/下划线" autocomplete="username" required>
+    <label for="p">密码</label>
+    <input id="p" name="password" type="password" placeholder="至少 6 位" autocomplete="current-password" required>
+    <div id="inviteBox" hidden>
+      <label for="invite">邀请码（如果服务器要求）</label>
+      <input id="invite" placeholder="没有就留空">
+    </div>
+    <div class="err" id="err"></div>
+    <button class="go" id="go" type="submit">登 录</button>
+  </form>
+
+  <div class="hint" id="tip">首次部署：第一个注册的账号会自动成为管理员。</div>
+  <div class="foot"><span>JMA · CENC · CWA · GQ</span><span id="ver">—</span></div>
+</main>
+<script>
+  const $ = s => document.querySelector(s);
+  let mode = 'login';
+  const setMode = m => {
+    mode = m;
+    $('#tabLogin').classList.toggle('on', m === 'login');
+    $('#tabReg').classList.toggle('on', m === 'register');
+    $('#inviteBox').hidden = m !== 'register';
+    $('#go').textContent = m === 'login' ? '登 录' : '注 册 并 登 录';
+    $('#p').autocomplete = m === 'login' ? 'current-password' : 'new-password';
+    $('#tip').textContent = m === 'login'
+      ? '登录状态会保持 30 天，换浏览器需要重新登录。'
+      : '首次部署：第一个注册的账号会自动成为管理员。';
+    $('#err').textContent = '';
+  };
+  $('#tabLogin').onclick = () => setMode('login');
+  $('#tabReg').onclick = () => setMode('register');
+
+  async function post(url, body) {
+    const r = await fetch(url, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    let d = {};
+    try { d = await r.json(); } catch (e) { }
+    if (!r.ok || d.ok === false) throw new Error(d.error || ('请求失败（' + r.status + '）'));
+    return d;
+  }
+
+  $('#form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const u = $('#u').value.trim(), p = $('#p').value;
+    if (!u || !p) { $('#err').textContent = '用户名和密码都要填'; return; }
+    $('#go').disabled = true;
+    $('#err').textContent = '';
+    try {
+      const d = await post(mode === 'login' ? '/api/login' : '/api/register',
+        { username: u, password: p, invite: $('#invite').value.trim() });
+      localStorage.setItem('eew.user', (d.user && d.user.name) || u);
+      location.replace('/');
+    } catch (err) {
+      $('#err').textContent = err.message;
+      $('#go').disabled = false;
+    }
+  });
+
+  fetch('/api/health').then(r => r.json()).then(d => {
+    if (d && d.version) $('#ver').textContent = 'v' + d.version;
+  }).catch(() => { });
+</script>
+</body>
+</html>

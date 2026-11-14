@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>震线 EEW · 中日地震预警</title>
+<link rel="stylesheet" href="style.css?v=225">
+</head>
+<body>
+
+<header class="hud">
+  <div class="hud-l">
+    <svg class="mark" viewBox="0 0 40 40" aria-hidden="true">
+      <circle cx="20" cy="20" r="17" fill="none" stroke="currentColor" stroke-width="1.1" opacity=".28"/>
+      <circle cx="20" cy="20" r="10.5" fill="none" stroke="currentColor" stroke-width="1.1" opacity=".45"/>
+      <circle cx="20" cy="20" r="4" fill="currentColor"/>
+      <path d="M3 22h8l3.4-7.6 4.8 14.6 4-9.6 2.8 2.6h11" fill="none" stroke="currentColor"
+            stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"/>
+    </svg>
+    <div class="name">震线<em>EEW</em></div>
+    <span class="ver" id="verChip">v—</span>
+    <div class="srcdots" id="srcDots"></div>
+  </div>
+
+  <div class="hud-r">
+    <span class="userchip" id="userChip" hidden><b id="userName">—</b><button id="btnLogout" title="退出登录">退出</button></span>
+    <div class="clock"><b id="clockBJ">--:--:--</b><i>北京</i></div>
+    <div class="clock"><b id="clockJP">--:--:--</b><i>東京</i></div>
+    <div class="hud-btns">
+      <button class="pill" id="btnHistory">历史</button>
+      <button class="pill" id="btnStats">统计</button>
+      <button class="icon" id="btnSound" title="声音 (M)">
+        <svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path class="wave" d="M16.5 8.5a5 5 0 010 7"/><path class="wave" d="M19 6a8.5 8.5 0 010 12"/></svg>
+      </button>
+      <button class="icon" id="btnSettings" title="设置 (S)">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<div class="tsualert" id="tsuAlert" hidden>
+  <b id="tsuAlertTitle">津波警報</b>
+  <span id="tsuAlertBody"></span>
+  <em id="tsuAlertTime"></em>
+</div>
+
+<main class="stage">
+  <canvas id="map"></canvas>
+
+  <div class="quiet" id="quiet"><span class="dot"></span><span id="quietTxt">正在连接数据源…</span></div>
+
+  <section class="hero" id="hero" hidden>
+    <div class="hero-hd">
+      <span class="badge" id="heroBadge">緊急地震速報</span>
+      <span class="srcname" id="heroSrc">気象庁</span>
+      <span class="qchip" id="heroQual" hidden>质量 —</span>
+      <button class="hero-x" id="heroClose" title="收起">×</button>
+    </div>
+    <div class="hero-alts" id="heroAlts" hidden></div>
+    <h1 class="hero-place" id="heroPlace">—</h1>
+    <div class="hero-meta">
+      <span>M <b id="heroMag">—</b></span>
+      <span>深 <b id="heroDepth">—</b> km</span>
+      <span id="heroTime">—</span>
+      <span id="heroSerial" hidden>第 1 报</span>
+      <span class="maxchip" id="heroMax" hidden>最大<b id="heroMaxVal">—</b></span>
+    </div>
+    <div class="hero-nums">
+      <div class="num">
+        <b id="heroInt">—</b>
+        <i>预计<span id="heroScale">震度</span> · <span id="heroFocus">北京</span></i>
+      </div>
+      <div class="num right">
+        <b id="heroTimer">--</b>
+        <i id="heroTimerCap">主要动到达</i>
+      </div>
+    </div>
+    <div class="hero-watch" id="heroWatch" hidden></div>
+    <div class="hero-foot">
+      <div class="bar"><span id="heroBar"></span><em class="p" id="heroP"></em><em class="s" id="heroS"></em></div>
+      <button class="link" id="heroReplay">回放</button>
+      <button class="link" id="heroCopy" title="复制事件文字，粘贴到群里">复制</button>
+    </div>
+    <div class="phases" id="phasesRow" title="点击查看走时计算">
+      <span class="ph"><i>P</i><b id="heroPT">--</b><em id="heroPState">—</em></span>
+      <span class="ph s"><i>S</i><b id="heroST">--</b><em id="heroSState">—</em></span>
+      <span class="calc-toggle">公式</span>
+    </div>
+    <div class="calc" id="calcBox" hidden></div>
+  </section>
+
+  <aside class="obs" id="obsCard" hidden>
+    <div class="obs-hd">
+      <b>震度速報</b>
+      <span class="obs-no" id="obsNo">第 1 号</span>
+      <button class="obs-x" id="obsClose" title="收起">×</button>
+    </div>
+    <div class="obs-issue" id="obsIssue">—</div>
+    <div class="obs-quake" id="obsQuake">—</div>
+    <div class="obs-max"><i>最大震度</i><b id="obsMax">—</b><em id="obsWhere"></em></div>
+    <div class="obs-lpgm" id="obsLpgm" hidden>
+      <i>长周期</i><b id="obsLpgmVal">—</b><em id="obsLpgmPlace"></em>
+    </div>
+    <div class="obs-list" id="obsList"></div>
+    <div class="obs-foot" id="obsFoot"></div>
+  </aside>
+
+  <!-- 双地实时最大震度：JMA 取 kmoni 逐站计测震度，台湾取 P-Alert 的 PGA 换算。
+       平时是灰的，真在摇才亮 —— 一眼看出两边哪边在动。 -->
+  <div class="livemax" id="liveMax">
+    <div class="lm" id="lmJp">
+      <div class="lm-top"><i>JMA</i><span class="lm-dot"></span>
+        <b id="lmJpVal">—</b><u>震度</u></div>
+      <em id="lmJpPlace">待機</em>
+    </div>
+    <div class="lm tw" id="lmTw">
+      <div class="lm-top"><i>台湾</i><span class="lm-dot"></span>
+        <b id="lmTwVal">—</b><u>震度</u></div>
+      <em id="lmTwPlace">待機</em>
+    </div>
+    <!-- 台网自检行：站数 / 峰值 / 绿框数 / 推算状态。
+         一直看不见反应时，先看这一行——是没数据、还是没到门槛，一眼分明。 -->
+    <div class="lm net" id="lmNet">
+      <div class="lm-top"><i>台网</i><span class="lm-dot"></span>
+        <b id="lmNetVal">—</b><u>峰值</u></div>
+      <em id="lmNetPlace">连接中</em>
+    </div>
+  </div>
+
+  <div class="tools">
+    <button data-act="zin" title="放大">+</button>
+    <button data-act="zout" title="缩小">−</button>
+    <button data-act="home" title="复位视野 (R)">⌖</button>
+    <button data-act="globe" title="全球视野 (G)">🌍</button>
+    <button data-act="layers" title="图层" id="btnLayers">◈</button>
+    <button data-act="full" title="全屏 (F)" id="btnFull">⛶</button>
+  </div>
+
+  <div class="pop" id="layerPop" hidden>
+    <label><input type="checkbox" data-layer="stations">台站</label>
+    <label><input type="checkbox" data-layer="palert">P-Alert 測站</label>
+    <label><input type="checkbox" data-layer="gqst">GQ全球测站</label>
+    <label><input type="checkbox" data-layer="field">烈度场</label>
+    <label><input type="checkbox" data-layer="pref">县界区块</label>
+    <label><input type="checkbox" data-layer="waves">波前</label>
+    <label><input type="checkbox" data-layer="labels">地名</label>
+    <div class="pop-sep"></div>
+    <div class="pop-lbl">台站着色</div>
+    <div class="seg mini" id="stColorSeg">
+      <button data-sc="auto" class="on">自动</button>
+      <button data-sc="est">预计</button>
+      <button data-sc="obs">观测</button>
+    </div>
+  </div>
+
+  <section class="recent" id="recent">
+    <div class="recent-hd">
+      <span>最近地震</span>
+      <button id="recentMore">全部</button>
+    </div>
+    <div class="recent-list" id="recentList"></div>
+  </section>
+
+  <div class="legend" id="legend">
+    <div class="lg-hd"><b>台站震动</b><em id="lgCount">—</em></div>
+    <div class="lg-bar" id="lgBar"></div>
+    <div class="lg-ticks"><span>震度7</span><span>震度4</span><span>震度0</span></div>
+    <div class="lg-sep"></div>
+    <div class="legend-cells" id="legendCells"></div>
+    <div class="legend-cap" id="legendCap">—</div>
+  </div>
+
+  <div class="tsun" id="tsun" hidden>
+    <div class="tsun-hd">
+      <span class="tsun-badge">海啸</span>
+      <span class="tsun-sub" id="tsunSub">模拟传播</span>
+    </div>
+    <div class="tsun-main">
+      <i>波前波高</i>
+      <b id="tsunH">—</b><span class="tsun-unit">m</span>
+      <em id="tsunNow">—</em>
+    </div>
+    <div class="tsun-list" id="tsunList"></div>
+    <div class="tsun-scale" id="tsunScale"></div>
+    <div class="tsun-note">仅绘制预计波高 ≥0.2m 的岸段 · 波速 720km/h，近岸增水未计</div>
+  </div>
+
+  <div class="mapfoot">
+    <span id="mapStatus">连接中…</span>
+    <span class="sep">·</span>
+    <span id="cursorPos">—</span>
+    <span class="hint" id="mapHint">悬停台站看观测状态 · 点击空白处设关注点</span>
+  </div>
+
+  <div class="tip" id="tip"></div>
+  <div class="toast" id="toast"></div>
+</main>
+
+<section class="sheet" id="sheet" hidden>
+  <div class="sheet-bg" id="sheetBg"></div>
+  <div class="sheet-panel">
+    <div class="sheet-grip"></div>
+    <div class="sheet-hd">
+      <b>历史地震</b>
+      <span class="hint" id="histHint">—</span>
+      <button class="icon" id="sheetClose" title="关闭">×</button>
+    </div>
+    <div class="sheet-filters">
+      <div class="seg" id="histDays">
+        <button data-days="1">24 小时</button>
+        <button data-days="7">7 天</button>
+        <button data-days="30" class="on">30 天</button>
+        <button data-days="90">90 天</button>
+        <button data-days="365">1 年</button>
+      </div>
+      <select id="histMag">
+        <option value="3">M ≥ 3.0</option>
+        <option value="4">M ≥ 4.0</option>
+        <option value="4.5" selected>M ≥ 4.5</option>
+        <option value="5">M ≥ 5.0</option>
+        <option value="6">M ≥ 6.0</option>
+      </select>
+    </div>
+    <div class="sheet-list" id="histList"></div>
+  </div>
+</section>
+
+<dialog id="settingsDlg">
+  <form method="dialog" class="dlg">
+    <div class="dlg-hd">
+      <h2>设置</h2>
+      <button value="close" class="icon">×</button>
+    </div>
+    <div class="dlg-body">
+      <div class="sec">
+        <h3>关注地点</h3>
+        <p class="hint">用于计算主要动（S 波）到达倒计时与本地预计震度。也可以直接点击地图选点。</p>
+        <div class="focus-pick" id="focusPick"></div>
+        <div class="row">
+          <input id="focusSearch" class="input" placeholder="输入城市名，如 成都 / 東京">
+          <button type="button" class="btn" id="btnFocusFind">查找</button>
+        </div>
+        <div class="row">
+          <input id="focusLat" class="input mono" placeholder="纬度">
+          <input id="focusLon" class="input mono" placeholder="经度">
+          <button type="button" class="btn" id="btnFocusCoord">使用坐标</button>
+        </div>
+        <div class="cur-focus">当前：<b id="curFocus">—</b></div>
+        <div class="row" style="margin-top:10px">
+          <input id="watchSearch" class="input" placeholder="再加一个关注点，如 大阪 / 35.7,139.7">
+          <button type="button" class="btn" id="btnWatchAdd">添加</button>
+        </div>
+        <div class="watch-list" id="watchList"></div>
+        <p class="hint">最多再挂 3 个点：事件卡会同时列出各点的预计震度，
+          任何一点达到阈值都会响警报，卡片大数字仍显示主关注点。</p>
+      </div>
+
+      <div class="sec">
+        <h3>告警</h3>
+        <div class="row between"><label>声音告警</label><input type="checkbox" id="optSound" class="switch"></div>
+        <div class="row between"><label>系统朗读（TTS，中日文）</label><input type="checkbox" id="optSpeech" class="switch"></div>
+        <div class="row between">
+          <label>日本震度阈值</label>
+          <input type="number" id="optThJp" class="select" min="1" max="7" step="0.5" value="4.5" style="width:86px">
+        </div>
+        <div class="row between">
+          <label>中国烈度阈值</label>
+          <input type="number" id="optThCn" class="select" min="2" max="9" step="0.5" value="6" style="width:86px">
+        </div>
+        <div class="row between">
+          <label>全球检测最小震级</label>
+          <input type="number" id="optGqMag" class="select" min="1" max="8" step="0.5" value="3" style="width:86px">
+        </div>
+        <div class="row between">
+          <label>全球检测弹窗震级</label>
+          <input type="number" id="optGqAlert" class="select" min="2" max="8" step="0.5" value="4.5" style="width:86px">
+        </div>
+        <div class="row between"><label>桌面通知（窗口在后台也弹）</label><input type="checkbox" id="optNotify" class="switch"></div>
+        <div class="row between"><label>夜间免打扰</label><input type="checkbox" id="optQuiet" class="switch"></div>
+        <div class="row quiet-row">
+          <label style="flex:none;width:56px">时段</label>
+          <input type="number" id="optQuietFrom" class="select mono" min="0" max="23" step="1" value="23" style="width:70px">
+          <span class="hint" style="flex:none">至次日</span>
+          <input type="number" id="optQuietTo" class="select mono" min="0" max="23" step="1" value="7" style="width:70px">
+          <span class="hint" style="flex:none">点</span>
+        </div>
+        <div class="row quiet-row">
+          <label style="flex:none;width:56px">门槛</label>
+          <span class="hint" style="flex:none">低于 M</span>
+          <input type="number" id="optQuietMag" class="select mono" min="2" max="7.5" step="0.1" value="5.5" style="width:76px">
+          <span class="hint">不响铃、不弹桌面通知（卡片照常显示）</span>
+        </div>
+        <p class="hint">关注点预估震度/烈度 ≥ 阈值才响警报音，可自由输入。
+          全球检测（GQ）没有本地震度概念，按「弹窗震级」单独判定：达到就弹事件卡 + 响铃 + 桌面通知，
+          不受关注点远近影响；列表最小震级只影响「最近地震」里显示多少。
+          桌面通知需要浏览器授权，窗口最小化时也能看到。</p>
+      </div>
+
+      <div class="sec">
+        <h3>地图</h3>
+        <div class="row between">
+          <label>同时显示波前的地震数</label>
+          <input type="number" id="optWaveN" class="select" min="1" max="10" step="1" value="10" style="width:86px">
+        </div>
+        <div class="row between"><label>P 波触边时自动拉远视野</label><input type="checkbox" id="optAutoZoom" class="switch"></div>
+        <div class="row between"><label>自动跟随地震并归位</label><input type="checkbox" id="optFollow" class="switch"></div>
+        <p class="hint">地图左右无缝衔接，可以一直往东/往西拖动绕地球一圈，没有断开的边缘。
+          同屏最多同时显示 1~10 起地震的 P/S 波前（主事件最亮，其余淡一些）。
+          P 波圈快撞到屏幕边缘时，视野会平滑拉远，让整圈波前一直看得到；手动缩放过会暂停 3 秒再接管。
+          打开「自动跳到震中」后，每当有够格上卡的地震就飞过去；事件收卡 10 秒仍没有新地震，
+          自动飞回中国+日本全景（自己拖过或缩放过会先让 5 秒，不抢操作）。</p>
+      </div>
+
+      <div class="sec">
+        <h3>语音包</h3>
+        <p class="hint">只加载你标注过语义的 <b id="packCount">—</b> 段；未标注的数字文件已全部丢弃。
+          「测站提示音」和「播报」是两条独立的声道：<b>测站只发提示音，不念人声</b>；
+          播报（事件/预想震度/最终报）才用语音包里的人声，由下面的「人声发音」开关决定。</p>
+        <div class="row between"><label>事件语音播报</label><input type="checkbox" id="optVoice" class="switch"></div>
+        <div class="row between"><label>播报用人声（关掉只播提示音）</label><input type="checkbox" id="optHuman" class="switch"></div>
+        <div class="row between"><label>测站音用人声版（有真人念「震度几」时优先播它）</label><input type="checkbox" id="optStHuman" class="switch"></div>
+        <div class="row between"><label>测站震度音（波到台站时）</label><input type="checkbox" id="optStVoice" class="switch"></div>
+        <div class="row between"><label>最终报后继续播测站震度音</label><input type="checkbox" id="optStAfterFinal" class="switch"></div>
+        <div class="row">
+          <label style="flex:none;width:64px">衰减速度</label>
+          <input type="range" id="optDecay" min="0.5" max="6" step="0.25" style="flex:1;min-width:0">
+          <span id="decayVal" class="mono" style="flex:none;width:38px;text-align:right">1.6×</span>
+        </div>
+        <p class="hint">台站摇晃退去的快慢：往左快、往右慢，默认 1.6×（可拉到 6×）。<b>觉得震度掉得还是太快就往右拉</b>；调到 3× 以上，震度 1~2 的余晃能挂好几分钟。</p>
+        <div class="row">
+          <label style="flex:none;width:64px">警报音</label>
+          <select id="optChime" class="select" style="flex:1;min-width:0"></select>
+        </div>
+        <div class="voice-list" id="voiceList"></div>
+      </div>
+
+      <div class="sec">
+        <h3>数据源</h3>
+        <p class="hint">按延迟升序排列，标「主」的是当前同类里延迟最低的一个（每 10 秒重算）。
+          需要令牌的源显示「待授权」：把令牌填进 <code>data/tokens.json</code> 即刻生效。</p>
+        <table class="srctbl">
+          <thead><tr><th>数据</th><th>提供方</th><th>频率</th><th>状态</th></tr></thead>
+          <tbody id="srcTable"></tbody>
+        </table>
+        <p class="hint">已接入：日本气象厅 / 中国地震预警 / 中国地震台网 / 台湾 P-Alert 强震网（实时 PGA）/
+          WHEWS（待授权）/ EQSC（待授权）。</p>
+      </div>
+
+      <div class="sec">
+        <h3>台站（仅地图点位）</h3>
+        <p class="hint">日本：NIED K-NET/KiK-net 真实强震观测点 <b>1749</b> 个（官方台站名册，
+          有预警时按 P/S 波到达逐点亮）＋气象厅震度电文报到的观测点（实测，收到几个画几个）。
+          震度 0 不显示。<br>
+          中国：内置代表点，只在没有实测电文时打点。
+          点颜色 = 震动强度（浅蓝最强 · 绿 = 刚够震度 0）。<br>
+          CSV 每行：<code>code,name,country,lat,lon</code></p>
+        <textarea id="stCsv" class="input mono" rows="3"
+          placeholder="KNET.TKYH,東京平河町,JP,35.690,139.692&#10;SC.51001,成都,CN,30.572,104.066"></textarea>
+        <div class="row">
+          <button type="button" class="btn primary" id="btnImport">导入</button>
+          <button type="button" class="btn" id="btnClearCustom">清空自定义</button>
+          <span class="hint" id="customCount"></span>
+        </div>
+      </div>
+
+      <div class="sec">
+        <h3>演练</h3>
+        <p class="hint">生成一次虚拟地震，验证告警、波前与倒计时。会明确标注「演练」。
+          勾选「在地图上选点」后，点地图任意位置即可指定震中。</p>
+        <div class="row between"><label>在地图上选点</label><input type="checkbox" id="optSimPick" class="switch"></div>
+        <div class="hint" id="simPickPos">当前：使用预设震源</div>
+        <div class="row">
+          <select id="simCountry" class="select">
+            <option value="JP">日本</option>
+            <option value="CN">中国</option>
+          </select>
+          <input id="simMag" class="input mono" value="6.8" placeholder="M">
+          <input id="simDepth" class="input mono" value="20" placeholder="深度">
+          <button type="button" class="btn" id="btnSim">开始</button>
+          <button type="button" class="btn" id="btnSimClear">结束</button>
+        </div>
+      </div>
+
+      <div class="sec">
+        <h3>关于</h3>
+        <p class="hint">
+          数据：日本气象厅 緊急地震速報 / 震源・震度情報；中国地震台网 CENC；中国地震预警（ICL）；
+          历史回看另接 USGS。存在数秒延迟，非官方、非护命用途。<br>
+          震度换算：司・翠川(1999) 衰减 + 計測震度经验式；中国烈度按 GB/T 17742 峰值速度分档。均为估算。
+        </p>
+      </div>
+    </div>
+    <div class="dlg-ft">
+      <span class="mono" id="dlgVer"></span>
+      <button value="close" class="btn primary">完成</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="statsDlg">
+  <div class="dlg stats-dlg">
+    <div class="dlg-hd">
+      <h2>地震统计</h2>
+      <button type="button" class="icon" id="statsClose">×</button>
+    </div>
+    <div class="dlg-body">
+      <div class="seg" id="statsDays">
+        <button data-days="1">24 小时</button>
+        <button data-days="7" class="on">7 天</button>
+        <button data-days="30">30 天</button>
+        <button data-days="90">90 天</button>
+      </div>
+      <div class="stats-kpi" id="statsKpi">
+        <div class="kpi"><b id="kpiTotal">—</b><i>地震次数</i></div>
+        <div class="kpi"><b id="kpiMax">—</b><i>最大震级</i></div>
+        <div class="kpi"><b id="kpiAvg">—</b><i>日均</i></div>
+        <div class="kpi"><b id="kpiMaxDay">—</b><i>最多的一天</i></div>
+      </div>
+      <div class="stats-sec">
+        <h3>每日次数 <span class="hint" id="statsSpan">—</span></h3>
+        <div class="stats-chart"><canvas id="statsChart"></canvas></div>
+        <div class="stats-axis" id="statsAxis"></div>
+      </div>
+      <div class="stats-sec">
+        <h3>区域分布</h3>
+        <div class="stats-bars" id="statsRegion"></div>
+      </div>
+      <div class="stats-sec">
+        <h3>震级分布</h3>
+        <div class="stats-bars" id="statsMag"></div>
+      </div>
+      <div class="stats-sec">
+        <h3>最大的一次</h3>
+        <div class="stats-top" id="statsTop">—</div>
+      </div>
+    </div>
+    <div class="dlg-ft">
+      <span class="hint" id="statsNote">本地档案统计，不含 USGS 补录</span>
+      <button type="button" class="btn" id="btnStatsCsv">导出 CSV</button>
+      <button type="button" class="btn primary" id="statsDone">关闭</button>
+    </div>
+  </div>
+</dialog>
+
+<script src="tt.js?v=1"></script>
+<script src="tt_jma.js?v=1"></script>
+<script src="geo.js?v=207"></script>
+<script src="geo_jp.js?v=176"></script>
+<script src="geo_world.js?v=207"></script>
+<script src="app.js?v=275"></script>
+</body>
+</html>

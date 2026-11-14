@@ -1,0 +1,31 @@
+# ---------- 构建产物 ----------
+build*/
+dist/
+_tmp/
+__pycache__/
+*.py[cod]
+
+# ---------- 本地数据：含第三方令牌与个人记录，绝不入库 ----------
+# tokens.json 里是第三方数据源的 API 令牌（eqsc / trem / seedlink / jian）
+data/tokens.json
+# 本地累计的地震档案、登录用户、个人设置、自定义台站
+data/archive.json
+data/point_geo.json
+data/custom_stations.json
+data/users.json
+data/users.db
+data/users/
+data/settings.json
+data/certs/
+
+# ---------- 日志与调试快照 ----------
+*.log
+s.json
+*.pid
+
+# ---------- 开发中间产物 ----------
+# 由 tools/build_geo.py 从 Natural Earth 原始数据生成的中间文件（约 12MB）
+tools/ne10_land.json
+tools/ne50_land.json
+tools/shots/
+jd.html
