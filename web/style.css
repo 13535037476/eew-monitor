@@ -733,3 +733,47 @@ body.obs-on .quiet{display:none}
 .mytok .hint{margin:8px 0 0}
 .mytok-state-on{color:var(--ok)}
 .mytok-state-off{opacity:.62}
+
+/* ---------- 账号与密钥管理 ---------- */
+#adminDlg{border-radius:20px;width:min(760px,94vw)}
+.admin-dlg .dlg-body{padding-top:8px}
+.admin-sec{padding:14px 0;border-top:1px solid var(--line)}
+.admin-sec:first-of-type{border-top:0}
+.admin-sec h3{margin:0 0 10px;font-size:12px;font-weight:700;color:var(--txt2);letter-spacing:.06em}
+.atshared{
+  margin-top:10px;padding:12px 12px 8px;border-radius:12px;
+  border:1px solid rgba(110,168,254,.22);background:rgba(110,168,254,.06);
+}
+.acct-list{display:flex;flex-direction:column;gap:8px}
+.acct{
+  border:1px solid var(--line);border-radius:12px;padding:10px 12px 8px;
+  background:rgba(255,255,255,.025);
+}
+.acct.me{border-color:rgba(110,168,254,.4);background:rgba(110,168,254,.07)}
+.acct-hd{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.acct-hd b{font-size:13px;font-weight:700}
+.acct-hd .sp{flex:1;min-width:0}
+.tag{
+  font-size:10.5px;padding:2px 7px;border-radius:999px;border:1px solid var(--line2);
+  color:var(--txt2);white-space:nowrap;
+}
+.tag.adm{color:#cfe0ff;border-color:rgba(110,168,254,.5);background:rgba(110,168,254,.14)}
+.tag.own{color:#bff0c8;border-color:rgba(50,215,75,.4);background:rgba(50,215,75,.12)}
+.tag.shr{color:#ffe0a8;border-color:rgba(255,176,32,.4);background:rgba(255,176,32,.12)}
+.tag.non{color:#ffb3ae;border-color:rgba(255,69,58,.4);background:rgba(255,69,58,.12)}
+.acct-meta{font-size:11px;color:var(--dim);font-family:var(--mono);margin-top:3px}
+.acct-tok{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:8px}
+.acct-tok .input{flex:1;min-width:120px;font-size:11.5px;padding:6px 9px}
+.acct-ft{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.btn.sm{padding:5px 10px;font-size:11.5px;border-radius:8px}
+.btn.danger{color:#ffb3ae;border-color:rgba(255,69,58,.42)}
+.btn.danger:hover{background:rgba(255,69,58,.16)}
+.btn.danger.arm{background:rgba(255,69,58,.28);color:#fff;border-color:rgba(255,69,58,.8)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.acct-pwd{display:flex;gap:6px;margin-top:8px}
+.acct-pwd .input{flex:1;min-width:120px;font-size:11.5px;padding:6px 9px}
+@media (max-width:640px){
+  .admin-dlg{width:96vw}
+  .acct-tok{flex-direction:column;align-items:stretch}
+  .acct-tok .btn{width:100%}
+}

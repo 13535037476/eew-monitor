@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>震线 EEW · 中日地震预警</title>
-<link rel="stylesheet" href="style.css?v=226">
+<link rel="stylesheet" href="style.css?v=228">
 </head>
 <body>
 
@@ -361,6 +361,15 @@
             这条流的数据只进你自己的界面：别人登录看不到你的预警，你这边断了也不影响别人。
             留空 / 清除则回落到本机共享密钥。</p>
         </div>
+
+        <div class="mytok" id="adminEntry" hidden>
+          <div class="row between">
+            <label>账号与密钥总览</label>
+            <button type="button" class="btn" id="btnAdmin">打开管理…</button>
+          </div>
+          <p class="hint">只有管理员看得到。一个页面看清每个账号用的是哪把密钥、在线几台设备，
+            可建号 / 改密码 / 踢下线 / 删号，也能替别人配密钥。</p>
+        </div>
       </div>
 
       <div class="sec">
@@ -459,11 +468,61 @@
   </div>
 </dialog>
 
+<dialog id="adminDlg">
+  <div class="dlg admin-dlg">
+    <div class="dlg-hd">
+      <h2>账号与密钥管理</h2>
+      <button type="button" class="icon" id="adminClose">×</button>
+    </div>
+    <div class="dlg-body">
+      <div class="atshared">
+        <div class="row between">
+          <label>本机共享 Jian 密钥</label>
+          <span class="hint mono" id="adminSharedState">—</span>
+        </div>
+        <div class="row">
+          <input id="adminSharedInput" class="input mono" placeholder="rt_…"
+            autocomplete="off" spellcheck="false">
+          <button type="button" class="btn" id="btnAdminSharedSave">保存</button>
+          <button type="button" class="btn" id="btnAdminSharedClear">清除</button>
+        </div>
+        <p class="hint">所有没有专属密钥的账号都走这一条流。清除后，这些账号将收不到 Jian 预警
+          （其余 17 个公开源不受影响）。</p>
+      </div>
+
+      <div class="admin-sec">
+        <h3>账号 <span class="hint" id="adminCount">—</span></h3>
+        <div class="acct-list" id="adminList"></div>
+      </div>
+
+      <div class="admin-sec">
+        <h3>新建账号</h3>
+        <div class="row">
+          <input id="adminNewName" class="input" placeholder="用户名（2~24 位）" autocomplete="off">
+          <input id="adminNewPwd" class="input mono" type="password" placeholder="密码（≥6 位）"
+            autocomplete="new-password">
+          <button type="button" class="btn primary" id="btnAdminCreate">创建</button>
+        </div>
+        <div class="row between" style="margin-top:8px">
+          <label>直接给管理员权限</label>
+          <input type="checkbox" id="adminNewAdm" class="switch">
+        </div>
+        <p class="hint">管理员建号不受「关闭注册」与邀请码限制。</p>
+      </div>
+    </div>
+    <div class="dlg-ft">
+      <span class="hint" id="adminNote"></span>
+      <button type="button" class="btn" id="adminRefresh">刷新</button>
+      <button type="button" class="btn primary" id="adminDone">关闭</button>
+    </div>
+  </div>
+</dialog>
+
 <script src="tt.js?v=1"></script>
 <script src="tt_jma.js?v=1"></script>
 <script src="geo.js?v=207"></script>
 <script src="geo_jp.js?v=176"></script>
 <script src="geo_world.js?v=207"></script>
-<script src="app.js?v=276"></script>
+<script src="app.js?v=277"></script>
 </body>
 </html>

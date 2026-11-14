@@ -4638,8 +4638,11 @@
             return;
           }
         }
+        state.me = d.user.name;
         $('#userName').textContent = d.user.name + (d.user.admin ? ' · 管理员' : '');
         $('#userChip').hidden = false;
+        const ae = $('#adminEntry');
+        if (ae) ae.hidden = !d.user.admin;
       }
     } catch (e) { }
   }
@@ -5375,6 +5378,237 @@
   const btnTokClear = $('#btnMyTokClear');
   if (btnTokClear) btnTokClear.addEventListener('click', async () => {
     if (await saveMyTokens('')) { toast('已清除，回落到共享密钥'); loadMyTokens(); }
+  });
+
+  // ---------------- 账号与密钥管理（仅管理员） ----------------
+  const adminDlg = $('#adminDlg');
+  let adminData = null;
+
+  function agoText(ts) {
+    if (!ts) return '从未登录';
+    const s = Math.max(0, Date.now() / 1000 - ts);
+    if (s < 90) return '刚刚';
+    if (s < 3600) return Math.floor(s / 60) + ' 分钟前';
+    if (s < 86400) return Math.floor(s / 3600) + ' 小时前';
+    if (s < 86400 * 30) return Math.floor(s / 86400) + ' 天前';
+    return Math.floor(s / 86400 / 30) + ' 个月前';
+  }
+
+  async function adminApi(url, body) {
+    const opt = body === undefined
+      ? { cache: 'no-store' }
+      : { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) };
+    const r = await fetch(url, opt);
+    let d = {};
+    try { d = await r.json(); } catch (e) { }
+    if (!r.ok || d.ok === false) throw new Error(d.error || ('HTTP ' + r.status));
+    return d;
+  }
+
+  function el(tag, cls, txt) {
+    const n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (txt !== undefined) n.textContent = txt;
+    return n;
+  }
+
+  function srcTag(u) {
+    if (u.source === 'own') return el('span', 'tag own', '专属密钥');
+    if (u.source === 'shared') return el('span', 'tag shr', '共享密钥');
+    return el('span', 'tag non', '无密钥');
+  }
+
+  function acctCard(u) {
+    const myName = state.me || '';
+    const card = el('div', 'acct' + (u.name === myName ? ' me' : ''));
+
+    const hd = el('div', 'acct-hd');
+    hd.appendChild(el('b', '', u.name));
+    if (u.admin) hd.appendChild(el('span', 'tag adm', '管理员'));
+    hd.appendChild(srcTag(u));
+    hd.appendChild(el('span', 'sp'));
+    const meta = el('div', 'acct-meta',
+      '最后登录 ' + agoText(u.last_login) + ' · ' + (u.sessions || 0) + ' 台设备在线');
+    card.appendChild(hd);
+    card.appendChild(meta);
+
+    if (u.jian_ok === false && u.jian_err) {
+      card.appendChild(el('div', 'acct-meta', '流异常：' + u.jian_err));
+    }
+
+    // 密钥行
+    const tk = el('div', 'acct-tok');
+    if (u.source === 'own') tk.appendChild(el('span', 'hint mono', u.token || '(空)'));
+    const inp = el('input', 'input mono');
+    inp.placeholder = u.source === 'own' ? '填新的 rt_… 替换' : 'rt_…（填了就有专属流）';
+    inp.autocomplete = 'off';
+    inp.spellcheck = false;
+    const bSave = el('button', 'btn sm', '保存');
+    const bClear = el('button', 'btn sm', '清除');
+    bClear.disabled = u.source !== 'own';
+    tk.appendChild(inp);
+    tk.appendChild(bSave);
+    tk.appendChild(bClear);
+    card.appendChild(tk);
+
+    const doTok = async (val) => {
+      try {
+        await adminApi('/api/admin/tokens', { username: u.name, jian: val });
+        toast(val ? ('已为 ' + u.name + ' 设置专属密钥') : ('已清除 ' + u.name + ' 的专属密钥'));
+        await loadAdmin();
+      } catch (e) { toast(e.message || '操作失败'); }
+    };
+    bSave.addEventListener('click', () => {
+      const v = (inp.value || '').trim();
+      if (!v) { toast('先填入 rt_ 开头的密钥'); return; }
+      doTok(v);
+    });
+    bClear.addEventListener('click', () => doTok(''));
+
+    // 操作行
+    const ft = el('div', 'acct-ft');
+    const isMe = u.name === myName;
+
+    const bPwd = el('button', 'btn sm', '改密码');
+    bPwd.addEventListener('click', () => {
+      if (card.querySelector('.acct-pwd')) return;
+      const row = el('div', 'acct-pwd');
+      const p = el('input', 'input mono');
+      p.type = 'password';
+      p.placeholder = '新密码（≥6 位）';
+      p.autocomplete = 'new-password';
+      const ok = el('button', 'btn sm primary', '确定');
+      const no = el('button', 'btn sm', '取消');
+      const run = async () => {
+        const v = (p.value || '').trim();
+        if (v.length < 6) { toast('密码至少 6 位'); return; }
+        try {
+          await adminApi('/api/admin/users', { action: 'password', username: u.name, password: v });
+          toast('已改密码，该账号所有设备被下线');
+          await loadAdmin();
+        } catch (e) { toast(e.message || '改密码失败'); }
+      };
+      ok.addEventListener('click', run);
+      p.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') run(); });
+      no.addEventListener('click', () => row.remove());
+      row.appendChild(p); row.appendChild(ok); row.appendChild(no);
+      card.appendChild(row);
+      p.focus();
+    });
+    ft.appendChild(bPwd);
+
+    if (!isMe) {
+      const bAdm = el('button', 'btn sm', u.admin ? '取消管理员' : '设为管理员');
+      bAdm.addEventListener('click', async () => {
+        try {
+          await adminApi('/api/admin/users',
+            { action: 'admin', username: u.name, admin: !u.admin });
+          toast(u.admin ? ('已取消 ' + u.name + ' 的管理员') : ('已把 ' + u.name + ' 设为管理员'));
+          await loadAdmin();
+        } catch (e) { toast(e.message || '操作失败'); }
+      });
+      ft.appendChild(bAdm);
+    }
+
+    if (u.sessions > 0) {
+      const bKick = el('button', 'btn sm', '踢下线');
+      bKick.addEventListener('click', async () => {
+        try {
+          const d = await adminApi('/api/admin/users', { action: 'kick', username: u.name });
+          toast('已清掉 ' + (d.kicked || 0) + ' 个会话');
+          await loadAdmin();
+        } catch (e) { toast(e.message || '操作失败'); }
+      });
+      ft.appendChild(bKick);
+    }
+
+    if (!isMe) {
+      const bDel = el('button', 'btn sm danger', '删除账号');
+      let armed = 0;
+      bDel.addEventListener('click', async () => {
+        if (!armed) {
+          armed = setTimeout(() => { armed = 0; bDel.classList.remove('arm'); bDel.textContent = '删除账号'; }, 4000);
+          bDel.classList.add('arm');
+          bDel.textContent = '确认删除？';
+          return;
+        }
+        clearTimeout(armed); armed = 0;
+        try {
+          await adminApi('/api/admin/users', { action: 'delete', username: u.name });
+          toast('已删除账号 ' + u.name);
+          await loadAdmin();
+        } catch (e) { toast(e.message || '删除失败'); }
+      });
+      ft.appendChild(bDel);
+    } else {
+      ft.appendChild(el('span', 'hint', '（当前登录）'));
+    }
+    card.appendChild(ft);
+    return card;
+  }
+
+  function renderAdmin() {
+    if (!adminData) return;
+    const sh = adminData.shared || {};
+    const st = $('#adminSharedState');
+    st.textContent = sh.set ? ('已配置 · ' + sh.jian) : '未配置（这些账号收不到 Jian 预警）';
+    st.className = 'hint mono ' + (sh.set ? 'mytok-state-on' : 'mytok-state-off');
+    $('#adminCount').textContent = adminData.users.length + ' 个';
+    const box = $('#adminList');
+    box.textContent = '';
+    for (const u of adminData.users) box.appendChild(acctCard(u));
+  }
+
+  async function loadAdmin() {
+    try {
+      adminData = await adminApi('/api/admin/users');
+      renderAdmin();
+    } catch (e) {
+      $('#adminNote').textContent = e.message || '加载失败';
+    }
+  }
+
+  const btnAdmin = $('#btnAdmin');
+  if (btnAdmin) btnAdmin.addEventListener('click', () => {
+    $('#adminNote').textContent = '';
+    adminDlg.showModal();
+    loadAdmin();
+  });
+  if ($('#adminClose')) $('#adminClose').addEventListener('click', () => adminDlg.close());
+  if ($('#adminDone')) $('#adminDone').addEventListener('click', () => adminDlg.close());
+  if ($('#adminRefresh')) $('#adminRefresh').addEventListener('click', loadAdmin);
+  if ($('#btnAdminCreate')) $('#btnAdminCreate').addEventListener('click', async () => {
+    const n = ($('#adminNewName').value || '').trim();
+    const p = ($('#adminNewPwd').value || '');
+    if (!n) { toast('先填用户名'); return; }
+    try {
+      await adminApi('/api/admin/users',
+        { action: 'create', username: n, password: p, admin: $('#adminNewAdm').checked });
+      $('#adminNewName').value = '';
+      $('#adminNewPwd').value = '';
+      $('#adminNewAdm').checked = false;
+      toast('已创建账号 ' + n);
+      await loadAdmin();
+    } catch (e) { toast(e.message || '创建失败'); }
+  });
+  if ($('#btnAdminSharedSave')) $('#btnAdminSharedSave').addEventListener('click', async () => {
+    const v = ($('#adminSharedInput').value || '').trim();
+    if (!v) { toast('先填入 rt_ 开头的密钥'); return; }
+    try {
+      await adminApi('/api/admin/tokens', { username: '', jian: v });
+      $('#adminSharedInput').value = '';
+      toast('共享密钥已更新');
+      await loadAdmin();
+      loadMyTokens();
+    } catch (e) { toast(e.message || '保存失败'); }
+  });
+  if ($('#btnAdminSharedClear')) $('#btnAdminSharedClear').addEventListener('click', async () => {
+    try {
+      await adminApi('/api/admin/tokens', { username: '', jian: '' });
+      toast('共享密钥已清除');
+      await loadAdmin();
+      loadMyTokens();
+    } catch (e) { toast(e.message || '操作失败'); }
   });
 
   $('#btnSettings').addEventListener('click', () => {

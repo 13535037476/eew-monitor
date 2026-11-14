@@ -65,16 +65,21 @@ CUSTOM_STATIONS = os.path.join(DATA_DIR, "custom_stations.json")
 USER_DATA = os.path.join(DATA_DIR, "users")
 
 
-def user_dir(name):
+def _user_path(name):
+    """账号目录路径，不创建。删号时要先算路径再删，不能顺手建出来。"""
     safe = re.sub(r"[^\w\u4e00-\u9fa5.-]", "_", name or "_")[:48] or "_"
-    p = os.path.join(USER_DATA, safe)
+    return os.path.join(USER_DATA, safe)
+
+
+def user_dir(name):
+    p = _user_path(name)
     os.makedirs(p, exist_ok=True)
     return p
 
 
 def user_file(name, fn):
     return os.path.join(user_dir(name), fn)
-VERSION = "1.12.0"
+VERSION = "1.13.0"
 
 # ---------------- 可调阈值（settings.json 里的 gqMag） ----------------
 # 前端设置面板改「全球检测最小震级」后会 POST /api/settings 落盘，
@@ -2039,6 +2044,12 @@ class Handler(SimpleHTTPRequestHandler):
                             "shared": bool(shared_tok),
                             "state": (_jian_rt(name) if own else {}).get("ok")})
                 return
+            if path == "/api/admin/users":
+                me = self._user() or {}
+                if not me.get("admin"):
+                    return self._json({"ok": False, "error": "仅管理员可访问"}, 403)
+                self._json(admin_overview())
+                return
             if path == "/api/history":
                 qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
                 days = max(1, min(3650, int(float((qs.get("days") or ["30"])[0]))))
@@ -2216,6 +2227,66 @@ class Handler(SimpleHTTPRequestHandler):
             publish()
             self._json({"ok": True, "own": bool(tok), "jian": _mask(tok)})
             return
+        if path in ("/api/admin/users", "/api/admin/tokens"):
+            me = self._user() or {}
+            if not me.get("admin"):
+                return self._json({"ok": False, "error": "仅管理员可访问"}, 403)
+            me_name = me.get("name") or ""
+            if path == "/api/admin/tokens":
+                who = str(body.get("username") or "").strip()
+                tok = str(body.get("jian") or "").strip()
+                if tok and not tok.startswith("rt_"):
+                    return self._json(
+                        {"ok": False,
+                         "error": "Jian 的密钥以 rt_ 开头；lk_ 是登录密钥，要先换票才能用"}, 400)
+                if len(tok) > 400:
+                    return self._json({"ok": False, "error": "密钥过长"}, 400)
+                if not who:
+                    try:
+                        apply_shared_tokens(tok)
+                    except OSError as exc:
+                        return self._json({"ok": False, "error": "写入失败：%s" % exc}, 500)
+                    return self._json({"ok": True, "scope": "shared", "jian": _mask(tok)})
+                if not auth.exists(who):
+                    return self._json({"ok": False, "error": "账号不存在"}, 404)
+                try:
+                    apply_own_tokens(who, tok)
+                except OSError as exc:
+                    return self._json({"ok": False, "error": "写入失败：%s" % exc}, 500)
+                return self._json({"ok": True, "scope": who, "jian": _mask(tok)})
+
+            act = str(body.get("action") or "")
+            who = str(body.get("username") or "").strip()
+            pwd = str(body.get("password") or "")
+            try:
+                if act == "create":
+                    nu = auth.create(who, pwd, bool(body.get("admin")))
+                    # 新号默认没有专属密钥，会落到共享档；桶按需在登录时建
+                    return self._json({"ok": True, "user": nu})
+                if act in ("password", "admin", "kick", "delete") and not who:
+                    return self._json({"ok": False, "error": "缺少用户名"}, 400)
+                if act == "password":
+                    auth.set_password(who, pwd)
+                    return self._json({"ok": True, "kicked": 1})
+                if act == "admin":
+                    if who == me_name:
+                        return self._json(
+                            {"ok": False, "error": "不能改自己的管理员身份"}, 400)
+                    auth.set_admin(who, bool(body.get("admin")))
+                    return self._json({"ok": True})
+                if act == "kick":
+                    return self._json({"ok": True, "kicked": auth.kick(who)})
+                if act == "delete":
+                    if who == me_name:
+                        return self._json({"ok": False, "error": "不能删自己正在用的账号"}, 400)
+                    auth.delete_user(who)
+                    purge_user(who)
+                    return self._json({"ok": True})
+                return self._json({"ok": False, "error": "未知操作：%s" % act}, 400)
+            except ValueError as exc:
+                return self._json({"ok": False, "error": str(exc)}, 400)
+            except Exception as exc:
+                return self._json({"ok": False, "error": "失败：%s" % exc}, 500)
         if path == "/api/sim/clear":
             with LOCK:
                 STATE["sim"] = None
@@ -2508,6 +2579,69 @@ def _mask(tok):
     if len(t) <= 10:
         return t[:3] + "****"
     return t[:6] + "****" + t[-4:]
+
+
+def purge_user(name):
+    """删号后清干净：专属密钥、Jian 流、状态桶、运行时统计、账号目录。
+
+    漏掉任何一样都会留个永不再更新的死桶在内存里，或者下次同名账号
+    注册时莫名继承上一任的密钥。
+    """
+    stop_jian(name)
+    with _BUCKET_LOCK:
+        BUCKETS.pop(name, None)
+    OWN_TOKENS.pop(name, None)
+    SRC_RUNTIME.pop("jian@" + name, None)
+    sources.set_tokens({}, name)
+    shutil.rmtree(_user_path(name), ignore_errors=True)
+
+
+def apply_shared_tokens(tok):
+    """改机器级共享密钥（data/tokens.json），并让共享那条 Jian 流立刻跟上。"""
+    path = _data_file("tokens.json")
+    tok = str(tok or "").strip()
+    cur = _read_tokens(path)
+    if tok:
+        cur["jian"] = tok
+    else:
+        cur.pop("jian", None)
+    d = os.path.dirname(path)
+    if d:
+        os.makedirs(d, exist_ok=True)
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(cur, f, ensure_ascii=False, indent=2)
+    os.replace(tmp, path)
+    restart_jian("")
+    return cur
+
+
+def admin_overview():
+    """账号面板的数据：每个账号是谁、用什么密钥、在线几台设备。"""
+    shared = str(sources.tokens("").get("jian") or "")
+    rows = []
+    for u in auth.list_all():
+        name = u["name"]
+        own = name in OWN_TOKENS
+        own_tok = ""
+        if own:
+            own_tok = str(_read_tokens(user_file(name, "tokens.json")).get("jian") or "")
+        prof = name if own else ""
+        rt = _jian_rt(prof)
+        rows.append({
+            "name": name,
+            "admin": bool(u["admin"]),
+            "created": u["created"],
+            "last_login": u["last_login"],
+            "sessions": u["sessions"],
+            "token": _mask(own_tok),
+            "source": "own" if own else ("shared" if shared else "none"),
+            "jian_ok": rt.get("ok"),
+            "jian_err": (rt.get("err") or "")[:160],
+        })
+    return {"ok": True, "users": rows,
+            "shared": {"jian": _mask(shared), "set": bool(shared)},
+            "version": VERSION}
 
 
 def jian_loop(profile=""):
