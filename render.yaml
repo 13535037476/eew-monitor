@@ -10,8 +10,8 @@ services:
     healthCheckPath: /api/health
     autoDeploy: true
     envVars:
-      - key: PYTHON_VERSION
-        value: "3.11.9"
+      # 不写死 PYTHON_VERSION：本项目只用标准库，3.9+ 都能跑，
+      # 交给平台默认版本，免得指定了一个平台没提供的补丁号导致构建失败。
       - key: PYTHONUNBUFFERED
         value: "1"
       # 公网部署必须设邀请码：第一个用邀请码注册的人成为管理员，
