@@ -5418,6 +5418,92 @@
     return el('span', 'tag non', '无密钥');
   }
 
+  function devName(ua) {
+    const s = String(ua || '');
+    let os = '未知设备';
+    if (/iPhone/.test(s)) os = 'iPhone';
+    else if (/iPad/.test(s)) os = 'iPad';
+    else if (/Android/.test(s)) os = 'Android 手机';
+    else if (/Windows/.test(s)) os = 'Windows 电脑';
+    else if (/Macintosh|Mac OS X/.test(s)) os = 'Mac';
+    else if (/Linux/.test(s)) os = 'Linux';
+    else if (/curl|python|okhttp|Postman/i.test(s)) os = '程序 / 命令行';
+    let br = '';
+    if (/Edg\//.test(s)) br = 'Edge';
+    else if (/OPR\//.test(s)) br = 'Opera';
+    else if (/Chrome\//.test(s)) br = 'Chrome';
+    else if (/Firefox\//.test(s)) br = 'Firefox';
+    else if (/Safari\//.test(s)) br = 'Safari';
+    return br ? (os + ' · ' + br) : os;
+  }
+
+  function devList(u) {
+    const box = el('div', 'dev-list');
+    const list = u.devices || [];
+    for (const d of list) {
+      const row = el('div', 'dev' + (d.me ? ' me' : ''));
+      const nm = el('div', 'dev-nm');
+      nm.appendChild(el('b', '', devName(d.ua)));
+      nm.appendChild(el('span', 'dev-meta',
+        (d.ip || '—') + ' · 最近 ' + agoText(d.last_seen)));
+      row.appendChild(nm);
+      if (d.me) {
+        row.appendChild(el('span', 'tag own', '本机'));
+      } else {
+        const b = el('button', 'btn sm', '下线');
+        b.addEventListener('click', async () => {
+          try {
+            await adminApi('/api/admin/device', { username: u.name, id: d.id });
+            toast('已让这台设备下线');
+            await loadAdmin();
+          } catch (e) { toast(e.message || '操作失败'); }
+        });
+        row.appendChild(b);
+      }
+      box.appendChild(row);
+    }
+    if (!list.length) box.appendChild(el('div', 'hint', '没有在线设备'));
+    return box;
+  }
+
+  function machineRow(key, info) {
+    const card = el('div', 'mach');
+    const hd = el('div', 'mach-hd');
+    hd.appendChild(el('b', '', info.label || key));
+    hd.appendChild(el('span', 'hint mono ' + (info.set ? 'mytok-state-on' : 'mytok-state-off'),
+      info.set ? ('已配置 · ' + info.mask) : '未配置'));
+    card.appendChild(hd);
+    const row = el('div', 'acct-tok');
+    const inp = el('input', 'input mono');
+    inp.autocomplete = 'off';
+    inp.spellcheck = false;
+    inp.placeholder = key === 'seedlink'
+      ? (info.set ? 'host:port（填新的替换）' : 'host:port')
+      : (info.set ? '填新的替换' : '粘贴令牌…');
+    const bSave = el('button', 'btn sm', '保存');
+    const bClear = el('button', 'btn sm', '清除');
+    bClear.disabled = !info.set;
+    const save = async (val) => {
+      try {
+        const r = await adminApi('/api/admin/machine', { [key]: val });
+        if (r && r.machine) adminData.machine = r.machine;
+        toast(val ? ('已保存 ' + (info.label || key)) : ('已清除 ' + (info.label || key)));
+        renderAdmin();
+      } catch (e) { toast(e.message || '操作失败'); }
+    };
+    bSave.addEventListener('click', () => {
+      const v = (inp.value || '').trim();
+      if (!v) { toast('先填入内容'); return; }
+      save(v);
+    });
+    bClear.addEventListener('click', () => save(''));
+    row.appendChild(inp);
+    row.appendChild(bSave);
+    row.appendChild(bClear);
+    card.appendChild(row);
+    return card;
+  }
+
   function acctCard(u) {
     const myName = state.me || '';
     const card = el('div', 'acct' + (u.name === myName ? ' me' : ''));
@@ -5435,6 +5521,8 @@
     if (u.jian_ok === false && u.jian_err) {
       card.appendChild(el('div', 'acct-meta', '流异常：' + u.jian_err));
     }
+
+    card.appendChild(devList(u));
 
     // 密钥行
     const tk = el('div', 'acct-tok');
@@ -5511,7 +5599,7 @@
     }
 
     if (u.sessions > 0) {
-      const bKick = el('button', 'btn sm', '踢下线');
+      const bKick = el('button', 'btn sm', '全部下线');
       bKick.addEventListener('click', async () => {
         try {
           const d = await adminApi('/api/admin/users', { action: 'kick', username: u.name });
@@ -5553,11 +5641,16 @@
     const box = $('#adminList');
     box.textContent = '';
     for (const u of adminData.users) box.appendChild(acctCard(u));
+
     const m = adminData.machine || {};
-    const lack = Object.keys(m).filter(k => !m[k]);
+    const mbox = $('#adminMachine');
+    mbox.textContent = '';
+    const keys = Object.keys(m);
+    for (const k of keys) mbox.appendChild(machineRow(k, m[k]));
+    const lack = keys.filter(k => !m[k] || !m[k].set);
     $('#adminNote').textContent = lack.length
-      ? ('机器级公开源令牌未配置：' + lack.join(' / '))
-      : '机器级公开源令牌齐全';
+      ? ('机器级令牌未配置：' + lack.join(' / '))
+      : '机器级令牌已齐全';
   }
 
   async function loadAdmin() {

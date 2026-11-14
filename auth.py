@@ -46,6 +46,11 @@ def init(path):
             ua TEXT
         )""")
         c.execute("CREATE INDEX IF NOT EXISTS idx_sess_uid ON sessions(uid)")
+        # 设备管理要能看清「这是哪台机器」，老库平滑加列。
+        cols = {r["name"] for r in c.execute("PRAGMA table_info(sessions)")}
+        for col, ddl in (("ip", "TEXT"), ("last_seen", "REAL")):
+            if col not in cols:
+                c.execute("ALTER TABLE sessions ADD COLUMN %s %s" % (col, ddl))
 
 
 @contextmanager
@@ -108,16 +113,67 @@ def verify(username, password):
     return _public(row)
 
 
-def new_session(user, ua=""):
+def new_session(user, ua="", ip=""):
     token = secrets.token_urlsafe(32)
     th = hashlib.sha256(token.encode()).hexdigest()
     now = time.time()
     with _LOCK, _db() as c:
         uid = c.execute("SELECT id FROM users WHERE username=?", (user["name"],)).fetchone()["id"]
         c.execute("DELETE FROM sessions WHERE expires < ?", (now,))
-        c.execute("INSERT INTO sessions(token,uid,created,expires,ua) VALUES(?,?,?,?,?)",
-                  (th, uid, now, now + 30 * 86400, (ua or "")[:200]))
+        c.execute("INSERT INTO sessions(token,uid,created,expires,ua,ip,last_seen) "
+                  "VALUES(?,?,?,?,?,?,?)",
+                  (th, uid, now, now + 30 * 86400, (ua or "")[:200],
+                   (ip or "")[:64], now))
     return token
+
+
+def touch(token):
+    """记录一次活跃。节流到 60 秒一次，别每个请求都写库。"""
+    if not token:
+        return
+    th = hashlib.sha256(token.encode()).hexdigest()
+    now = time.time()
+    with _LOCK, _db() as c:
+        c.execute("UPDATE sessions SET last_seen=? "
+                  "WHERE token=? AND (last_seen IS NULL OR last_seen < ?)",
+                  (now, th, now - 60))
+
+
+def devices(username):
+    """某账号的所有有效会话（每台设备一条），给「人员管理」用。"""
+    now = time.time()
+    with _LOCK, _db() as c:
+        rows = c.execute(
+            """SELECT s.token, s.ua, s.ip, s.created, s.expires, s.last_seen
+                 FROM sessions s JOIN users u ON u.id=s.uid
+                WHERE u.username=? AND s.expires>? ORDER BY s.created DESC""",
+            (username, now)).fetchall()
+    out = []
+    for r in rows:
+        out.append({
+            "id": (r["token"] or "")[:12],
+            "ua": r["ua"] or "",
+            "ip": r["ip"] or "",
+            "created": r["created"],
+            "expires": r["expires"],
+            "last_seen": r["last_seen"] or r["created"],
+        })
+    return out
+
+
+def revoke_device(username, sid):
+    """踢掉某账号的某一台设备（会话 id 见 devices()）。返回是否命中。"""
+    sid = (sid or "").strip()
+    if not sid:
+        return False
+    with _LOCK, _db() as c:
+        rows = c.execute(
+            """SELECT s.token FROM sessions s JOIN users u ON u.id=s.uid
+                WHERE u.username=?""", (username,)).fetchall()
+        hit = [r["token"] for r in rows if (r["token"] or "").startswith(sid)]
+        for th in hit:
+            c.execute("DELETE FROM sessions WHERE token=?", (th,))
+        return bool(hit)
 
 
 def user_by_token(token):

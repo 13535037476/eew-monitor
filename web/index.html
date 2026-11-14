@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>震线 EEW · 中日地震预警</title>
-<link rel="stylesheet" href="style.css?v=229">
+<link rel="stylesheet" href="style.css?v=230">
 </head>
 <body>
 
@@ -473,19 +473,18 @@
 <dialog id="adminDlg">
   <div class="dlg admin-dlg">
     <div class="dlg-hd">
-      <h2>账号与密钥管理</h2>
+      <h2>人员管理</h2>
       <button type="button" class="icon" id="adminClose">×</button>
     </div>
     <div class="dlg-body">
       <div class="atshared">
-        <p class="hint" style="margin:0">密钥<b>跟着账号走</b>：同一账号在手机、电脑上登录都用它自己那把，
-          换账号登录就用那个账号的，绝不会沿用上一个的。所以这里没有「机器共享密钥」——
-          每个账号要么有自己的一把，要么没有 Jian 预警。<br>
-          密钥原文任何人都看不到（含管理员），只显示前 6 位 + 后 4 位。</p>
+        <p class="hint" style="margin:0">这里管三件事：<b>人</b>（账号与权限）、<b>设备</b>（谁在哪台机器上登录着）、
+          <b>密钥</b>（Jian 个人密钥按账号存，公开数据源令牌按这台机器存）。
+          在哪台设备上打开这个面板都一样管用；密钥原文任何人都看不到，只显示前 6 位 + 后 4 位。</p>
       </div>
 
       <div class="admin-sec">
-        <h3>账号 <span class="hint" id="adminCount">—</span></h3>
+        <h3>人员 <span class="hint" id="adminCount">—</span></h3>
         <div class="acct-list" id="adminList"></div>
       </div>
 
@@ -503,6 +502,13 @@
         </div>
         <p class="hint">管理员建号不受「关闭注册」与邀请码限制。</p>
       </div>
+
+      <div class="admin-sec">
+        <h3>本机公开数据源令牌</h3>
+        <p class="hint">这三路抓的是公开数据（谁跑都一样），属于这台机器，所有账号共用一份；
+          改完立刻生效，不用重启。</p>
+        <div id="adminMachine"></div>
+      </div>
     </div>
     <div class="dlg-ft">
       <span class="hint" id="adminNote"></span>
@@ -517,6 +523,6 @@
 <script src="geo.js?v=207"></script>
 <script src="geo_jp.js?v=176"></script>
 <script src="geo_world.js?v=207"></script>
-<script src="app.js?v=278"></script>
+<script src="app.js?v=279"></script>
 </body>
 </html>

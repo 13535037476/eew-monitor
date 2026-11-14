@@ -1134,6 +1134,10 @@ JIAN_HOST = "api.sismotide.top"
 JIAN_BACKUP_HOST = "api.jianproject.cloud"
 
 
+class JianBanned(Exception):
+    """密钥被服务端封禁：继续重连只会加重处罚，要长时间静默。"""
+
+
 class JianFeed:
     """Jian Project 的 WebSocket 长连接。
 
@@ -1160,7 +1164,19 @@ class JianFeed:
                      "Accept": "application/json",
                      "User-Agent": UA})
         opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
-        with opener.open(req, timeout=15) as r:
+        try:
+            r = opener.open(req, timeout=15)
+        except urllib.error.HTTPError as exc:
+            body = b""
+            try:
+                body = exc.read()
+            except Exception:
+                pass
+            text = body.decode("utf-8", "replace")
+            if "account_banned" in text or "4006" in text:
+                raise JianBanned("密钥被服务端封禁（account_banned），请到 Jian 重新申请")
+            raise
+        with r:
             d = json.loads(r.read().decode("utf-8", "replace"))
         tok = str(d.get("token") or "")
         if not d.get("ok") or not tok.startswith("at_"):
@@ -1286,6 +1302,11 @@ class JianFeed:
                     elif op == 8:
                         self.log("jian close: %s" % payload[:80])
                         break
+            except JianBanned as exc:
+                # 被封了还每 30 秒撞一次，只会让处罚更久。静默 10 分钟再试。
+                self.log("jian 断开: %s" % exc)
+                time.sleep(600)
+                backoff = 1
             except Exception as exc:
                 self.log("jian 断开: %s" % exc)
                 time.sleep(backoff)

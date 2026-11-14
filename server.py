@@ -4,6 +4,8 @@
 浏览器打开 http://127.0.0.1:8765/
 """
 import argparse
+import copy
+import hashlib
 import json
 import ssl
 import math
@@ -79,7 +81,7 @@ def user_dir(name):
 
 def user_file(name, fn):
     return os.path.join(user_dir(name), fn)
-VERSION = "1.14.0"
+VERSION = "1.15.0"
 
 # ---------------- 可调阈值（settings.json 里的 gqMag） ----------------
 # 前端设置面板改「全球检测最小震级」后会 POST /api/settings 落盘，
@@ -440,11 +442,13 @@ class Hub:
 HUB = Hub()
 
 # ---------------- 账号级状态桶 ----------------
-# 每个「自带数据源令牌」的账号各有一套独立的预警状态，互不干扰：
-# 甲填的 Jian 密钥收到的事件，不会出现在乙的界面上。
+# 每个账号一套独立的预警状态，互不干扰：甲收到的事件不会出现在乙的界面上。
 #
-# 没有专属令牌的账号全部落在共享桶 ""（用机器级 data/tokens.json），
-# 这样新注册的账号开箱就有数据，也不会因为多开一个号就多一条连接。
+# 桶分两种角色：
+#   ""          服务端的「母本」桶。未登录页面看它，公开源也往它写一份。
+#               新账号第一次登录时从它深拷贝一份现场数据，所以不会白屏。
+#   账号名       该账号自己的界面状态。公开源（18 路里除 Jian 以外的）会被
+#               分发进每一个账号桶；私源（Jian）只写自己账号的桶。
 #
 # 实现上用「线程绑定 + 代理」：STATE 是个按当前线程所属桶路由的代理对象。
 # 这样原来 40 多处 STATE[...] 一行都不用改，也不会漏改某处导致两个账号串数据。
@@ -489,21 +493,58 @@ def enter(bucket):
     return _TLS.bucket
 
 
+# 母本桶里属于「公开数据」的槽位：新账号继承这些，登录立刻能看到当前现场。
+# 演练（sim）、账号自己的告警列表（alerts）不继承——那是某个人的操作痕迹。
+_SEED_KEYS = ("eew", "catalogs", "events", "obs", "tsunami", "lpgm",
+              "palert", "primary")
+
+
+def _seed_from_master(st, master):
+    """把母本桶的公开数据深拷贝进一个新桶（调用方需持有 _BUCKET_LOCK）。
+
+    少了这一步，新账号登录后要等下一轮轮询（1~20 秒）才有内容，
+    正在震的时候刚好登进来会看到一张空地图，像坏了一样。
+    """
+    for k in _SEED_KEYS:
+        if k in master:
+            try:
+                st[k] = copy.deepcopy(master[k])
+            except Exception:
+                pass
+
+
 def bucket_state(name=None):
     n = current_bucket() if name is None else (name or "")
     with _BUCKET_LOCK:
         st = BUCKETS.get(n)
         if st is None:
             st = BUCKETS[n] = _blank_state()
+            if n and BUCKETS.get(""):
+                _seed_from_master(st, BUCKETS[""])
         return st
 
 
 def bucket_names():
-    """所有「账号」桶。空名那个是服务端自己的落脚桶（未登录、登录页、
-    心跳线程初始态都用它），不参与公开源的 fanout——多写一份没人看。"""
+    """所有「账号」桶，用于 SSE 推送与状态序列化。
+
+    空名那个是服务端自己的母本桶（未登录、登录页、心跳线程初始态都用它），
+    它不订阅推送——没有客户端挂在上面，序列化它纯属浪费。
+    """
     with _BUCKET_LOCK:
         names = [n for n in BUCKETS if n]
     return names or [""]
+
+
+def fanout_targets():
+    """公开源要写哪些桶：母本桶 + 所有账号桶。
+
+    这里曾经写成「只有一个账号桶就直接写当前线程的桶」，结果数据全落进
+    母本桶（公开源线程从来没绑定过账号），账号那边 obs / palert / 震度速報
+    全是空——测站不亮、速报不出，正是这个原因。分发目标必须显式列出来，
+    不能靠「当前线程碰巧在哪个桶」。
+    """
+    with _BUCKET_LOCK:
+        return [""] + [n for n in BUCKETS if n]
 
 
 def bucket_of(user):
@@ -1279,6 +1320,13 @@ def source_loop(src):
     last_payload = None
     errors = 0
     while True:
+        # 令牌可以在运行中被清掉（管理员改了机器级令牌）：静默待命，别一直刷报错。
+        # 线程不退出，下次填回来立刻恢复，不用重启。
+        if src.get("need_token") and not sources.has_token(src):
+            last_payload = None
+            rt.update({"ok": None, "err": None, "has_data": False})
+            time.sleep(max(2, src["poll"]))
+            continue
         started = time.time()
         try:
             payload = poll_once(src)
@@ -1311,6 +1359,35 @@ def source_loop(src):
             })
             publish()
         time.sleep(src["poll"])
+
+
+# 已经起过线程的源。管理员在面板里补一把令牌后，要能把对应的源当场拉起来。
+STARTED_SRC = set()
+_SRC_BOOT_LOCK = threading.Lock()
+
+
+def start_source(src):
+    """起一路公开源的轮询线程（幂等）。返回是否新起了一个。"""
+    sid = src["id"]
+    with _SRC_BOOT_LOCK:
+        if sid in STARTED_SRC:
+            return False
+        STARTED_SRC.add(sid)
+    threading.Thread(target=source_loop, args=(src,), daemon=True).start()
+    return True
+
+
+def start_pending_sources():
+    """把「现在有令牌、但还没起线程」的源补起来（改完机器级令牌后调用）。"""
+    n = 0
+    for src in sources.SOURCES:
+        if src["id"] == "jian" or src.get("wip"):
+            continue
+        if not sources.has_token(src):
+            continue
+        if start_source(src):
+            n += 1
+    return n
 
 
 def _apply_eew(ev):
@@ -1358,18 +1435,15 @@ def _apply_eew(ev):
 
 
 def apply_payload(src, payload):
-    """把一个公开源的数据分发进「所有」账号桶。
+    """把一个公开源的数据分发进「母本桶 + 每个账号桶」。
 
     十几路公开源是机器级共享连接（抓一次就够），但每个账号的界面状态是
     独立的，所以要逐桶写一遍。私源（Jian）不走这里：它有专属令牌的账号
     各自一条连接，回调里直接调 _apply_payload_one 只写自己的桶。
     """
-    names = bucket_names()
-    if len(names) <= 1:
-        return _apply_payload_one(src, payload)
     prev = current_bucket()
     try:
-        for name in names:
+        for name in fanout_targets():
             enter(name)
             _apply_payload_one(src, payload)
     finally:
@@ -1871,9 +1945,17 @@ class Handler(SimpleHTTPRequestHandler):
                 return v
         return ""
 
+    def _sid(self):
+        """当前这台设备的会话短 id（和 auth.devices 里的 id 同一套算法）。"""
+        return hashlib.sha256(self._token().encode()).hexdigest()[:12]
+
     def _user(self):
         try:
-            return auth.user_by_token(self._token())
+            u = auth.user_by_token(self._token())
+            if u:
+                # 记一次活跃，人员管理里才能看出「这台设备是不是还在用」
+                auth.touch(self._token())
+            return u
         except Exception:
             return None
 
@@ -2045,11 +2127,13 @@ class Handler(SimpleHTTPRequestHandler):
                             "shared": False,
                             "state": _jian_rt(name).get("ok")})
                 return
-            if path == "/api/admin/users":
+            if path in ("/api/admin/users", "/api/admin/machine"):
                 me = self._user() or {}
                 if not me.get("admin"):
                     return self._json({"ok": False, "error": "仅管理员可访问"}, 403)
-                self._json(admin_overview())
+                if path == "/api/admin/machine":
+                    return self._json({"ok": True, "machine": machine_tokens_state()})
+                self._json(admin_overview(my_sid=self._sid()))
                 return
             if path == "/api/history":
                 qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
@@ -2104,7 +2188,8 @@ class Handler(SimpleHTTPRequestHandler):
                         return self._json({"ok": False, "error": "用户名或密码不对"}, 401)
             except ValueError as e:
                 return self._json({"ok": False, "error": str(e)}, 400)
-            token = auth.new_session(u, self.headers.get("User-Agent") or "")
+            token = auth.new_session(u, self.headers.get("User-Agent") or "",
+                                     ip=self.client_address[0])
             return self._json({"ok": True, "user": u},
                               cookie=self._cookie(token))
         if path == "/api/logout":
@@ -2228,11 +2313,38 @@ class Handler(SimpleHTTPRequestHandler):
             publish()
             self._json({"ok": True, "own": bool(tok), "jian": _mask(tok)})
             return
-        if path in ("/api/admin/users", "/api/admin/tokens"):
+        if path in ("/api/admin/users", "/api/admin/tokens",
+                    "/api/admin/device", "/api/admin/machine"):
             me = self._user() or {}
             if not me.get("admin"):
                 return self._json({"ok": False, "error": "仅管理员可访问"}, 403)
             me_name = me.get("name") or ""
+            if path == "/api/admin/machine":
+                patch = {k: body.get(k) for k in MACHINE_KEYS if k in body}
+                if not patch:
+                    return self._json({"ok": False, "error": "没有要改的项"}, 400)
+                for k, v in patch.items():
+                    if len(str(v or "")) > 400:
+                        return self._json({"ok": False, "error": "令牌过长"}, 400)
+                try:
+                    started = save_machine_tokens(patch)
+                except OSError as exc:
+                    return self._json({"ok": False, "error": "写入失败：%s" % exc}, 500)
+                return self._json({"ok": True, "machine": machine_tokens_state(),
+                                   "started": started})
+            if path == "/api/admin/device":
+                who = str(body.get("username") or "").strip()
+                sid = str(body.get("id") or "").strip()
+                if not who or not sid:
+                    return self._json({"ok": False, "error": "缺少账号或设备 id"}, 400)
+                if not auth.exists(who):
+                    return self._json({"ok": False, "error": "账号不存在"}, 404)
+                if sid == self._sid():
+                    return self._json(
+                        {"ok": False, "error": "这就是你正在用的这台，别把自己踢了"}, 400)
+                ok = auth.revoke_device(who, sid)
+                return self._json({"ok": ok, "kicked": 1 if ok else 0,
+                                   "error": "" if ok else "这台设备已经不在了"}, 200)
             if path == "/api/admin/tokens":
                 who = str(body.get("username") or "").strip()
                 tok = str(body.get("jian") or "").strip()
@@ -2563,22 +2675,57 @@ def jian_on_event(msg, profile=""):
         enter(prev)
 
 
-JIAN_FEEDS = {}          # profile -> JianFeed 实例（改密钥时用来停掉旧连接）
+# 连接按「密钥」而不是按「账号」管理：
+#   JIAN_FEEDS = {rt_…: JianFeed}
+# 因为同一个 rt_ 连两条 WebSocket，服务端会认为是异常客户端（实测会直接
+# 把账号封掉：{"code":4006,"error":"account_banned"}）。所以两个账号就算
+# 填了同一把密钥，也只开一条连接，事件同时写进这两个账号的桶。
+JIAN_FEEDS = {}
+_JIAN_LOCK = threading.Lock()
+
+
+class _Pending:
+    """占位：连接正在建立。防止并发调用 ensure_jian 时开出两条。"""
+    alive = True
+
+
+def jian_profiles(tok):
+    """当前所有用这把 Jian 密钥的档案（含 "" 机器档）。"""
+    tok = str(tok or "").strip()
+    if not tok:
+        return []
+    out = []
+    for p, d in list(sources.TOKEN_SETS.items()):
+        try:
+            if str((d or {}).get("jian") or "").strip() == tok:
+                out.append(p)
+        except Exception:
+            continue
+    return out
 
 
 def ensure_jian(profile=""):
-    """确保该档案有一条 Jian 长连接在跑（已经有就不重复起）。"""
-    if not str(sources.tokens(profile).get("jian") or "").strip():
+    """确保这把密钥有一条长连接在跑（已经有就不重复起）。"""
+    tok = str(sources.tokens(profile).get("jian") or "").strip()
+    if not tok:
         return
-    f = JIAN_FEEDS.get(profile)
-    if f is not None and getattr(f, "alive", False):
-        return
-    threading.Thread(target=jian_loop, args=(profile,), daemon=True).start()
+    with _JIAN_LOCK:
+        if JIAN_FEEDS.get(tok) is not None:
+            return
+        JIAN_FEEDS[tok] = _Pending()
+    threading.Thread(target=jian_loop, args=(tok,), daemon=True).start()
 
 
 def stop_jian(profile=""):
-    """停掉旧连接。alive=False 之后 run() 会在当前帧/超时之后退出。"""
-    f = JIAN_FEEDS.pop(profile, None)
+    """停掉这个账号用的连接；还有别的账号用同一把密钥时不能断。"""
+    tok = str(sources.tokens(profile).get("jian") or "").strip()
+    if not tok:
+        return
+    others = [p for p in jian_profiles(tok) if p != profile]
+    if others:
+        return                     # 同一个密钥还有人在用，连接留着
+    with _JIAN_LOCK:
+        f = JIAN_FEEDS.pop(tok, None)
     if f is not None:
         try:
             f.alive = False
@@ -2587,7 +2734,7 @@ def stop_jian(profile=""):
 
 
 def restart_jian(profile=""):
-    """换了密钥：先断旧流，重新读令牌，再起新流。"""
+    """换了密钥：先断旧流（确认没人共用），重新读令牌，再起新流。"""
     stop_jian(profile)
     p = user_file(profile, "tokens.json") if profile else _data_file("tokens.json")
     sources.set_tokens(_read_tokens(p), profile)
@@ -2659,38 +2806,98 @@ def purge_user(name):
     shutil.rmtree(_user_path(name), ignore_errors=True)
 
 
-def admin_overview():
-    """账号面板的数据：每个账号是谁、用什么密钥、在线几台设备。"""
+# 机器级令牌：抓的是「谁跑都一样的公开数据」，属于这台机器，不属于某个账号。
+# jian 不在其中——它是个人授权，只存 data/users/<账号>/tokens.json。
+MACHINE_KEYS = ("trem", "eqsc", "seedlink")
+_MACHINE_LABEL = {
+    "trem": "TREM-Net 台湾即时震度",
+    "eqsc": "EQSC 日本气象厅速报",
+    "seedlink": "SeedLink 波形流",
+}
+
+
+def machine_tokens_state():
+    d = _read_tokens(_data_file("tokens.json"))
+    out = {}
+    for k in MACHINE_KEYS:
+        v = str(d.get(k) or "").strip()
+        out[k] = {"set": bool(v), "mask": _mask(v) if v else "",
+                  "label": _MACHINE_LABEL.get(k, k)}
+    return out
+
+
+def refresh_all_buckets():
+    """每个账号桶的数据源面板各算一遍（has_token 依赖于桶里的令牌档案）。"""
+    prev = current_bucket()
+    try:
+        for name in bucket_names():
+            enter(name)
+            refresh_sources_meta()
+    finally:
+        enter(prev)
+
+
+def save_machine_tokens(patch):
+    """改机器级令牌：值非空就写入，空字符串就删掉。写文件后立刻生效。
+
+    不认识的键一律忽略（防止把 jian 又写回机器级，那是账号级的东西）。
+    """
+    path = _data_file("tokens.json")
+    cur = _read_tokens(path)
+    for k, v in (patch or {}).items():
+        if k not in MACHINE_KEYS:
+            continue
+        v = str(v or "").strip()
+        if v:
+            cur[k] = v
+        else:
+            cur.pop(k, None)
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(cur, f, ensure_ascii=False, indent=2)
+    os.replace(tmp, path)
+    sources.set_tokens(cur, "")
+    started = start_pending_sources()
+    refresh_all_buckets()
+    publish()
+    return started
+
+
+def admin_overview(my_sid=""):
+    """账号面板的数据：每个账号是谁、用什么密钥、在线几台设备、都是哪几台。"""
     rows = []
     for u in auth.list_all():
         name = u["name"]
         tok = str(_read_tokens(user_file(name, "tokens.json")).get("jian") or "")
         rt = _jian_rt(name)
+        try:
+            devs = auth.devices(name)
+        except Exception:
+            devs = []
+        for d in devs:
+            d["me"] = bool(my_sid) and d.get("id") == my_sid
         rows.append({
             "name": name,
             "admin": bool(u["admin"]),
             "created": u["created"],
             "last_login": u["last_login"],
-            "sessions": u["sessions"],
+            "sessions": len(devs) or u["sessions"],
             "token": _mask(tok),
             "source": "own" if tok else "none",
             "jian_ok": rt.get("ok"),
             "jian_err": (rt.get("err") or "")[:160],
+            "devices": devs,
         })
-    # 每个账号各持一把，所以这里没有「机器共享密钥」可汇报；
-    # 只带一条机器级令牌的存在性，方便面板提示「这三路公开源还能不能用」。
-    machine = _read_tokens(_data_file("tokens.json"))
     return {"ok": True, "users": rows,
-            "machine": {k: bool(str(machine.get(k) or "").strip())
-                        for k in ("trem", "eqsc", "seedlink")},
+            "machine": machine_tokens_state(),
             "version": VERSION}
 
 
-def jian_loop(profile=""):
-    tok = sources.tokens(profile).get("jian")
-
+def jian_loop(tok):
+    """一条 WebSocket 服务这把密钥背后的所有档案（通常就一个账号）。"""
     def note(msg):
-        """把连接失败写回该账号自己的面板。
+        """把连接失败写回各账号自己的面板。
 
         JianFeed 的 log 里混了正常日志（「已连」）和错误，只挑错误标状态，
         否则连上之后每帧都会把源标成异常。
@@ -2698,28 +2905,36 @@ def jian_loop(profile=""):
         text = str(msg)
         if not any(k in text for k in ("断开", "连不上", "失败", "出错", "close")):
             return
-        prev = current_bucket()
-        try:
-            enter(profile)
-            rt = _jian_rt(profile)
-            rt.update({"ok": False, "err": text[:200],
-                       "last_err_ts": time.time(),
-                       "errors_total": (rt.get("errors_total") or 0) + 1})
-            publish(only=profile)
-        finally:
-            enter(prev)
+        for profile in (jian_profiles(tok) or [""]):
+            prev = current_bucket()
+            try:
+                enter(profile)
+                rt = _jian_rt(profile)
+                rt.update({"ok": False, "err": text[:200],
+                           "last_err_ts": time.time(),
+                           "errors_total": (rt.get("errors_total") or 0) + 1})
+                publish(only=profile)
+            finally:
+                enter(prev)
 
-    feed = sources.JianFeed(
-        tok, "/jma-eew",
-        on_event=lambda m: jian_on_event(m, profile),
-        on_alive=lambda: jian_alive(profile),
-        log=note)
-    JIAN_FEEDS[profile] = feed
+    def on_event(msg):
+        for profile in (jian_profiles(tok) or [""]):
+            jian_on_event(msg, profile)
+
+    def on_alive():
+        for profile in (jian_profiles(tok) or [""]):
+            jian_alive(profile)
+
+    feed = sources.JianFeed(tok, "/jma-eew",
+                            on_event=on_event, on_alive=on_alive, log=note)
+    with _JIAN_LOCK:
+        JIAN_FEEDS[tok] = feed
     try:
         feed.run()
     finally:
-        if JIAN_FEEDS.get(profile) is feed:
-            JIAN_FEEDS.pop(profile, None)
+        with _JIAN_LOCK:
+            if JIAN_FEEDS.get(tok) is feed:
+                JIAN_FEEDS.pop(tok, None)
 
 
 def boot(host="127.0.0.1", port=8765, tls_cert=None, tls_key=None):
@@ -2740,7 +2955,7 @@ def boot(host="127.0.0.1", port=8765, tls_cert=None, tls_key=None):
             continue                      # 需要授权又没令牌 → 不起线程
         if src.get("id") == "jian" or src.get("wip"):
             continue                      # Jian 走 WebSocket 长连接；wip 的还没实现
-        threading.Thread(target=source_loop, args=(src,), daemon=True).start()
+        start_source(src)
     # 每个持有 Jian 令牌的档案各起一条流：共享档一条，各账号自己的档各一条。
     # 它们各自写各自的状态桶，互不可见。
     for prof in list(sources.TOKEN_SETS):

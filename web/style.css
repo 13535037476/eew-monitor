@@ -777,3 +777,21 @@ body.obs-on .quiet{display:none}
   .acct-tok{flex-direction:column;align-items:stretch}
   .acct-tok .btn{width:100%}
 }
+
+/* ---------- 人员管理：设备与机器级令牌 ---------- */
+.dev-list{margin-top:8px;display:flex;flex-direction:column;gap:4px}
+.dev{
+  display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;
+  background:rgba(255,255,255,.03);border:1px solid transparent;
+}
+.dev.me{border-color:rgba(110,168,254,.3);background:rgba(110,168,254,.08)}
+.dev-nm{display:flex;flex-direction:column;gap:1px;flex:1;min-width:0}
+.dev-nm b{font-size:12px;font-weight:600}
+.dev-meta{font-size:10.5px;color:var(--dim);font-family:var(--mono)}
+.mach{
+  margin-top:8px;padding:8px 10px;border-radius:10px;
+  border:1px solid var(--line);background:rgba(255,255,255,.02);
+}
+.mach-hd{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px}
+.mach-hd b{font-size:12px;font-weight:600}
+.mach .acct-tok{margin-top:0}
