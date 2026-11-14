@@ -1,0 +1,26 @@
+# 构建镜像时不要带进去的东西
+.git
+.gitignore
+build*/
+dist/
+_tmp/
+__pycache__/
+*.py[cod]
+*.log
+s.json
+
+# 敏感与个人数据：绝不烘进镜像
+data/tokens.json
+data/archive.json
+data/users.db
+data/users/
+data/settings.json
+data/point_geo.json
+data/custom_stations.json
+data/certs/
+
+# 开发中间产物
+tools/ne10_land.json
+tools/ne50_land.json
+tools/shots/
+jd.html
