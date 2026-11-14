@@ -161,3 +161,10 @@ def is_admin(username):
 def count():
     with _LOCK, _db() as c:
         return c.execute("SELECT COUNT(*) AS n FROM users").fetchone()["n"]
+
+
+def usernames():
+    """所有用户名。按账号加载各自的 tokens.json 时用。"""
+    with _LOCK, _db() as c:
+        return [r["username"] for r in
+                c.execute("SELECT username FROM users ORDER BY id")]

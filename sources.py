@@ -16,6 +16,7 @@ import base64
 import socket
 import struct
 import http.client
+import threading
 import urllib.parse
 import urllib.request
 import urllib.error
@@ -179,17 +180,44 @@ SOURCES = [
 
 # 需要授权才能用的源：没有 token 时只在数据源面板里显示「待授权」，
 # 不起线程、不参与延迟竞争；填了 token 立刻生效。
-TOKENS = {}
+#
+# 令牌按「配置档案」分开存：
+#   ""     机器级默认档，读 data/tokens.json，所有没有专属令牌的账号共用
+#   "alice" 某个账号自己的档，读 data/users/alice/tokens.json
+# 线程绑定了哪个档案，has_token() 就查哪个档案（server.enter() 负责绑定）。
+TOKEN_SETS = {"": {}}
+TOKENS = TOKEN_SETS[""]          # 兼容旧引用：机器级默认档
+_PROFILE_TLS = threading.local()
 
 
-def set_tokens(d):
-    TOKENS.clear()
-    TOKENS.update(d or {})
+def set_profile(name):
+    """绑定当前线程使用的令牌档案（空字符串=机器级默认）"""
+    _PROFILE_TLS.name = name or ""
 
 
-def has_token(src):
+def current_profile():
+    return getattr(_PROFILE_TLS, "name", "")
+
+
+def set_tokens(d, profile=None):
+    p = current_profile() if profile is None else (profile or "")
+    t = TOKEN_SETS.get(p)
+    if t is None:
+        t = TOKEN_SETS[p] = {}
+    t.clear()
+    t.update(d or {})
+
+
+def tokens(profile=None):
+    p = current_profile() if profile is None else (profile or "")
+    return TOKEN_SETS.get(p) or {}
+
+
+def has_token(src, profile=None):
     key = src.get("need_token")
-    return not key or bool(str(TOKENS.get(key) or "").strip())
+    if not key:
+        return True
+    return bool(str(tokens(profile).get(key) or "").strip())
 
 JST = 9
 CST = 8

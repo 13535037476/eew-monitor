@@ -722,3 +722,14 @@ body.obs-on .quiet{display:none}
   .dlg-hd,.dlg-ft{padding-left:14px;padding-right:14px}
   .sbar{grid-template-columns:56px 1fr 40px}
 }
+
+/* 设置面板 · 我的数据源密钥 */
+.mytok{
+  margin-top:14px;padding:12px 12px 10px;border-radius:10px;
+  border:1px solid rgba(120,170,220,.18);background:rgba(120,170,220,.05);
+}
+.mytok .row + .row{margin-top:8px}
+.mytok .input{flex:1;min-width:0}
+.mytok .hint{margin:8px 0 0}
+.mytok-state-on{color:var(--ok)}
+.mytok-state-off{opacity:.62}

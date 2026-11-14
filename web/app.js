@@ -5333,7 +5333,53 @@
     syncSound();
     toast(state.settings.sound ? '声音告警已开启' : '声音告警已关闭');
   });
-  $('#btnSettings').addEventListener('click', () => { paintFocus(); dlg.showModal(); });
+  // ---- 我的数据源密钥（按账号存，各自一条预警流）----
+  async function loadMyTokens() {
+    try {
+      const d = await (await fetch('/api/mytokens', { cache: 'no-store' })).json();
+      const st = $('#myTokState');
+      if (!st) return;
+      if (d.own) {
+        st.textContent = '已用自己的密钥 · ' + (d.jian || '');
+        st.className = 'hint mono mytok-state-on';
+        $('#myTokInput').placeholder = '已保存 ' + d.jian + '，填新的可替换';
+      } else {
+        st.textContent = d.shared ? '跟随本机共享密钥' : '共享密钥也未配置';
+        st.className = 'hint mono mytok-state-off';
+        $('#myTokInput').placeholder = 'rt_…（留空则用本机共享密钥）';
+      }
+    } catch (e) { }
+  }
+  async function saveMyTokens(tok) {
+    let d = {};
+    try {
+      const r = await fetch('/api/mytokens', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jian: tok }),
+      });
+      d = await r.json().catch(() => ({}));
+      if (!r.ok || !d.ok) { toast(d.error || '保存失败'); return false; }
+    } catch (e) { toast('保存失败：网络异常'); return false; }
+    return true;
+  }
+  const btnTokSave = $('#btnMyTokSave');
+  if (btnTokSave) btnTokSave.addEventListener('click', async () => {
+    const v = ($('#myTokInput').value || '').trim();
+    if (!v) { toast('先填入 rt_ 开头的密钥'); return; }
+    if (await saveMyTokens(v)) {
+      $('#myTokInput').value = '';
+      toast('已保存，正在用你的密钥重连');
+      loadMyTokens();
+    }
+  });
+  const btnTokClear = $('#btnMyTokClear');
+  if (btnTokClear) btnTokClear.addEventListener('click', async () => {
+    if (await saveMyTokens('')) { toast('已清除，回落到共享密钥'); loadMyTokens(); }
+  });
+
+  $('#btnSettings').addEventListener('click', () => {
+    paintFocus(); dlg.showModal(); loadMyTokens();
+  });
 
   $('#btnImport').addEventListener('click', async () => {
     const raw = $('#stCsv').value.trim();

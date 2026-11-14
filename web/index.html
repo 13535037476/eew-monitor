@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>震线 EEW · 中日地震预警</title>
-<link rel="stylesheet" href="style.css?v=225">
+<link rel="stylesheet" href="style.css?v=226">
 </head>
 <body>
 
@@ -345,6 +345,22 @@
         </table>
         <p class="hint">已接入：日本气象厅 / 中国地震预警 / 中国地震台网 / 台湾 P-Alert 强震网（实时 PGA）/
           WHEWS（待授权）/ EQSC（待授权）。</p>
+
+        <div class="mytok">
+          <div class="row between">
+            <label>我的 Jian 密钥</label>
+            <span class="hint mono" id="myTokState">—</span>
+          </div>
+          <div class="row">
+            <input id="myTokInput" class="input mono" placeholder="rt_…（留空则用本机共享密钥）"
+              autocomplete="off" spellcheck="false">
+            <button type="button" class="btn" id="btnMyTokSave">保存</button>
+            <button type="button" class="btn" id="btnMyTokClear">清除</button>
+          </div>
+          <p class="hint" id="myTokHint">填了自己的密钥，就单独连一条 Jian 预警流，
+            这条流的数据只进你自己的界面：别人登录看不到你的预警，你这边断了也不影响别人。
+            留空 / 清除则回落到本机共享密钥。</p>
+        </div>
       </div>
 
       <div class="sec">
@@ -448,6 +464,6 @@
 <script src="geo.js?v=207"></script>
 <script src="geo_jp.js?v=176"></script>
 <script src="geo_world.js?v=207"></script>
-<script src="app.js?v=275"></script>
+<script src="app.js?v=276"></script>
 </body>
 </html>

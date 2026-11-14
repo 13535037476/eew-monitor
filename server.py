@@ -74,7 +74,7 @@ def user_dir(name):
 
 def user_file(name, fn):
     return os.path.join(user_dir(name), fn)
-VERSION = "1.11.2"
+VERSION = "1.12.0"
 
 # ---------------- 可调阈值（settings.json 里的 gqMag） ----------------
 # 前端设置面板改「全球检测最小震级」后会 POST /api/settings 落盘，
@@ -404,26 +404,27 @@ LOCK = threading.RLock()   # 可重入：防止锁内再进 build_state() 造成
 
 
 class Hub:
-    """SSE 客户端广播"""
+    """SSE 客户端广播（按账号桶分投：甲的预警不会推到乙的界面）"""
 
     def __init__(self):
-        self.clients = []
+        self.clients = []          # [(bucket, queue.Queue)]
         self.lock = threading.Lock()
 
-    def add(self):
+    def add(self, bucket=""):
         q = queue.Queue(maxsize=8)
         with self.lock:
-            self.clients.append(q)
+            self.clients.append((bucket or "", q))
         return q
 
     def drop(self, q):
         with self.lock:
-            if q in self.clients:
-                self.clients.remove(q)
+            self.clients = [c for c in self.clients if c[1] is not q]
 
-    def broadcast(self, text):
+    def broadcast(self, text, bucket=None):
+        """bucket=None 表示发给所有人；给了桶名就只发给该桶的订阅者"""
         with self.lock:
-            targets = list(self.clients)
+            targets = [q for b, q in self.clients
+                       if bucket is None or b == bucket]
         for q in targets:
             try:
                 q.put_nowait(text)
@@ -433,25 +434,158 @@ class Hub:
 
 HUB = Hub()
 
-STATE = {
-    "ts": 0,
-    "version": VERSION,
-    "sources": [],
-    "eew": {"JP": None, "CN": None, "TW": None},
-    "catalogs": {"JP": [], "CN": []},
-    "events": [],
-    "alerts": [],
-    "obs": None,
-    "tsunami": None,
-    "lpgm": None,
-    "sim": None,
-    "primary": {},          # {"eew": {...}, "obs": {...}} 每 10 秒重算的「延迟最低源」
-    "palert": None,         # 台湾 P-Alert 测站级实时 PGA
-    "started": time.time(),
-}
+# ---------------- 账号级状态桶 ----------------
+# 每个「自带数据源令牌」的账号各有一套独立的预警状态，互不干扰：
+# 甲填的 Jian 密钥收到的事件，不会出现在乙的界面上。
+#
+# 没有专属令牌的账号全部落在共享桶 ""（用机器级 data/tokens.json），
+# 这样新注册的账号开箱就有数据，也不会因为多开一个号就多一条连接。
+#
+# 实现上用「线程绑定 + 代理」：STATE 是个按当前线程所属桶路由的代理对象。
+# 这样原来 40 多处 STATE[...] 一行都不用改，也不会漏改某处导致两个账号串数据。
+_TLS = threading.local()
+_BUCKET_LOCK = threading.RLock()
+BUCKETS = {}
+OWN_TOKENS = {}          # 账号名 -> True：该账号自带 Jian 密钥，单独一个桶
+START_TS = time.time()
+
+
+def _blank_state():
+    return {
+        "ts": 0,
+        "version": VERSION,
+        "sources": [],
+        "eew": {"JP": None, "CN": None, "TW": None},
+        "catalogs": {"JP": [], "CN": []},
+        "events": [],
+        "alerts": [],
+        "obs": None,
+        "tsunami": None,
+        "lpgm": None,
+        "sim": None,
+        "primary": {},          # {"eew": {...}, "obs": {...}} 每 10 秒重算的「延迟最低源」
+        "palert": None,         # 台湾 P-Alert 测站级实时 PGA
+        "sim_speed": 1.0,       # 演练倍速（每个账号各自记，互不影响）
+        "started": START_TS,
+    }
+
+
+def current_bucket():
+    return getattr(_TLS, "bucket", "")
+
+
+def enter(bucket):
+    """把当前线程绑定到某个账号桶（同时同步给 sources，供 has_token 判断）"""
+    _TLS.bucket = bucket or ""
+    try:
+        sources.set_profile(_TLS.bucket)
+    except Exception:
+        pass
+    return _TLS.bucket
+
+
+def bucket_state(name=None):
+    n = current_bucket() if name is None else (name or "")
+    with _BUCKET_LOCK:
+        st = BUCKETS.get(n)
+        if st is None:
+            st = BUCKETS[n] = _blank_state()
+        return st
+
+
+def bucket_names():
+    with _BUCKET_LOCK:
+        names = list(BUCKETS.keys())
+    return names or [""]
+
+
+def bucket_of(user):
+    """这个账号用哪个桶。
+
+    只有「自己的令牌文件里真的填了 jian 密钥」才单独开桶；文件存在但没填
+    （或者只填了别的键）就回落到共享桶——否则那个账号会莫名其妙少一路数据源。
+    """
+    name = (user or {}).get("name") or ""
+    if name and name in OWN_TOKENS:
+        return name
+    return ""
+
+
+def refresh_own_tokens():
+    """重扫各账号的令牌文件，更新「谁有专属 Jian 密钥」的索引。
+
+    启动时扫一次；账号保存/删除自己的令牌后再调一次，不用重启。
+    """
+    found = {}
+    try:
+        names = auth.usernames()
+    except Exception:
+        names = []
+    for name in names:
+        try:
+            p = user_file(name, "tokens.json")
+            if not os.path.exists(p):
+                continue
+            tok = _read_tokens(p).get("jian")
+            if str(tok or "").strip():
+                found[name] = True
+        except Exception:
+            continue
+    with _BUCKET_LOCK:
+        OWN_TOKENS.clear()
+        OWN_TOKENS.update(found)
+    return found
+
+
+class _StateView:
+    """STATE 的替身：读写都落到当前线程所属的桶"""
+
+    def __getitem__(self, k):
+        return bucket_state()[k]
+
+    def __setitem__(self, k, v):
+        bucket_state()[k] = v
+
+    def __delitem__(self, k):
+        del bucket_state()[k]
+
+    def __contains__(self, k):
+        return k in bucket_state()
+
+    def get(self, k, d=None):
+        return bucket_state().get(k, d)
+
+    def setdefault(self, k, d=None):
+        return bucket_state().setdefault(k, d)
+
+    def update(self, *a, **kw):
+        bucket_state().update(*a, **kw)
+
+    def keys(self):
+        return bucket_state().keys()
+
+    def items(self):
+        return bucket_state().items()
+
+    def values(self):
+        return bucket_state().values()
+
+    def __repr__(self):
+        return "<STATE bucket=%r>" % current_bucket()
+
+
+STATE = _StateView()
 
 SRC_RUNTIME = {}
 LOGIN_FAILS = {}          # ip -> [失败时间]
+
+
+def _rt_key(sid):
+    """数据源运行时统计的键。Jian 是按账号各连一条的，状态必须分开记，
+    否则甲那条流断了会把乙面板上的「在线」一起拉掉。"""
+    if sid == "jian" and current_bucket():
+        return "jian@" + current_bucket()
+    return sid
 
 
 SIM_PRESETS = {
@@ -789,7 +923,7 @@ def sim_obs_report(ev, mag, depth, lat, lon):
 #      台站越多越收敛；
 #   ④ 终报 = S 波扫过有感范围（虚拟时间有上限，不然一场演练要看几分钟）；
 #   ⑤ 震度速報在终报之后再等一会儿才发，绝不在还在摇的时候冒出来。
-SIM_SPEED = {"v": 1.0}
+# 演练倍速按账号存（STATE["sim_speed"]）：甲调成 3× 不该把乙的演练也加速。
 # 走时以 AK135 表为准（ttable.py）；这两个常数只在表不可用时兜底
 SIM_S_KMPS = 4.2
 SIM_P_KMPS = 6.0
@@ -1010,7 +1144,7 @@ def sim_sequence(uid, true, country, place):
     last = time.time()
     while True:
         now = time.time()
-        sp = SIM_SPEED["v"] if SIM_SPEED["v"] > 0 else 1.0
+        sp = STATE.get("sim_speed") or 1.0
         vt += (now - last) * sp
         last = now
 
@@ -1218,6 +1352,25 @@ def _apply_eew(ev):
 
 
 def apply_payload(src, payload):
+    """把一个公开源的数据分发进「所有」账号桶。
+
+    十几路公开源是机器级共享连接（抓一次就够），但每个账号的界面状态是
+    独立的，所以要逐桶写一遍。私源（Jian）不走这里：它有专属令牌的账号
+    各自一条连接，回调里直接调 _apply_payload_one 只写自己的桶。
+    """
+    names = bucket_names()
+    if len(names) <= 1:
+        return _apply_payload_one(src, payload)
+    prev = current_bucket()
+    try:
+        for name in names:
+            enter(name)
+            _apply_payload_one(src, payload)
+    finally:
+        enter(prev)
+
+
+def _apply_payload_one(src, payload):
     sid = src["id"]
     with LOCK:
         if sid == "palert":
@@ -1346,7 +1499,7 @@ def build_state():
             "tsunami": STATE["tsunami"],
             "lpgm": STATE["lpgm"],
             "sim": STATE["sim"],
-            "sim_speed": SIM_SPEED["v"],
+            "sim_speed": STATE.get("sim_speed") or 1.0,
             "primary": STATE.get("primary") or {},
             "palert": STATE.get("palert"),
             "gq_act": gq_act,
@@ -1373,17 +1526,30 @@ def enrich_obs_points(points):
     threading.Thread(target=run, daemon=True).start()
 
 
-def publish():
-    payload = build_state()
-    text = "data: " + json.dumps(payload, ensure_ascii=False, separators=(",", ":")) + "\n\n"
-    HUB.broadcast(text)
+def publish(only=None):
+    """把当前状态推给 SSE 订阅者，按账号桶分别序列化。
+
+    only 给定时只推那一个桶——私源（Jian）收到事件时用，免得把甲的预警
+    广播给乙，也省掉为了一条消息把别的桶全序列化一遍。
+    """
+    names = [only] if only is not None else bucket_names()
+    prev = current_bucket()
+    try:
+        for name in names:
+            enter(name)
+            payload = build_state()
+            text = "data: " + json.dumps(payload, ensure_ascii=False,
+                                         separators=(",", ":")) + "\n\n"
+            HUB.broadcast(text, bucket=name)
+    finally:
+        enter(prev)
 
 
 def refresh_sources_meta():
     out = []
     now = time.time()
     for src in sources.SOURCES:
-        rt = SRC_RUNTIME.setdefault(src["id"], {
+        rt = SRC_RUNTIME.setdefault(_rt_key(src["id"]), {
             "ok": None, "err": None, "latency_ms": 0,
             "last_ok_ts": 0, "last_ok_str": "", "errors_total": 0,
             "last_err_ts": 0, "has_data": False,
@@ -1505,10 +1671,16 @@ def pick_primary():
 
 
 def primary_loop():
-    """10 秒一轮：重算主源，写进 STATE 并推给前端"""
+    """10 秒一轮：重算主源，写进 STATE 并推给前端（每个账号桶各算各的）"""
     while True:
-        with LOCK:
-            STATE["primary"] = pick_primary()
+        prev = current_bucket()
+        try:
+            for name in bucket_names():
+                enter(name)
+                with LOCK:
+                    STATE["primary"] = pick_primary()
+        finally:
+            enter(prev)
         publish()
         time.sleep(10)
 
@@ -1516,7 +1688,15 @@ def primary_loop():
 def heartbeat_loop():
     while True:
         time.sleep(4)
-        refresh_sources_meta()
+        # 每个桶的 has_token 不一样（有人自带 Jian 密钥、有人走共享档），
+        # 数据源面板必须逐桶算，否则甲的「已授权」会显示到乙的面板上。
+        prev = current_bucket()
+        try:
+            for name in bucket_names():
+                enter(name)
+                refresh_sources_meta()
+        finally:
+            enter(prev)
         publish()
 
 
@@ -1718,6 +1898,9 @@ class Handler(SimpleHTTPRequestHandler):
         super().end_headers()
 
     def do_GET(self):
+        # 同一个连接线程会连续处理不同账号的请求，进来先复位，
+        # 否则上一个账号的桶会被「继承」给下一个请求。
+        enter("")
         path = self.path.split("?")[0]
         # ---- 登录页与鉴权 ----
         if path in ("/login", "/login.html"):
@@ -1732,6 +1915,7 @@ class Handler(SimpleHTTPRequestHandler):
             u = self._user()
             if not u:
                 return self._json({"ok": False, "error": "未登录", "login": True}, 401)
+            enter(bucket_of(u))       # 之后所有读取都落在该账号自己的桶里
         if path in ("/", "/index.html") and not self._user():
             return self._redirect("/login")
         try:
@@ -1843,6 +2027,18 @@ class Handler(SimpleHTTPRequestHandler):
                 except (OSError, ValueError):
                     self._json({"ok": True, "settings": None})
                 return
+            if path == "/api/mytokens":
+                u = self._user() or {}
+                name = u.get("name") or ""
+                own = name in OWN_TOKENS
+                own_tok = ""
+                if own:
+                    own_tok = str(_read_tokens(user_file(name, "tokens.json")).get("jian") or "")
+                shared_tok = str(sources.tokens("").get("jian") or "")
+                self._json({"ok": True, "own": own, "jian": _mask(own_tok),
+                            "shared": bool(shared_tok),
+                            "state": (_jian_rt(name) if own else {}).get("ok")})
+                return
             if path == "/api/history":
                 qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
                 days = max(1, min(3650, int(float((qs.get("days") or ["30"])[0]))))
@@ -1873,6 +2069,7 @@ class Handler(SimpleHTTPRequestHandler):
         super().do_GET()
 
     def do_POST(self):
+        enter("")
         path = self.path.split("?")[0]
         body = self._body()
         # ---- 账号 ----
@@ -1902,8 +2099,10 @@ class Handler(SimpleHTTPRequestHandler):
             auth.revoke(self._token())
             return self._json({"ok": True}, cookie=self._cookie("", clear=True))
         if path.startswith("/api/") and path != "/api/health":
-            if not self._user():
+            u = self._user()
+            if not u:
                 return self._json({"ok": False, "error": "未登录", "login": True}, 401)
+            enter(bucket_of(u))
         if path == "/api/stations/custom":
             u0 = self._user() or {}
             if body.get("user") and body.get("user") != u0.get("name"):
@@ -1967,15 +2166,15 @@ class Handler(SimpleHTTPRequestHandler):
                 v = float(body.get("speed", 1))
             except (TypeError, ValueError):
                 v = 1.0
-            SIM_SPEED["v"] = 3.0 if v >= 2 else 1.0
+            STATE["sim_speed"] = 3.0 if v >= 2 else 1.0
             with LOCK:
                 cur = STATE.get("sim")
                 if cur:                       # 让前端立刻看到新倍速，不用等下一条报文
                     cur = dict(cur)
-                    cur["speed"] = SIM_SPEED["v"]
+                    cur["speed"] = STATE.get("sim_speed") or 1.0
                     STATE["sim"] = cur
             publish()
-            self._json({"ok": True, "speed": SIM_SPEED["v"]})
+            self._json({"ok": True, "speed": STATE.get("sim_speed") or 1.0})
             return
         if path == "/api/settings":
             st = body.get("settings")
@@ -1996,6 +2195,26 @@ class Handler(SimpleHTTPRequestHandler):
                     self._json({"ok": False})
             else:
                 self._json({"ok": False})
+            return
+        if path == "/api/mytokens":
+            u = self._user() or {}
+            name = u.get("name") or ""
+            if not name:
+                return self._json({"ok": False, "error": "未登录"}, 401)
+            tok = str(body.get("jian") or "").strip()
+            if tok and not tok.startswith("rt_"):
+                return self._json(
+                    {"ok": False,
+                     "error": "Jian 的密钥以 rt_ 开头；lk_ 是登录密钥，要先换票才能用"}, 400)
+            if len(tok) > 400:
+                return self._json({"ok": False, "error": "密钥过长"}, 400)
+            try:
+                apply_own_tokens(name, tok)
+            except OSError as exc:
+                return self._json({"ok": False, "error": "写入失败：%s" % exc}, 500)
+            enter(bucket_of(u))
+            publish()
+            self._json({"ok": True, "own": bool(tok), "jian": _mask(tok)})
             return
         if path == "/api/sim/clear":
             with LOCK:
@@ -2082,7 +2301,7 @@ class Handler(SimpleHTTPRequestHandler):
             "origin_ts": now,
             "report_ts": 0,
             "sim_t": 0.0,
-            "speed": SIM_SPEED["v"],
+            "speed": STATE.get("sim_speed") or 1.0,
             "place": place,
             "lat": lat, "lon": lon, "depth": depth, "mag": round(mag, 1),
             "max_intensity": "—",
@@ -2104,9 +2323,16 @@ class Handler(SimpleHTTPRequestHandler):
                 STATE["eew"][country] = None
             STATE["sim"] = ev
         publish()
-        threading.Thread(target=sim_sequence,
-                         args=(uid, {"lat": lat, "lon": lon, "depth": depth, "mag": mag},
-                               country, place), daemon=True).start()
+        sim_true = {"lat": lat, "lon": lon, "depth": depth, "mag": mag}
+        sim_bucket = current_bucket()
+
+        def _run_sim():
+            # 演练线程要绑回发起它的账号：它一直在读 STATE["sim"] 判断
+            # 「这场演练还在不在」，桶错了会读到别人的演练直接退出。
+            enter(sim_bucket)
+            sim_sequence(uid, sim_true, country, place)
+
+        threading.Thread(target=_run_sim, daemon=True).start()
         self._json({"ok": True, "event": ev})
 
     def _stream(self):
@@ -2117,7 +2343,7 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_header("X-Accel-Buffering", "no")
         self.send_header("Access-Control-Allow-Origin", "*")
         self.end_headers()
-        q = HUB.add()
+        q = HUB.add(current_bucket())
         try:
             snapshot = "data: " + json.dumps(build_state(), ensure_ascii=False,
                                              separators=(",", ":")) + "\n\n"
@@ -2136,66 +2362,188 @@ class Handler(SimpleHTTPRequestHandler):
             HUB.drop(q)
 
 
-def load_tokens():
-    """读 data/tokens.json：{"whews": "wat_…", "eqsc": "…"}
-    用户明确要求「需要申请 API 的源不用」，所以默认是空的：
-    没令牌的源只在面板里显示「待授权」，不起线程、不参与延迟竞争。
-    哪天想用了，把令牌填进这个文件即可，不用改代码。
-    打包版：随 exe 内嵌的那份 tokens.json 会先复制到 exe 旁边再读，
-    用户改旁边这份就能换令牌，不用重新打包。"""
-    path = _data_file("tokens.json")
-    if not os.path.exists(path):
-        sources.set_tokens({})
-        return
+def _read_tokens(path):
     try:
         with open(path, "r", encoding="utf-8") as f:
             d = json.load(f)
-        sources.set_tokens(d if isinstance(d, dict) else {})
+        return d if isinstance(d, dict) else {}
     except Exception:
-        sources.set_tokens({})
+        return {}
 
 
-def _jian_rt():
-    return SRC_RUNTIME.setdefault("jian", {
+def load_tokens():
+    """加载令牌，分两级：
+
+    1. 机器级 `data/tokens.json` —— 共享档，所有没有专属令牌的账号都用它
+    2. 账号级 `data/users/<账号>/tokens.json` —— 谁填了谁用自己那份
+
+    账号自带令牌时会单独起一条 Jian 流、单独一套界面状态，别人的界面
+    看不到他的预警，他断线也不会影响别人。没填的账号回落到共享档，
+    所以新注册的号开箱就有数据，不会白屏。
+
+    打包版：随 exe 内嵌的那份 tokens.json 会先复制到 exe 旁边再读，
+    用户改旁边这份就能换令牌，不用重新打包。"""
+    sources.set_tokens(_read_tokens(_data_file("tokens.json")), "")
+    with _BUCKET_LOCK:
+        BUCKETS.setdefault("", _blank_state())
+    refresh_own_tokens()
+    for name in list(OWN_TOKENS):
+        p = user_file(name, "tokens.json")
+        sources.set_tokens(_read_tokens(p), name)
+        with _BUCKET_LOCK:
+            BUCKETS.setdefault(name, _blank_state())
+
+
+def _jian_rt(profile=""):
+    key = ("jian@" + profile) if profile else "jian"
+    return SRC_RUNTIME.setdefault(key, {
         "ok": None, "err": None, "latency_ms": 0, "last_ok_ts": 0,
         "last_ok_str": "", "errors_total": 0, "last_err_ts": 0,
         "has_data": False, "lat_hist": [],
     })
 
 
-def jian_alive():
+def jian_alive(profile=""):
     """Jian 是推送流：延迟就是「服务端发出 → 我们收到」的几十毫秒，
     比 HTTP 轮询（RTT + poll 间隔）先天快一个数量级。这里记 25ms 名义值，
     让它有资格参与「延迟最低源」的竞争，而不是因为比不了 RTT 被排除在外。"""
-    rt = _jian_rt()
-    hist = rt.setdefault("lat_hist", [])
-    hist.append(25)
-    del hist[:-5]
-    rt.update({
-        "ok": True, "err": None, "latency_ms": 25,
-        "last_ok_ts": time.time(),
-        "last_ok_str": time.strftime("%H:%M:%S"),
-        "has_data": True,
-    })
+    prev = current_bucket()
+    try:
+        enter(profile)
+        rt = _jian_rt(profile)
+        hist = rt.setdefault("lat_hist", [])
+        hist.append(25)
+        del hist[:-5]
+        rt.update({
+            "ok": True, "err": None, "latency_ms": 25,
+            "last_ok_ts": time.time(),
+            "last_ok_str": time.strftime("%H:%M:%S"),
+            "has_data": True,
+        })
+    finally:
+        enter(prev)
 
 
-def jian_on_event(msg):
+def jian_on_event(msg, profile=""):
+    """Jian 推来的预警。有专属令牌的账号只写自己的桶，
+    别人的界面不会出现这条事件（这正是「各管各的」的意思）。"""
     if str(msg.get("type") or "") != "jma-eew":
         return
     ev = sources.norm_jian_eew(msg.get("Data") or {})
     if not ev:
         return
-    with LOCK:
-        ok = _apply_eew(ev)
-    if ok:
-        publish()
+    prev = current_bucket()
+    try:
+        enter(profile)
+        with LOCK:
+            ok = _apply_eew(ev)
+        if ok:
+            publish(only=profile)
+    finally:
+        enter(prev)
 
 
-def jian_loop():
+JIAN_FEEDS = {}          # profile -> JianFeed 实例（改密钥时用来停掉旧连接）
+
+
+def ensure_jian(profile=""):
+    """确保该档案有一条 Jian 长连接在跑（已经有就不重复起）。"""
+    if not str(sources.tokens(profile).get("jian") or "").strip():
+        return
+    f = JIAN_FEEDS.get(profile)
+    if f is not None and getattr(f, "alive", False):
+        return
+    threading.Thread(target=jian_loop, args=(profile,), daemon=True).start()
+
+
+def stop_jian(profile=""):
+    """停掉旧连接。alive=False 之后 run() 会在当前帧/超时之后退出。"""
+    f = JIAN_FEEDS.pop(profile, None)
+    if f is not None:
+        try:
+            f.alive = False
+        except Exception:
+            pass
+
+
+def restart_jian(profile=""):
+    """换了密钥：先断旧流，重新读令牌，再起新流。"""
+    stop_jian(profile)
+    p = user_file(profile, "tokens.json") if profile else _data_file("tokens.json")
+    sources.set_tokens(_read_tokens(p), profile)
+    with _BUCKET_LOCK:
+        BUCKETS.setdefault(profile, _blank_state())
+    ensure_jian(profile)
+
+
+def apply_own_tokens(name, tok):
+    """保存 / 清除某账号的专属 Jian 密钥，让连接和状态桶立刻跟上，不用重启。
+
+    tok 为空表示删掉专属密钥，回落到机器级共享档；那个账号的状态桶
+    也一起丢掉，避免内存里留一份永远不会再更新的旧状态。
+    """
+    p = user_file(name, "tokens.json")
+    if tok:
+        os.makedirs(user_dir(name), exist_ok=True)
+        with open(p, "w", encoding="utf-8") as f:
+            json.dump({"jian": tok}, f, ensure_ascii=False)
+    else:
+        try:
+            os.remove(p)
+        except OSError:
+            pass
+    refresh_own_tokens()
+    if tok:
+        restart_jian(name)
+    else:
+        stop_jian(name)
+        with _BUCKET_LOCK:
+            BUCKETS.pop(name, None)
+
+
+def _mask(tok):
+    t = str(tok or "")
+    if not t:
+        return ""
+    if len(t) <= 10:
+        return t[:3] + "****"
+    return t[:6] + "****" + t[-4:]
+
+
+def jian_loop(profile=""):
+    tok = sources.tokens(profile).get("jian")
+
+    def note(msg):
+        """把连接失败写回该账号自己的面板。
+
+        JianFeed 的 log 里混了正常日志（「已连」）和错误，只挑错误标状态，
+        否则连上之后每帧都会把源标成异常。
+        """
+        text = str(msg)
+        if not any(k in text for k in ("断开", "连不上", "失败", "出错", "close")):
+            return
+        prev = current_bucket()
+        try:
+            enter(profile)
+            rt = _jian_rt(profile)
+            rt.update({"ok": False, "err": text[:200],
+                       "last_err_ts": time.time(),
+                       "errors_total": (rt.get("errors_total") or 0) + 1})
+            publish(only=profile)
+        finally:
+            enter(prev)
+
     feed = sources.JianFeed(
-        sources.TOKENS.get("jian"), "/jma-eew",
-        on_event=jian_on_event, on_alive=jian_alive)
-    feed.run()
+        tok, "/jma-eew",
+        on_event=lambda m: jian_on_event(m, profile),
+        on_alive=lambda: jian_alive(profile),
+        log=note)
+    JIAN_FEEDS[profile] = feed
+    try:
+        feed.run()
+    finally:
+        if JIAN_FEEDS.get(profile) is feed:
+            JIAN_FEEDS.pop(profile, None)
 
 
 def boot(host="127.0.0.1", port=8765, tls_cert=None, tls_key=None):
@@ -2203,15 +2551,21 @@ def boot(host="127.0.0.1", port=8765, tls_cert=None, tls_key=None):
     auth.init(os.path.join(DATA_DIR, "users.db"))
     os.makedirs(DATA_DIR, exist_ok=True)
     load_tokens()
-    refresh_sources_meta()
+    # 每个桶的数据源面板状态不一样（取决于该账号有没有自己的令牌），逐个初始化
+    for name in bucket_names():
+        enter(name)
+        refresh_sources_meta()
+    enter("")
     for src in sources.SOURCES:
         if not sources.has_token(src):
             continue                      # 需要授权又没令牌 → 不起线程
         if src.get("id") == "jian" or src.get("wip"):
             continue                      # Jian 走 WebSocket 长连接；wip 的还没实现
         threading.Thread(target=source_loop, args=(src,), daemon=True).start()
-    if sources.TOKENS.get("jian"):
-        threading.Thread(target=jian_loop, daemon=True).start()
+    # 每个持有 Jian 令牌的档案各起一条流：共享档一条，各账号自己的档各一条。
+    # 它们各自写各自的状态桶，互不可见。
+    for prof in list(sources.TOKEN_SETS):
+        ensure_jian(prof)
     if gq_client:
         gq_client.start(publish)
     threading.Thread(target=heartbeat_loop, daemon=True).start()
