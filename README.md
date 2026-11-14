@@ -18,7 +18,7 @@
 build_exe.cmd
 ```
 
-产物 `dist\震线EEW.exe`（单文件，约 32 MB，含 18 段标注语音与图标）。打包用的是 PyInstaller +
+产物 `dist\震线EEW.exe`（单文件，约 21 MB，含 18 段标注语音与图标）。打包用的是 PyInstaller +
 pywebview，第一次需要联网装这两个包（脚本已配好阿里云镜像）。
 
 ### 浏览器版
@@ -32,24 +32,34 @@ python server.py --port 9000 --no-browser
 
 零依赖：只用 Python 标准库（3.9+）。浏览器打开后会自动重连，无需刷新。
 
-### 公网网页版（Render）
+### 可选：部署到公网
 
-仓库里带 `render.yaml`，可以直接部署成一个真实网址，手机电脑都能开。
-服务端要持续轮询 18 个数据源并保持 SSE 推送，所以不能放纯静态托管（GitHub Pages 跑不了）。
+**当前默认形态是本机运行**，不依赖任何云平台。仓库里保留了 `render.yaml` / `Dockerfile` /
+`Procfile` 与 `requirements.txt`，将来想把服务放到公网上，拿来就能用。
 
-1. 在 [Render](https://render.com) 用 GitHub 账号登录，授权访问本仓库
-2. **New → Blueprint**，选中本仓库，Render 会自动读 `render.yaml`
-3. 创建时会要求填 `EEW_INVITE`（邀请码），自己随便定一个字符串
-4. 部署完成后拿到 `https://eew-monitor-xxxx.onrender.com`，用邀请码注册第一个账号（自动成为管理员）
+需要先明白一件事：**GitHub Pages 这类静态托管放不了这套东西**。服务端要持续轮询 18 个数据源、
+维持 SSE 长连接、代理各家的无 CORS 接口，必须是常驻进程。
+
+Render / Railway 这类平台的现状（2026-11 实测）：
+
+- Render 免费档要绑外币卡，0.1 CPU / 512 MB，15 分钟无访问休眠，冷启动 30~60 秒
+- Railway 是 $5 试用额度、30 天、不需要卡，但对「受限试用」账号可能限制出网
+- Koyeb 免费档已在 2026-02 取消
+
+真要部署，步骤是这样：
+
+1. 平台用 GitHub 账号登录，授权访问本仓库
+2. Render 走 **New → Blueprint**（自动读 `render.yaml`）；Railway 走 **Deploy from GitHub repo**
+3. 启动命令：`python server.py --host 0.0.0.0 --port $PORT --no-browser`
+4. 环境变量填 `EEW_INVITE`（邀请码），自己随便定一个字符串
+5. 在 Networking 里 Generate Domain，拿到网址后用邀请码注册第一个账号（自动成为管理员）
 
 注意事项：
 
-- 免费实例 **15 分钟无访问会休眠**，被访问时冷启动约 30~60 秒，期间收不到预警。
-  需要 7×24 常驻请升级付费实例（或换 Fly.io / 有状态容器）。
-- 免费实例的磁盘是临时的，重启后 `data/archive.json` 会清空，统计面板从零开始。
-- `data/tokens.json` 里的第三方令牌不会随仓库上传，云端这份是空的；
-  需要的话在 Render 的 Secret Files 里放一份。
-- 公网暴露后**务必保留邀请码**，否则任何人都能注册；第一个注册的人拥有管理员权限。
+- 免费实例 **15 分钟无访问会休眠**，冷启动期间收不到预警
+- 免费实例的磁盘是临时的，重启后 `data/archive.json` 会清空，统计面板从零开始
+- `data/tokens.json` 里的第三方令牌不会随仓库上传，云端这份是空的
+- 公网暴露后**务必保留邀请码**，否则任何人都能注册；第一个注册的人拥有管理员权限
 
 ## 数据源
 

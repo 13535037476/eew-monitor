@@ -74,7 +74,7 @@ def user_dir(name):
 
 def user_file(name, fn):
     return os.path.join(user_dir(name), fn)
-VERSION = "1.11.1"
+VERSION = "1.11.2"
 
 # ---------------- 可调阈值（settings.json 里的 gqMag） ----------------
 # 前端设置面板改「全球检测最小震级」后会 POST /api/settings 落盘，
@@ -1613,6 +1613,23 @@ def kmoni_loop():
 
 # ---------------- HTTP ----------------
 
+class Server(ThreadingHTTPServer):
+    """连接被对端掐断不算错误：静默吞掉，别让 traceback 刷屏。
+
+    SimpleHTTPRequestHandler 在写响应体时抛出 ConnectionAborted 很常见
+    （窗口刚被销毁、手机锁屏、页面刷新），socketserver 默认会打印完整
+    调用栈，几百行下去真正的异常就被埋了。
+    """
+    daemon_threads = True
+
+    def handle_error(self, request, client_address):
+        exc = sys.exc_info()[1]
+        if isinstance(exc, (BrokenPipeError, ConnectionAbortedError,
+                            ConnectionResetError, TimeoutError)):
+            return
+        super().handle_error(request, client_address)
+
+
 class Handler(SimpleHTTPRequestHandler):
     server_version = "EEWMonitor/" + VERSION
     protocol_version = "HTTP/1.1"
@@ -1625,17 +1642,22 @@ class Handler(SimpleHTTPRequestHandler):
 
     def _json(self, obj, code=200, cookie=None):
         body = json.dumps(obj, ensure_ascii=False).encode("utf-8")
-        self.send_response(code)
-        self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header("Content-Length", str(len(body)))
-        self.send_header("Cache-Control", "no-store")
-        self.send_header("Access-Control-Allow-Origin", "*")
-        if cookie:
-            self.send_header("Set-Cookie", cookie)
-        if self._https():
-            self.send_header("Strict-Transport-Security", "max-age=31536000")
-        self.end_headers()
-        self.wfile.write(body)
+        try:
+            self.send_response(code)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            if cookie:
+                self.send_header("Set-Cookie", cookie)
+            if self._https():
+                self.send_header("Strict-Transport-Security", "max-age=31536000")
+            self.end_headers()
+            self.wfile.write(body)
+        except (BrokenPipeError, ConnectionAbortedError, ConnectionResetError):
+            # 关窗、切页、手机断网都很常见：对端已经走了，这时写回去必然失败。
+            # 静默收尾即可，不然控制台会被 traceback 刷满，真错误反而看不见。
+            self.close_connection = True
 
     def _https(self):
         if isinstance(self.connection, ssl.SSLSocket):
@@ -1800,8 +1822,11 @@ class Handler(SimpleHTTPRequestHandler):
                     # index 必须带上：GQ 的台站编号是稀疏的（全局目录 9000+，
                     # 当前在线只有一部分），前端拿数组下标当 index 会整体错位，
                     # 结果就是「有些测站不显示、亮起来的还不是那几个站」。
+                    # 用 .get：台站表在接收过程中可能只是半成品，缺字段时
+                    # 宁可在前端显示成空，也不要整条接口 500。
                     self._json({"n": len(st),
-                                "s": [[p["i"], p["lat"], p["lon"], p["net"], p["code"], p["loc"]]
+                                "s": [[p.get("i"), p.get("lat"), p.get("lon"),
+                                       p.get("net"), p.get("code"), p.get("loc")]
                                       for p in st]})
                 else:
                     self._json({"n": 0, "s": []})
@@ -2192,7 +2217,7 @@ def boot(host="127.0.0.1", port=8765, tls_cert=None, tls_key=None):
     threading.Thread(target=heartbeat_loop, daemon=True).start()
     threading.Thread(target=primary_loop, daemon=True).start()
     threading.Thread(target=kmoni_loop, daemon=True).start()
-    srv = ThreadingHTTPServer((host, port), Handler)
+    srv = Server((host, port), Handler)
     srv.daemon_threads = True
     if tls_cert and tls_key:
         ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
