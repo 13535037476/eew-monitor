@@ -368,9 +368,10 @@
             <label>账号与密钥总览</label>
             <button type="button" class="btn" id="btnAdmin">打开管理…</button>
           </div>
-          <p class="hint">只有管理员看得到。能看清每个账号配没配密钥、在线几台设备，
+          <p class="hint">只有<b>站点所有者</b>看得到。能看清每个账号配没配密钥、在线几台设备，
             可建号 / 改密码 / 踢下线 / 删号，也能替别人配密钥。
-            <b>密钥原文谁都看不到</b>，只显示前 6 位和后 4 位。</p>
+            <b>密钥原文谁都看不到</b>，只显示前 6 位和后 4 位。
+            其他账号看不到这一块，也看不到别人的名字和设备。</p>
         </div>
       </div>
 
@@ -478,8 +479,9 @@
     </div>
     <div class="dlg-body">
       <div class="atshared">
-        <p class="hint" style="margin:0">这里管三件事：<b>人</b>（账号与权限）、<b>设备</b>（谁在哪台机器上登录着）、
-          <b>密钥</b>（Jian 个人密钥按账号存，公开数据源令牌按这台机器存）。
+        <p class="hint" style="margin:0">只有<b>站点所有者</b>能打开这个面板。这里管三件事：<b>人</b>（账号）、
+          <b>设备</b>（谁在哪台机器上登录着）、<b>密钥</b>（Jian 个人密钥按账号存，公开数据源令牌按这台机器存）。
+          普通账号看不到这一页，只能在自己的「数据源」里管自己的 Jian 密钥。
           在哪台设备上打开这个面板都一样管用；密钥原文任何人都看不到，只显示前 6 位 + 后 4 位。</p>
       </div>
 
@@ -496,11 +498,8 @@
             autocomplete="new-password">
           <button type="button" class="btn primary" id="btnAdminCreate">创建</button>
         </div>
-        <div class="row between" style="margin-top:8px">
-          <label>直接给管理员权限</label>
-          <input type="checkbox" id="adminNewAdm" class="switch">
-        </div>
-        <p class="hint">管理员建号不受「关闭注册」与邀请码限制。</p>
+        <p class="hint">新建的都是<b>普通账号</b>：只能管自己的数据源密钥，看不到别人，也进不了这一页。
+          建号不受「关闭注册」与邀请码限制。</p>
       </div>
 
       <div class="admin-sec">
@@ -523,6 +522,6 @@
 <script src="geo.js?v=207"></script>
 <script src="geo_jp.js?v=176"></script>
 <script src="geo_world.js?v=207"></script>
-<script src="app.js?v=279"></script>
+<script src="app.js?v=280"></script>
 </body>
 </html>

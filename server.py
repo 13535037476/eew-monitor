@@ -81,7 +81,17 @@ def user_dir(name):
 
 def user_file(name, fn):
     return os.path.join(user_dir(name), fn)
-VERSION = "1.15.0"
+VERSION = "1.16.0"
+
+# ---------------- 站点所有者 ----------------
+# 这套东西默认是本机一家人用，账号管理（建号/改密/踢设备/替人配密钥）
+# 只给「所有者」一个账号，其余账号只能管自己的数据源密钥。
+# 换人部署时用环境变量 EEW_OWNER 指定，不用改代码。
+OWNER = (os.environ.get("EEW_OWNER") or "eggy").strip()
+
+
+def is_owner(u):
+    return bool(u) and (u.get("name") or "") == OWNER
 
 # ---------------- 可调阈值（settings.json 里的 gqMag） ----------------
 # 前端设置面板改「全球检测最小震级」后会 POST /api/settings 落盘，
@@ -1955,6 +1965,10 @@ class Handler(SimpleHTTPRequestHandler):
             if u:
                 # 记一次活跃，人员管理里才能看出「这台设备是不是还在用」
                 auth.touch(self._token())
+                # 账号管理只认「所有者」，不看 is_admin：
+                # 老库里被设成管理员的账号，升级后也不会自动获得人员管理入口。
+                u = dict(u)
+                u["owner"] = is_owner(u)
             return u
         except Exception:
             return None
@@ -2129,8 +2143,8 @@ class Handler(SimpleHTTPRequestHandler):
                 return
             if path in ("/api/admin/users", "/api/admin/machine"):
                 me = self._user() or {}
-                if not me.get("admin"):
-                    return self._json({"ok": False, "error": "仅管理员可访问"}, 403)
+                if not is_owner(me):
+                    return self._json({"ok": False, "error": "仅站点所有者可访问"}, 403)
                 if path == "/api/admin/machine":
                     return self._json({"ok": True, "machine": machine_tokens_state()})
                 self._json(admin_overview(my_sid=self._sid()))
@@ -2180,6 +2194,13 @@ class Handler(SimpleHTTPRequestHandler):
             pwd = str(body.get("password") or "")
             try:
                 if path == "/api/register":
+                    # 所有者名字是保留位：谁先注册到就等于抢到了账号管理的钥匙。
+                    # 正常情况它就是已有账号，register 会报「已有人用」；
+                    # 空库被人抢注这种情况要提前拦掉，只能由本机脚本建。
+                    if user == OWNER:
+                        return self._json(
+                            {"ok": False,
+                             "error": "这个用户名是保留的站点所有者账号，请用别的名字"}, 403)
                     u = auth.register(user, pwd, body.get("invite"))
                 else:
                     u = auth.verify(user, pwd)
@@ -2190,6 +2211,8 @@ class Handler(SimpleHTTPRequestHandler):
                 return self._json({"ok": False, "error": str(e)}, 400)
             token = auth.new_session(u, self.headers.get("User-Agent") or "",
                                      ip=self.client_address[0])
+            u = dict(u)
+            u["owner"] = is_owner(u)
             return self._json({"ok": True, "user": u},
                               cookie=self._cookie(token))
         if path == "/api/logout":
@@ -2316,8 +2339,9 @@ class Handler(SimpleHTTPRequestHandler):
         if path in ("/api/admin/users", "/api/admin/tokens",
                     "/api/admin/device", "/api/admin/machine"):
             me = self._user() or {}
-            if not me.get("admin"):
-                return self._json({"ok": False, "error": "仅管理员可访问"}, 403)
+            if not is_owner(me):
+                # 非所有者连「有哪些人」都看不到，这里直接 403，不做任何 enumerate。
+                return self._json({"ok": False, "error": "仅站点所有者可访问"}, 403)
             me_name = me.get("name") or ""
             if path == "/api/admin/machine":
                 patch = {k: body.get(k) for k in MACHINE_KEYS if k in body}
@@ -2371,7 +2395,8 @@ class Handler(SimpleHTTPRequestHandler):
             pwd = str(body.get("password") or "")
             try:
                 if act == "create":
-                    nu = auth.create(who, pwd, bool(body.get("admin")))
+                    # 所有者模式：新号一律普通账号，只能管自己的数据源密钥。
+                    nu = auth.create(who, pwd, False)
                     # 新号默认没有专属密钥，会落到共享档；桶按需在登录时建
                     return self._json({"ok": True, "user": nu})
                 if act in ("password", "admin", "kick", "delete") and not who:
@@ -2380,16 +2405,22 @@ class Handler(SimpleHTTPRequestHandler):
                     auth.set_password(who, pwd)
                     return self._json({"ok": True, "kicked": 1})
                 if act == "admin":
-                    if who == me_name:
-                        return self._json(
-                            {"ok": False, "error": "不能改自己的管理员身份"}, 400)
-                    auth.set_admin(who, bool(body.get("admin")))
-                    return self._json({"ok": True})
+                    # 升级到 v1.16 后不再有「管理员」，人员管理只认所有者账号。
+                    return self._json(
+                        {"ok": False,
+                         "error": "现在只有站点所有者（%s）能管理账号，不再单独授予管理员" % OWNER},
+                        400)
                 if act == "kick":
+                    if who == OWNER:
+                        return self._json(
+                            {"ok": False, "error": "站点所有者账号不能强制下线"}, 400)
                     return self._json({"ok": True, "kicked": auth.kick(who)})
                 if act == "delete":
                     if who == me_name:
                         return self._json({"ok": False, "error": "不能删自己正在用的账号"}, 400)
+                    if who == OWNER:
+                        return self._json(
+                            {"ok": False, "error": "站点所有者账号不能删除，否则没人能管账号了"}, 400)
                     auth.delete_user(who)
                     purge_user(who)
                     return self._json({"ok": True})
@@ -2880,6 +2911,7 @@ def admin_overview(my_sid=""):
         rows.append({
             "name": name,
             "admin": bool(u["admin"]),
+            "owner": name == OWNER,
             "created": u["created"],
             "last_login": u["last_login"],
             "sessions": len(devs) or u["sessions"],
@@ -2890,6 +2922,7 @@ def admin_overview(my_sid=""):
             "devices": devs,
         })
     return {"ok": True, "users": rows,
+            "owner": OWNER,
             "machine": machine_tokens_state(),
             "version": VERSION}
 

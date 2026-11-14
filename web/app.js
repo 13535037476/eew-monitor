@@ -4639,10 +4639,13 @@
           }
         }
         state.me = d.user.name;
-        $('#userName').textContent = d.user.name + (d.user.admin ? ' · 管理员' : '');
+        // 只有「站点所有者」有账号管理；其余账号只看到自己的数据源密钥。
+        const isOwner = !!d.user.owner;
+        state.owner = !!d.user.owner;
+        $('#userName').textContent = d.user.name + (d.user.owner ? ' · 所有者' : '');
         $('#userChip').hidden = false;
         const ae = $('#adminEntry');
-        if (ae) ae.hidden = !d.user.admin;
+        if (ae) ae.hidden = !isOwner;
       }
     } catch (e) { }
   }
@@ -5380,7 +5383,7 @@
     if (await saveMyTokens('')) { toast('已清除，回落到共享密钥'); loadMyTokens(); }
   });
 
-  // ---------------- 账号与密钥管理（仅管理员） ----------------
+  // ---------------- 账号与密钥管理（仅站点所有者） ----------------
   const adminDlg = $('#adminDlg');
   let adminData = null;
 
@@ -5510,7 +5513,7 @@
 
     const hd = el('div', 'acct-hd');
     hd.appendChild(el('b', '', u.name));
-    if (u.admin) hd.appendChild(el('span', 'tag adm', '管理员'));
+    if (u.owner) hd.appendChild(el('span', 'tag adm', '所有者'));
     hd.appendChild(srcTag(u));
     hd.appendChild(el('span', 'sp'));
     const meta = el('div', 'acct-meta',
@@ -5586,19 +5589,10 @@
     ft.appendChild(bPwd);
 
     if (!isMe) {
-      const bAdm = el('button', 'btn sm', u.admin ? '取消管理员' : '设为管理员');
-      bAdm.addEventListener('click', async () => {
-        try {
-          await adminApi('/api/admin/users',
-            { action: 'admin', username: u.name, admin: !u.admin });
-          toast(u.admin ? ('已取消 ' + u.name + ' 的管理员') : ('已把 ' + u.name + ' 设为管理员'));
-          await loadAdmin();
-        } catch (e) { toast(e.message || '操作失败'); }
-      });
-      ft.appendChild(bAdm);
+      ft.appendChild(el('span', 'hint', '普通账号：只能管自己的数据源密钥'));
     }
 
-    if (u.sessions > 0) {
+    if (u.sessions > 0 && !u.owner) {
       const bKick = el('button', 'btn sm', '全部下线');
       bKick.addEventListener('click', async () => {
         try {
@@ -5676,11 +5670,10 @@
     const p = ($('#adminNewPwd').value || '');
     if (!n) { toast('先填用户名'); return; }
     try {
-      await adminApi('/api/admin/users',
-        { action: 'create', username: n, password: p, admin: $('#adminNewAdm').checked });
+      // 新号一律普通账号，服务端也不收 admin 字段了
+      await adminApi('/api/admin/users', { action: 'create', username: n, password: p });
       $('#adminNewName').value = '';
       $('#adminNewPwd').value = '';
-      $('#adminNewAdm').checked = false;
       toast('已创建账号 ' + n);
       await loadAdmin();
     } catch (e) { toast(e.message || '创建失败'); }
