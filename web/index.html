@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>震线 EEW · 中日地震预警</title>
-<link rel="stylesheet" href="style.css?v=230">
+<link rel="stylesheet" href="style.css?v=231">
 </head>
 <body>
 
@@ -89,6 +89,22 @@
     </div>
     <div class="calc" id="calcBox" hidden></div>
   </section>
+
+  <!-- JMA 风格「震度速報」闪现卡：新地震第一报弹出来亮 12 秒，黄黑配色，
+       还没查明的项写「調査中」。只闪一次，点一下就收。 -->
+  <div class="sok" id="sokuhoFlash" hidden>
+    <div class="sok-tag">震度速報</div>
+    <div class="sok-card">
+      <div class="sok-row">
+        <div class="sok-int"><b id="sokInt">—</b></div>
+        <div class="sok-info">
+          <b id="sokPlace">震源 調査中</b>
+          <span id="sokTime">—</span>
+        </div>
+      </div>
+      <div class="sok-strip" id="sokStrip">震源 &amp; 規模 調査中</div>
+    </div>
+  </div>
 
   <aside class="obs" id="obsCard" hidden>
     <div class="obs-hd">
@@ -535,6 +551,6 @@
 <script src="geo.js?v=207"></script>
 <script src="geo_jp.js?v=176"></script>
 <script src="geo_world.js?v=207"></script>
-<script src="app.js?v=281"></script>
+<script src="app.js?v=282"></script>
 </body>
 </html>

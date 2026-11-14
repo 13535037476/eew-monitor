@@ -795,3 +795,39 @@ body.obs-on .quiet{display:none}
 .mach-hd{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px}
 .mach-hd b{font-size:12px;font-weight:600}
 .mach .acct-tok{margin-top:0}
+
+/* ===== JMA 风格「震度速報」闪现卡 =====
+   气象厅推特上那种黄黑卡：黑标签 + 黄底 + 大震度数字 + 黑色調査中条。
+   配色固定，不跟主题走——它本身就是「官方电文」的样子。 */
+.sok{position:fixed;top:78px;left:50%;transform:translateX(-50%);z-index:270;
+  width:min(360px,calc(100vw - 28px));cursor:pointer;user-select:none;
+  filter:drop-shadow(0 12px 26px rgba(0,0,0,.42));
+  animation:sokIn .4s cubic-bezier(.2,1.5,.45,1)}
+.sok[hidden]{display:none}
+.sok.out{animation:sokOut .28s ease forwards}
+@keyframes sokIn{from{opacity:0;transform:translateX(-50%) translateY(-18px) scale(.9)}
+  to{opacity:1;transform:translateX(-50%) translateY(0) scale(1)}}
+@keyframes sokOut{to{opacity:0;transform:translateX(-50%) translateY(-12px) scale(.95)}}
+.sok-tag{position:relative;z-index:1;display:table;background:#141414;color:#fff;
+  font-size:13px;font-weight:800;letter-spacing:3px;padding:5px 14px 4px;
+  border-radius:9px 9px 0 0;margin-left:8px}
+.sok-card{background:#ffd60a;border:3px solid #141414;border-radius:0 12px 12px 12px;
+  padding:9px 10px 8px}
+.sok-row{display:flex;align-items:center;gap:10px;min-width:0}
+.sok-int{flex:none;min-width:78px;height:78px;display:flex;align-items:center;
+  justify-content:center;background:#ffd60a;border:3px solid #141414;border-radius:8px}
+.sok-int b{font-size:44px;font-weight:900;color:#141414;line-height:1;white-space:nowrap}
+.sok-int.small b{font-size:26px}
+.sok-info{flex:1;min-width:0}
+.sok-info b{display:block;font-size:19px;font-weight:900;color:#141414;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sok-info span{display:block;margin-top:2px;font-size:12.5px;font-weight:700;
+  color:#141414;opacity:.85}
+.sok-strip{margin-top:8px;background:#141414;color:#fff;font-size:13.5px;font-weight:800;
+  padding:5px 10px;border-radius:6px;text-align:center;letter-spacing:1px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media (max-width:480px){
+  .sok-int{min-width:60px;height:60px}
+  .sok-int b{font-size:32px}
+  .sok-info b{font-size:16px}
+}

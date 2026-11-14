@@ -3544,6 +3544,90 @@
     chPush('obs', files, true);
   }
 
+  // ---------------- JMA 风格「震度速報」闪现卡 ----------------
+  // 新地震的第一报从屏幕顶上掉下来亮 12 秒：黄底黑框、左边大震度数字、
+  // 右边震源和发震时刻，还没查明的项写「調査中」——气象厅推特上那种卡。
+  // 按 uid 去重只闪一次；演练、推算、取消报都不闪；点一下就收。
+  const SOK_HOLD = 12000;
+  const sokSeen = new Set();
+  let sokTimer = 0, sokEl = null;
+
+  function sokHide() {
+    if (sokTimer) { clearTimeout(sokTimer); sokTimer = 0; }
+    const el = sokEl; sokEl = null;
+    if (!el) return;
+    el.classList.add('out');
+    setTimeout(() => el.remove(), 300);
+  }
+
+  function sokTime(ts, tzMin) {
+    if (!ts) return '--:--:--';
+    const d = new Date((ts + (tzMin || 0)) * 1000);
+    const p = n => String(n).padStart(2, '0');
+    return d.getUTCFullYear() + '/' + p(d.getUTCMonth() + 1) + '/' + p(d.getUTCDate()) +
+      ' ' + p(d.getUTCHours()) + ':' + p(d.getUTCMinutes()) + ':' + p(d.getUTCSeconds());
+  }
+
+  function showSokuho(it) {
+    if (!it || it.cancel || it.isSim || it.auto) return;
+    // 电文慢的话第一报可能迟到一会儿；超过 90 秒的就不补闪了，免得吓人
+    if (nowSec() - (it.report_ts || it.origin_ts || 0) > 90) return;
+    const isObs = it.max_intensity === undefined && it.max_scale !== undefined;
+    let label = isObs ? (GRADE[SCALE_RISK[it.max_scale]] || '') : (String(it.max_intensity || ''));
+    if (!label || label === '0') label = '?';
+    const place = String(it.place || '').trim();
+    const mag = Number(it.mag) || 0;
+    const depth = Number(it.depth) || 0;
+    const unknown = [];
+    if (!place || place === '不明' || place === '調査中') unknown.push('震源');
+    if (!mag) unknown.push('規模');
+    if (!depth) unknown.push('深さ');
+    const strip = unknown.length
+      ? unknown.join(' & ') + ' 調査中'
+      : '震源 ' + place + ' · M' + (Math.round(mag * 10) / 10) +
+        ' · 深さ ' + Math.round(depth) + 'km';
+    const when = sokTime(it.origin_ts || it.report_ts, tzOf(it)) + ' 発生';
+
+    if (sokEl) { sokEl.remove(); sokEl = null; }
+    if (sokTimer) { clearTimeout(sokTimer); sokTimer = 0; }
+    const el = $('#sokuhoFlash');
+    if (!el) return;
+    el.hidden = false;
+    el.classList.remove('out');
+    $('#sokInt').textContent = label;
+    // 5弱/6強 三个字，大字号塞不下就缩一档
+    $('#sokInt').parentNode.classList.toggle('small', label.length > 1);
+    $('#sokPlace').textContent = place && place !== '不明' ? ('震源 ' + place) : '震源 調査中';
+    $('#sokTime').textContent = when;
+    $('#sokStrip').textContent = strip;
+    sokEl = el;
+    sokTimer = setTimeout(sokHide, SOK_HOLD);
+  }
+  window.__sokTest = showSokuho;   // 测试钩子：截图脚本直接喂一条假报看效果
+
+  function maybeSokuho() {
+    if (state.historyEvent) return;
+    // 优先级和主卡一致：正在进行的正式速报第一，其次震度速報电文
+    const cands = [];
+    const ev = primaryEvent();
+    if (ev && !ev.isSim && !ev.auto) cands.push(ev);
+    const o = state.obs;
+    if (o) cands.push(o);
+    for (const it of cands) {
+      // 同一场地震不同来源（EEW 速报 / 震度速報电文）发震时刻差几秒，
+      // 按分钟取整当身份，速報闪过之后詳細电文就不会再闪一次
+      const uid = it.uid || ('OBS-' + Math.round((it.origin_ts || 0) / 60));
+      if (sokSeen.has(uid)) continue;
+      sokSeen.add(uid);
+      if (sokSeen.size > 400) sokSeen.clear();   // 只是个去重集合，别让它无限长
+      showSokuho(it);
+      if (sokEl) break;                          // 一屏一张，后面的等下一轮
+    }
+  }
+
+  const sokBox = $('#sokuhoFlash');
+  if (sokBox) sokBox.addEventListener('click', sokHide);
+
   function speak() {
     if (!window.speechSynthesis) return;
     const ev = currentEvent(); if (!ev) return;
@@ -4374,6 +4458,7 @@
     state.tsunami = data.tsunami || null;
     state.lpgm = data.lpgm || null;
     announceObs(state.obs);
+    try { maybeSokuho(); } catch (e) { }
     // 每 10 秒重算一次的「延迟最低源」+ 台湾 P-Alert 测站实时 PGA
     state.primary = data.primary || {};
     state.palert = data.palert || null;
