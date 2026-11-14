@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: eew-monitor
+    runtime: python
+    plan: free
+    region: singapore
+    buildCommand: "pip install -r requirements.txt"
+    # 云端没有桌面，必须 --no-browser；端口由平台通过 $PORT 注入
+    startCommand: "python server.py --host 0.0.0.0 --port $PORT --no-browser"
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      # 公网部署必须设邀请码：第一个用邀请码注册的人成为管理员，
+      # 之后没有邀请码的人无法注册，避免陌生人抢注。
+      # sync: false 表示不在文件里写明文，由平台创建时向你要。
+      - key: EEW_INVITE
+        sync: false
