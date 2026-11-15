@@ -803,14 +803,20 @@
     const g = fieldCanvas.getContext('2d');
     g.setTransform(1, 0, 0, 1, 0, 0);
     g.clearRect(0, 0, fieldCanvas.width, fieldCanvas.height);
-    if (!ev || !state.layers.field) { fieldDirty = false; return; }
+    if (!state.layers.field) { fieldDirty = false; return; }
+    // 速報到得晚（終報后约 2 分钟），那时事件多半已经收场——
+    // 只要还有新鲜的震度速報（15 分钟内），县块就继续铺着
+    if (!ev && !obsBlocks()) { fieldDirty = false; return; }
     g.setTransform(view.dpr, 0, 0, view.dpr, 0, 0);
 
     // 气象厅给了予想震度地域，就直接照它的区块画，不再自己算等值面。
     // 没有预警但有震度速報时，用速报的都道府县震度画块——速报本身就是
     // 「地域」级的东西，落到地图上就应该是块。
+    const ob = state.layers.pref === 0 ? null : obsBlocks();
     let blocks = state.layers.pref === 0 ? null : prefBlocks(ev);
-    if (!blocks) blocks = obsBlocks();
+    // 震度速報 是「摇完实测」的地域级原文，比 EEW 的予想、更比本机推算准：
+    // 同一场地震时压过那些块；推算出来的块（__est）也一律让位。
+    if (ob && (!ev || !blocks || blocks.__est || sameQuake(ev))) blocks = ob;
     if (blocks) {
       const idx = prefIndex();
       for (const name of Object.keys(blocks)) {
@@ -1589,11 +1595,21 @@
       else { state.tipPin = ''; tip.classList.remove('show', 'pin'); }
     }
     const live0 = !!currentEvent();
-    // 演练终报 15 虚拟秒后热力场也收掉——速報都出了，底色还亮着就是干扰
-    const showField = !!ev && (live0 || !!state.historyEvent) &&
-      !(ev.isSim && ev.final && simFinalAge(ev) >= 15);
+    // 演练终报后热力场不急着收：速報要終報后约 2 分钟才来，收早了中间空窗。
+    // 速報到了就让它接管（县块同源），再亮 10 分钟后一起收——底色亮太久也是干扰。
+    const simDone = ev && ev.isSim && ev.final && (() => {
+      const o = state.obs;
+      if (o && sameQuake(ev)) return nowSec() - (o.report_ts || 0) > 600;
+      return simFinalAge(ev) >= 120;
+    })();
+    // 真实速報在事件收场后也照样铺：15 分钟内的地域级原文都算数
+    const obFresh = state.obs && state.obs.pref &&
+      nowSec() - (state.obs.report_ts || state.obs.origin_ts || 0) < 900;
+    const showField = obFresh ||
+      (!!ev && (live0 || !!state.historyEvent) && !simDone);
     if (baseDirty) drawBase();
-    const key = (ev ? ev.uid + '|' + (ev.serial || 0) : 'none') + (showField ? '' : '#off');
+    const key = (ev ? ev.uid + '|' + (ev.serial || 0) : 'none') + (showField ? '' : '#off') +
+      '|' + obsKeyOf();
     if (fieldDirty || key !== fieldKey) { drawField(showField ? ev : null); fieldKey = key; }
 
     ctx.setTransform(view.dpr, 0, 0, view.dpr, 0, 0);
@@ -1807,32 +1823,32 @@
     }
   }
 
-  // 气象厅给出的予想震度区块（没有就是空对象）
+  // 地图上日本那一层用「都道府县填色块」还是渐变热力场，全看这里：
+  //   · 演练 → 按真值算县块（和台站同源）；
+  //   · 真实速报 → 报文带了地域别予想震度就原样用，没带就按报文给的震源算县块。
+  // 总之只要气象厅发了报，就是填色块，不再画那层自己外推的等值面。
   function prefBlocks(ev) {
     if (!ev || ev.country !== 'JP') return null;
-    const pi = ev.pref_intensity;
-    if (!pi) return null;
-    const keys = Object.keys(pi);
-    if (!keys.length) return null;
-    // 演练事件：服务端是拿「每个县里离震中最近的台站」算预想震度的，
-    // 台站往往深入内陆，离海岸远——三陸沖这种海上震源，岩手/宮城的区块会
-    // 比真实 JMA 预想（按地域面积推）低一整档。改用县多边形上离震源最近的
-    // 顶点重算，衰减式与台站一致。
     if (ev.isSim || ev.training) {
       const c = simPrefIntensity(ev);
       if (c) return c;
     }
-    return keys.length ? pi : null;
+    const pi = ev.pref_intensity;
+    if (pi && Object.keys(pi).length) return pi;
+    if (!isJmaReport(ev)) return null;    // 别的源的报不铺块
+    return estPrefIntensity(ev);
   }
 
   let pbKey = '', pbCache = null;
-  function simPrefIntensity(ev) {
+  // 按震源算每个县的震度：取县多边形上离震源最近的顶点，套同一条衰减式。
+  // 直接用县中心会偏——三陸沖这种海上震源，岩手/宮城中心离得远，会低一整档。
+  function prefFromSrc(ev, tag) {
     const g = window.GEOJP;
     if (!g || !g.prefs) return null;
-    // 演练：各县预想震度按真值算。这是「哪里真的会摇到几度」，
-    // 跟台站的颜色必须同源，不能跟着估算震源飘。
     const src = srcOf(ev);
-    const k = ev.uid + '#' + (ev.serial || 0) + '#' + (src.mag || 0) + '#' + (src.depth || 0);
+    const k = tag + ev.uid + '#' + (ev.serial || 0) + '#' + (src.mag || 0) + '#' +
+      (src.depth || 0) + '#' + Math.round((src.lat || 0) * 100) + ',' +
+      Math.round((src.lon || 0) * 100);
     if (pbKey === k && pbCache) return pbCache;
     const mag = src.mag || 0, depth = src.depth || 10;
     const out = {}; let best = -9;
@@ -1842,14 +1858,36 @@
         const d = haversine(src.lat, src.lon, v[1], v[0]);
         if (d < dmin) dmin = d;
       }
+      if (!isFinite(dmin)) continue;
       const R = Math.hypot(dmin, depth);
       const val = shindoVal(pgv(mag, depth, R));
       out[p.n] = { value: Math.round(val * 100) / 100, label: gradeOf(val).code };
       if (val > best) best = val;
     }
+    if (best < -8) return null;
     out.__max = best;
+    out.__est = tag === 'est:';      // 推算出来的块（不是气象厅原文）
     pbKey = k; pbCache = out;
     return out;
+  }
+  function simPrefIntensity(ev) { return prefFromSrc(ev, 'sim:'); }
+  function estPrefIntensity(ev) { return prefFromSrc(ev, 'est:'); }
+  // 测试钩子：喂一条假报，看县块是怎么选出来的（截图/自检脚本用）
+  window.__blkTest = ev => {
+    const b = prefBlocks(ev);
+    if (!b) return null;
+    const names = Object.keys(b).filter(k => !k.startsWith('__'));
+    let top = '';
+    for (const n of names) if (!top || b[n].value > b[top].value) top = n;
+    return { n: names.length, est: !!b.__est, max: b.__max, top: top,
+             topLabel: top ? (b[top].label || '') : '' };
+  };
+
+  // 震度速報 和当前这场是不是同一起（同一场地震，两个源的发震时刻差几秒）
+  function sameQuake(ev) {
+    const o = state.obs;
+    if (!ev || !o || !o.origin_ts || !ev.origin_ts) return false;
+    return Math.abs(o.origin_ts - ev.origin_ts) < 300;
   }
 
   // 震度速報 → 都道府县块。演练与「真实速报但没带观测点」两种情况都走这里：
@@ -3855,9 +3893,13 @@
       (usesShindo(ev)
         ? row('計測震度', shindoVal(est.pgv).toFixed(2) + ' → 震度 ' + est.label)
         : row('中国烈度', duOf(est.pgv).toFixed(1) + ' → ' + est.label)) +
-      (prefBlocks(ev)
-        ? '<div class="calc-note">日本境内已采用气象厅予想震度，此处数值仅供参考</div>'
-        : '<div class="calc-note">司・翠川(1999) 衰减式，未做场地放大</div>');
+      (() => {
+        const b = prefBlocks(ev);
+        if (!b) return '<div class="calc-note">司・翠川(1999) 衰减式，未做场地放大</div>';
+        return b.__est
+          ? '<div class="calc-note">日本境内按气象厅速报震源铺县块，此处数值仅供参考</div>'
+          : '<div class="calc-note">日本境内已采用气象厅予想震度，此处数值仅供参考</div>';
+      })();
 
     const span = Math.max(60, Math.min(180, Math.ceil(est.ts + 15)));
     $('#heroBar').style.width = clamp(elapsed / span * 100, 0, 100) + '%';
@@ -4234,14 +4276,21 @@
     }
     if (mode === 'est') {
       const e0 = eventForMap();
-      const hasBlk = !!prefBlocks(e0);
+      const blk = prefBlocks(e0);
+      const hasBlk = !!blk;
       const n = state.reactCount || 0;
       const tail = n ? ' · 已反应 ' + n + '/' + state.stations.length : '';
+      // 三种来源要分清：演练按真值、气象厅原文、气象厅只给了震源所以本地按县块算
+      const kind = !hasBlk ? '' : (e0 && e0.isSim && !blk.__est) ? '演练 '
+        : blk.__est ? '气象厅速报 · 推算' : '气象厅 ';
       cap.textContent = (hasBlk
-        ? (e0 && e0.isSim ? '演练 予想震度（都道府県）' : '气象厅 予想震度（都道府県）')
+        ? kind + '震度（都道府県）'
         : '台站 · 推算震动（颜色对应图例震度档）') + tail;
       cap.title = hasBlk
-        ? '日本气象厅紧急地震速报给出的地域别予想震度，原样使用，不做本机外推'
+        ? (blk.__est
+          ? '气象厅这封报只给了震源、没给地域别予想震度：仍按都道府县铺块，' +
+            '每县取离震源最近的顶点按衰减式算'
+          : '日本气象厅给出的地域别震度，原样使用，不做本机外推')
         : '气象厅没有给出地域别予想震度，这里按衰减式外推';
     } else if (mode === 'idle') {
       // 震度速報 已到：这是「地域」级速报，地图上给的是都道府县色块
