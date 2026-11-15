@@ -5399,6 +5399,46 @@
     }
   }
 
+  // ---------------- 更新日志 ----------------
+  // 20 条改动随安装包发一份 data/changelog.json，点开才读，不联网、不占启动时间。
+  const logDlg = $('#logDlg');
+  let logCache = null;
+  function renderLog(d) {
+    const entries = (d && d.entries) || [];
+    const box = $('#logList');
+    if (!box) return;
+    $('#logCount').textContent = entries.length + ' 条';
+    $('#logFoot').textContent = '最近 ' + entries.length + ' 条 · 随版本内置 · ' +
+      (d.updated ? '更新于 ' + d.updated : '');
+    box.innerHTML = entries.map(e => {
+      const tag = e.ver
+        ? '<span class="log-ver">v' + esc(e.ver) + '</span>'
+        : '<span class="log-ver infra">' + (e.kind === 'infra' ? '部署' : '早期') + '</span>';
+      const date = e.date ? '<span class="log-date">' + esc(e.date) + '</span>' : '';
+      const title = e.title ? '<span class="log-title">' + esc(e.title) + '</span>' : '';
+      const items = (e.items || []).map(x => '<li>' + esc(x) + '</li>').join('');
+      return '<div class="log-item"><div class="log-hd">' + tag + title + date +
+        '</div><ul>' + items + '</ul></div>';
+    }).join('');
+  }
+  async function openLog() {
+    if (!logDlg) return;
+    if (!logDlg.open) logDlg.showModal();
+    if (logCache) return;
+    try {
+      const r = await fetch('/api/changelog', { cache: 'no-store' });
+      logCache = await r.json();
+      renderLog(logCache);
+    } catch (e) {
+      $('#logList').textContent = '读取更新日志失败：' + e.message;
+    }
+  }
+  if (logDlg) {
+    const b = $('#btnChangelog');
+    if (b) b.addEventListener('click', openLog);
+    logDlg.addEventListener('click', e => { if (e.target === logDlg) logDlg.close(); });
+  }
+
   if (statsDlg) {
     const openStats = () => {
       if (!statsDlg.open) statsDlg.showModal();

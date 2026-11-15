@@ -81,7 +81,7 @@ def user_dir(name):
 
 def user_file(name, fn):
     return os.path.join(user_dir(name), fn)
-VERSION = "1.21.0"
+VERSION = "1.22.0"
 
 # ---------------- 站点所有者 ----------------
 # 这套东西默认是本机一家人用，账号管理（建号/改密/踢设备/替人配密钥）
@@ -2173,6 +2173,21 @@ class Handler(SimpleHTTPRequestHandler):
             if path == "/api/sound/log":
                 with _SND_CV:
                     self._json({"log": list(_SND_LOG)[-80:]})
+                return
+            if path == "/api/changelog":
+                # 更新日志（最近 20 条，随安装包发一份，不联网）
+                # 优先用安装包里那份（每次升级都是新的），再退回可写目录。
+                # 不能用 _data_file()：它只在首次复制，升级后会一直读旧的。
+                data = {"entries": []}
+                for fp in (os.path.join(RES_DIR, "data", "changelog.json"),
+                           os.path.join(DATA_DIR, "changelog.json")):
+                    try:
+                        with open(fp, encoding="utf-8") as f:
+                            data = json.load(f)
+                        break
+                    except Exception:
+                        continue
+                self._json(data)
                 return
             if path == "/api/health":
                 self._json({"ok": True, "version": VERSION,
