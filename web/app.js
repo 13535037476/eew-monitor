@@ -155,6 +155,7 @@
     tsunami: null, lpgm: null, obsVoiceUid: 0, obsVoiceRisk: -1, obsKey: '', obsAt: 0,
     palertStations: [],
     autoEv: null,      // 本地推算的弱震（JMA 不发时补位）
+    onAt: new Map(),   // code → 该站第一次超过门槛的时刻（推发震时刻用）
     focus: LS.get('focus', { name: '北京', lat: 39.904, lon: 116.407, country: 'CN' }),
     // 额外关注点：最多 3 个。事件卡同时列各点预计震度，任一点超标都响铃。
     watches: LS.get('watches', []),
@@ -4033,6 +4034,19 @@
         mxEl.hidden = true;
       }
     }
+    // 本地推算震源：把「震中 P/S 走时」也摆出来——这是推算出来的震源参数之一，
+    // 和 M / 深度 / 最大震度并列，不藏在公式面板里。
+    const psEl = $('#heroPS'), psVal = $('#heroPSv');
+    if (psEl) {
+      const on = !!ev.auto && ev.auto_p != null && ev.auto_s != null;
+      psEl.hidden = !on;
+      if (on) {
+        psVal.textContent = 'P ' + ev.auto_p + 's · S ' + ev.auto_s + 's';
+        psEl.title = '震中 P/S 走时：按反解出的震源（M' + (ev.mag || 0).toFixed(1) +
+          ' / 深 ' + Math.round(ev.depth || 0) + ' km）算，' +
+          (ev.onsets || 0) + ' 个台的起点反解了发震时刻';
+      }
+    }
     // GQ 没有官方震度（max_intensity 永远是 ?）：按报文震源给一个震中烈度估算，
     // 用虚线小胶囊标「估算」，不冒充气象厅/台网的官方数。
     const estEl = $('#heroEst'), estVal = $('#heroEstVal');
@@ -4102,6 +4116,14 @@
       row('S 走时', f1(ti.s.t) + ' s') +
       '<div class="calc-note">S−P 时间差 ' + f1(ti.s.t - ti.p.t) + ' s' +
       '（P 先到 ' + f1(ti.p.t) + ' s，S 到 ' + f1(ti.s.t) + ' s 开始强摇）</div>' +
+      (ev.auto
+        ? '<div class="calc-hd" style="margin-top:8px">震源推算（本地反演）</div>' +
+          row('发震时刻', fmtHM(ev.origin_ts, 9 * 3600)) +
+          row('参与台站', (ev.stations || 0) + ' 站 · 反解 ' + (ev.onsets || 0) + ' 站起点') +
+          row('拟合残差', (typeof ev.rms === 'number' ? ev.rms.toFixed(2) : '—') + ' 震度档') +
+          row('震中 P 走时', (ev.auto_p != null ? ev.auto_p.toFixed(1) : '—') + ' s') +
+          row('震中 S 走时', (ev.auto_s != null ? ev.auto_s.toFixed(1) : '—') + ' s')
+        : '') +
       '<div class="calc-hd" style="margin-top:8px">震度推算 · 关注点</div>' +
       row('PGV', ((est.pgv || 0) < 0.1 ? (est.pgv || 0).toFixed(3) : (est.pgv || 0).toFixed(1)) + ' cm/s') +
       (usesShindo(ev)
@@ -4237,7 +4259,7 @@
     greenLv: 1.5,
     coolSec: 90,        // 触发后冷却，别每帧都推一个新震源
     holdSec: 120,       // 推算结果在界面上留多久
-    depths: [10, 30, 60],   // 深度候选：数据只有震度，浅源/中源分得开就够了
+    depths: [5, 10, 15, 20, 25, 30, 40, 50, 60, 80, 100, 130],
     gridDeg: 0.2,       // 网格步长（度），以质心为中心 ±4 格 = ±0.8°
     lastAt: 0, lastTs: '',
   };
@@ -4341,15 +4363,47 @@
 
     // 地名：取最近的台站所在县，显示成「〇〇付近」。
     // 不限定 major——代表点太少，岩手县内陆找不到就只剩「推定震源」，太敷衍。
+    // 地名只认陆上站点：海底站的站号（S3N26付近）对读的人没有意义，
+    // 近海地震宁可写「〇〇県沖」也不要冒出一个站号。
     let nearCity = null, bd = 1e9;
     for (const st of state.stations) {
-      if (st.country !== 'JP') continue;
+      if (st.country !== 'JP' || st.sea || !st.region) continue;
       const d = haversine(lat, lon, st.lat, st.lon);
       if (d < bd) { bd = d; nearCity = st; }
     }
-    const place = nearCity ? (nearCity.region || nearCity.name) + '付近' : '推定震源';
+    const place = nearCity
+      ? (bd > 60 ? nearCity.region + '沖' : nearCity.region + '付近')
+      : '推定震源';
 
+    // ---- 发震时刻：用各站的「首次超过门槛」反解 ----
+    // 每站的起点 = 发震时刻 + 该站 S 走时，所以 origin_i = onset_i - tS(R_i, depth)。
+    // 取加权中位数（按震度加权），比原来写死的 now-3 靠谱：波前、P/S 倒计时
+    // 才不会整体偏几秒——偏了的话「P 波已过」和图上波前对不上。
     const now = nowSec();
+    const tSOf = (km, dep) => {
+      const ti = travelInfo(Math.max(0.5, km), dep, 'jma2001');
+      return ti && ti.s && isFinite(ti.s.t) ? ti.s.t : km / 3.5;
+    };
+    const oCand = [];
+    for (const p of near) {
+      const on = state.onAt.get(p.st.code);
+      if (!on) continue;
+      oCand.push({ o: on - tSOf(haversine(lat, lon, p.st.lat, p.st.lon), depth),
+                   w: Math.max(1, p.v) });
+    }
+    let origin = now - 5;
+    if (oCand.length >= 2) {
+      oCand.sort((a, b) => a.o - b.o);
+      const tot = oCand.reduce((a, b) => a + b.w, 0);
+      let acc = 0, med = oCand[0].o;
+      for (const c of oCand) { acc += c.w; if (acc >= tot / 2) { med = c.o; break; } }
+      origin = med;
+    }
+    origin = clamp(origin, now - 150, now - 0.5);
+    // 震中的 P/S 走时（秒，从发震时刻算起）：卡片上「P 6.1s / S 10.6s」就是它
+    const tiE = travelInfo(0.5, depth, 'jma2001');
+    const pSec = tiE && isFinite(tiE.p.t) ? tiE.p.t : depth / 6;
+    const sSec = tiE && isFinite(tiE.s.t) ? tiE.s.t : depth / 3.5;
     AUTO.lastAt = now;
     const risk = clamp(gradeOf(imax).risk, 0, 9);
     return {
@@ -4357,7 +4411,7 @@
       country: 'JP', source: 'auto', source_name: '本地推算（JMA 未发布）',
       event_id: 'AUTO-' + Math.round(now),
       serial: 1,
-      origin_ts: now - 3,          // 震动已经发生一小会儿了
+      origin_ts: Math.round(origin * 10) / 10,   // 反解出来的发震时刻
       report_ts: now,
       place: place,
       lat: lat, lon: lon, depth: depth,
@@ -4371,6 +4425,9 @@
       blues: blues,
       trigger: trig,                      // seven2 / strong，排查用
       rms: Math.round(rms * 100) / 100,   // 拟合残差（震度档），越小越可信
+      auto_p: Math.round(pSec * 10) / 10,  // 震中 P 走时（秒）
+      auto_s: Math.round(sSec * 10) / 10,  // 震中 S 走时（秒）
+      onsets: oCand.length,                // 参与反解发震时刻的站点数
       title: '推算震源',
     };
   }
@@ -5091,8 +5148,14 @@
             }
             if (v !== null && v !== undefined) {
               lv[st.code] = v; n++;
-              histPush(st.code, v, nowSec());
+              const tNow = nowSec();
+              histPush(st.code, v, tNow);
+              // 第一次超过震度门槛的时刻：推算发震时刻要用（onset = origin + S 走时）
+              if (v >= 0.5 && !state.onAt.has(st.code)) state.onAt.set(st.code, tNow);
             }
+          }
+          for (const [c0, t0] of state.onAt) {
+            if (nowSec() - t0 > 300) state.onAt.delete(c0);   // 5 分钟前的起点不再参与
           }
           if (n > 800)   // 命中过少说明取色坐标或图片异常，丢弃这帧
             state.kmoni = { ok: true, at: nowSec(), ts: lastTs, lv, n };

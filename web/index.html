@@ -6,7 +6,7 @@
 <title>震线 EEW · 中日地震预警</title>
 <script>/* 首帧前定主题，避免启动时先闪一下深色 */
 try{if(localStorage.getItem('eew.theme')==='light')document.documentElement.classList.add('light')}catch(e){}</script>
-<link rel="stylesheet" href="style.css?v=237">
+<link rel="stylesheet" href="style.css?v=238">
 </head>
 <body>
 
@@ -73,6 +73,7 @@ try{if(localStorage.getItem('eew.theme')==='light')document.documentElement.clas
       <span id="heroSerial" hidden>第 1 报</span>
       <span class="maxchip" id="heroMax" hidden>最大<b id="heroMaxVal">—</b></span>
       <span class="estchip" id="heroEst" hidden title=""><i>估算</i><b id="heroEstVal">—</b></span>
+      <span class="pschip" id="heroPS" hidden title="">震中<b id="heroPSv">—</b></span>
     </div>
     <div class="hero-nums">
       <div class="num">
@@ -593,6 +594,6 @@ try{if(localStorage.getItem('eew.theme')==='light')document.documentElement.clas
 <script src="geo.js?v=207"></script>
 <script src="geo_jp.js?v=176"></script>
 <script src="geo_world.js?v=207"></script>
-<script src="app.js?v=294"></script>
+<script src="app.js?v=295"></script>
 </body>
 </html>
