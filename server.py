@@ -81,7 +81,7 @@ def user_dir(name):
 
 def user_file(name, fn):
     return os.path.join(user_dir(name), fn)
-VERSION = "1.19.0"
+VERSION = "1.20.0"
 
 # ---------------- 站点所有者 ----------------
 # 这套东西默认是本机一家人用，账号管理（建号/改密/踢设备/替人配密钥）

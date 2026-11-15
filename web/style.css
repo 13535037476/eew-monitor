@@ -95,8 +95,8 @@ svg{stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-l
 
 /* ---------- 事件卡 ---------- */
 .hero{
-  position:fixed;left:20px;top:82px;z-index:25;width:344px;
-  padding:16px 18px 14px;border-radius:20px;
+  position:fixed;left:20px;top:82px;z-index:25;width:322px;
+  padding:11px 14px 10px;border-radius:16px;
   background:linear-gradient(180deg,rgba(20,25,34,.88),rgba(13,17,24,.9));
   backdrop-filter:blur(24px) saturate(140%);
   border:1px solid var(--line);
@@ -113,7 +113,7 @@ svg{stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-l
   background:linear-gradient(180deg,rgba(14,32,44,.92),rgba(10,17,24,.94));
   border-color:rgba(110,168,254,.35);
 }
-.hero-hd{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.hero-hd{display:flex;align-items:center;gap:7px;margin-bottom:6px}
 .badge{
   font-size:10px;font-weight:800;letter-spacing:.14em;padding:4px 8px;border-radius:6px;
   background:rgba(255,255,255,.12);color:#fff;
@@ -123,7 +123,7 @@ svg{stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-l
 .hero-x{background:none;border:0;color:var(--dim);font-size:19px;line-height:1;cursor:pointer;padding:0 2px}
 .hero-x:hover{color:var(--txt)}
 /* 多事件适配：同时进行的其它地震，一行小胶囊，点一下就切过去 */
-.hero-alts{display:flex;flex-wrap:wrap;align-items:center;gap:5px;margin:-2px 0 9px}
+.hero-alts{display:flex;flex-wrap:wrap;align-items:center;gap:5px;margin:-1px 0 7px}
 .hero-alts .altslb{font-size:10px;color:var(--dim);letter-spacing:.08em;flex:none}
 .altchip{
   display:inline-flex;align-items:center;gap:5px;max-width:172px;
@@ -139,9 +139,9 @@ svg{stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-l
 .hero.alert .altchip{background:rgba(255,255,255,.16);border-color:rgba(255,255,255,.22);color:#fff}
 .hero.alert .altchip:hover{background:rgba(255,255,255,.26)}
 .hero.alert .altchip i{color:rgba(255,255,255,.7)}
-.hero-place{margin:0;font-size:21px;font-weight:750;line-height:1.25;letter-spacing:.005em;
+.hero-place{margin:0;font-size:18.5px;font-weight:750;line-height:1.25;letter-spacing:.005em;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.hero-meta{display:flex;flex-wrap:wrap;gap:3px 14px;margin-top:6px;font-size:11.5px;color:var(--dim);font-family:var(--mono)}
+.hero-meta{display:flex;flex-wrap:wrap;gap:2px 11px;margin-top:5px;font-size:11px;color:var(--dim);font-family:var(--mono)}
 .hero-meta > span{white-space:nowrap}
 .hero-meta b{color:var(--txt2);font-weight:600}
 .hero-meta #heroSerial{color:#ffc966;font-weight:600}
@@ -151,15 +151,21 @@ svg{stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-l
   color:var(--txt2);font-size:10.5px;letter-spacing:.02em;white-space:nowrap}
 .hero-meta .maxchip b{font-size:12px;font-weight:800;color:#fff;padding:1px 6px 2px;border-radius:4px;
   background:rgba(255,255,255,.14)}
-.hero-nums{display:flex;align-items:flex-end;justify-content:space-between;margin:14px 0 12px;gap:12px}
+.hero-meta .estchip{display:inline-flex;align-items:center;gap:4px;flex:none;
+  padding:2px 7px 3px;border-radius:6px;border:1px dashed rgba(255,255,255,.24);
+  background:rgba(255,255,255,.04);color:var(--dim);font-size:10px;white-space:nowrap}
+.hero-meta .estchip i{font-style:normal;letter-spacing:.04em}
+.hero-meta .estchip b{font-size:12px;font-weight:800;color:var(--txt);
+  padding:1px 6px 2px;border-radius:4px;background:rgba(255,255,255,.10)}
+.hero-nums{display:flex;align-items:flex-end;justify-content:space-between;margin:9px 0 8px;gap:10px}
 .num{display:flex;flex-direction:column;gap:3px;min-width:0}
 .num.right{align-items:flex-end;text-align:right}
-.num b{font-family:var(--mono);font-size:38px;line-height:1;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
-.num b.chip-int{display:inline-block;padding:3px 13px 6px;border-radius:11px;font-size:34px;line-height:1.05;
+.num b{font-family:var(--mono);font-size:32px;line-height:1;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.num b.chip-int{display:inline-block;padding:2px 10px 5px;border-radius:9px;font-size:28px;line-height:1.05;
   box-shadow:0 8px 24px rgba(0,0,0,.28);transition:background .2s,color .2s}
 .num b.chip-int.zero{background:rgba(255,255,255,.1);color:#c3d0e2;box-shadow:none;
   font-size:26px;padding:8px 14px;border-radius:9px}
-.num i{font-style:normal;font-size:10.5px;color:var(--dim);letter-spacing:.04em;white-space:nowrap}
+.num i{font-style:normal;font-size:10px;color:var(--dim);letter-spacing:.04em;white-space:nowrap}
 .hero-foot{display:flex;align-items:center;gap:10px}
 .bar{position:relative;flex:1;height:4px;border-radius:2px;background:rgba(255,255,255,.12)}
 .hero.alert .bar{background:rgba(255,255,255,.18)}
@@ -171,7 +177,7 @@ svg{stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-l
 .link{background:none;border:0;color:var(--accent);font-size:11.5px;font-weight:600;cursor:pointer;padding:2px 0;white-space:nowrap}
 .hero.alert .link{color:#ffd9d5}
 .link:hover{text-decoration:underline}
-.phases{display:flex;justify-content:space-between;gap:10px;margin-top:11px;padding-top:10px;
+.phases{display:flex;justify-content:space-between;gap:10px;margin-top:8px;padding-top:7px;
   border-top:1px solid rgba(255,255,255,.09);cursor:pointer}
 .calc-toggle{font-size:9.5px;color:var(--dim);border:1px solid var(--line);border-radius:5px;padding:1px 5px;align-self:center}
 .phases:hover .calc-toggle{color:var(--txt2);border-color:var(--line2)}
@@ -520,8 +526,8 @@ body.focus-map #btnFull{color:var(--accent);background:rgba(110,168,254,.12)}
 /* 震度速報 电文卡：按气象厅原文的排布（标题 → 発表时刻 → 地震 → 最大震度 → 地域）。
    位置就在事件卡那里——预警卡收起来之后由它接手同一个位置，读的人不用满屏找。 */
 .obs{
-  position:fixed;left:20px;top:82px;z-index:24;width:344px;
-  padding:12px 14px 11px;border-radius:16px;
+  position:fixed;left:20px;top:82px;z-index:24;width:322px;
+  padding:10px 12px 9px;border-radius:15px;
   background:linear-gradient(180deg,rgba(19,24,33,.93),rgba(10,14,20,.95));
   border:1px solid var(--line);
   box-shadow:0 16px 46px rgba(0,0,0,.52),inset 0 1px 0 rgba(255,255,255,.05);
@@ -836,3 +842,169 @@ body.obs-on .quiet{display:none}
   .sok-int b{font-size:32px}
   .sok-info b{font-size:16px}
 }
+
+/* ===== 浅色模式 =====
+   只在 <html class="light"> 时生效（index.html 的 head 里首帧前就打好 class）。
+   底图配色由 app.js 的 MPAL 同步切换；这里管的是所有浮层。
+   原则：白/浅灰打底、深色字，强调色压深一档，红色告警卡保留但换成浅粉底。 */
+html.light{
+  --bg:#eef3f9;
+  --glass:rgba(255,255,255,.88);
+  --glass2:rgba(255,255,255,.96);
+  --line:rgba(18,42,68,.12);
+  --line2:rgba(18,42,68,.20);
+  --txt:#0c1a29;
+  --txt2:#2e4358;
+  --dim:#63798f;
+  --accent:#2f6fd0;
+  --alert:#d92d20;
+  --amber:#a86a12;
+  --ok:#1a8f3c;
+}
+html.light body{background:var(--bg);color:var(--txt)}
+html.light .stage{background:#e7eef6}
+html.light .hud{box-shadow:0 6px 20px rgba(24,52,80,.10)}
+html.light .srcdots .sd{background:#c3cfdc}
+
+/* 事件卡 */
+html.light .hero{
+  background:linear-gradient(180deg,rgba(255,255,255,.96),rgba(246,250,254,.97));
+  box-shadow:0 14px 38px rgba(24,52,80,.16),inset 0 1px 0 #fff;
+}
+html.light .hero.alert{
+  background:linear-gradient(180deg,#fff3f1,#ffe6e2);
+  border-color:rgba(217,45,32,.35);
+  box-shadow:0 14px 38px rgba(180,30,20,.18);
+}
+html.light .hero.hist{
+  background:linear-gradient(180deg,#f2f8ff,#e9f2fc);
+  border-color:rgba(47,111,208,.28);
+}
+html.light .badge{background:rgba(12,26,41,.07);color:var(--txt)}
+html.light .hero.alert .badge{background:rgba(217,45,32,.12);color:#9b1c14}
+html.light .hero-x:hover{color:var(--txt)}
+html.light .altchip{background:rgba(12,26,41,.05);border-color:rgba(12,26,41,.10);color:var(--txt2)}
+html.light .altchip:hover{background:rgba(12,26,41,.10);color:var(--txt);border-color:rgba(12,26,41,.18)}
+html.light .altchip.on{background:rgba(47,111,208,.14);color:#1d4f8f;border-color:rgba(47,111,208,.35)}
+html.light .altchip i{color:var(--dim)}
+html.light .altchip.back{color:#9a5b00;border-color:rgba(200,130,20,.35)}
+html.light .hero.alert .altchip{background:rgba(217,45,32,.08);border-color:rgba(217,45,32,.18);color:#7f1d16}
+html.light .hero.alert .altchip i{color:rgba(127,29,22,.7)}
+html.light .hero-meta .maxchip{background:rgba(12,26,41,.06);color:var(--txt2)}
+html.light .hero-meta .maxchip b{color:#fff}
+html.light .hero-meta .estchip{border-color:rgba(12,26,41,.22);background:rgba(12,26,41,.03);color:var(--dim)}
+html.light .hero-meta .estchip b{background:rgba(12,26,41,.07);color:var(--txt)}
+html.light .num b.chip-int.zero{background:rgba(12,26,41,.07);color:#4a6076}
+html.light .bar{background:rgba(12,26,41,.10)}
+html.light .hero.alert .bar{background:rgba(217,45,32,.14)}
+html.light .hero.alert .bar span{background:#d92d20}
+html.light .bar em.p{background:rgba(12,26,41,.35)}
+html.light .calc{background:rgba(12,26,41,.04)}
+html.light .hero.alert .calc{background:rgba(217,45,32,.05)}
+html.light .calc-note{color:#1d4f8f;border-top-color:rgba(12,26,41,.12)}
+html.light .hero.alert .calc-note{color:#8a2a21}
+html.light .phases{border-top-color:rgba(12,26,41,.10)}
+html.light .hero.alert .phases{border-top-color:rgba(217,45,32,.18)}
+html.light .hero.alert .ph b{color:#5c1712}
+html.light .hero.alert .ph em{color:rgba(92,23,18,.65)}
+html.light .hero.alert .link{color:#a02a1e}
+html.light .hero-watch .wch{background:rgba(12,26,41,.05);color:var(--txt2)}
+html.light .hero-watch .wch b{background:rgba(12,26,41,.10);color:var(--txt)}
+html.light .wch.hot{background:rgba(217,45,32,.10);border-color:rgba(217,45,32,.25);color:#8a2a21}
+
+/* 浮层：工具条 / 面板 / 图例 / 历史 */
+html.light .tools button:hover,
+html.light .icon:hover,
+html.light .pill:hover{background:rgba(12,26,41,.07);color:var(--txt)}
+html.light .userchip{background:rgba(12,26,41,.05);border-color:var(--line)}
+html.light .userchip button:hover{background:rgba(217,45,32,.10);color:#a02a1e}
+html.light .rec:hover,
+html.light .hrow:hover{background:rgba(12,26,41,.05)}
+html.light .hrow.on{background:rgba(47,111,208,.10)}
+html.light .srcdots .sd:hover::after,
+html.light .tip,
+html.light .toast{background:rgba(255,255,255,.98);box-shadow:0 10px 28px rgba(24,52,80,.18)}
+html.light .tip .dimx{color:var(--dim)}
+html.light .tip.pin::after{color:var(--dim)}
+html.light .tip.pin{border-color:rgba(47,111,208,.35);box-shadow:0 14px 34px rgba(24,52,80,.20)}
+
+/* 底部历史抽屉 */
+html.light .sheet-bg{background:rgba(24,44,64,.28)}
+html.light .sheet-panel{background:linear-gradient(180deg,#fff,#f4f8fc);
+  box-shadow:0 -18px 50px rgba(24,52,80,.18)}
+html.light .sheet-grip{background:rgba(12,26,41,.18)}
+html.light .sheet-list::-webkit-scrollbar-thumb{background:rgba(12,26,41,.14)}
+
+/* 设置 / 管理弹窗 */
+html.light dialog{background:linear-gradient(180deg,#fff,#f5f9fd);box-shadow:0 30px 80px rgba(24,52,80,.22)}
+html.light dialog::backdrop{background:rgba(28,46,66,.32)}
+html.light .input,html.light .select{background:rgba(12,26,41,.04)}
+html.light .btn{background:rgba(12,26,41,.05);border-color:var(--line2)}
+html.light .btn:hover{background:rgba(12,26,41,.10)}
+html.light .btn.primary{background:rgba(47,111,208,.12);border-color:rgba(47,111,208,.45);color:#1d4f8f}
+html.light .seg{background:rgba(12,26,41,.04)}
+html.light .seg button.on{background:rgba(47,111,208,.14);color:#1d4f8f}
+html.light .vitem{background:rgba(12,26,41,.03)}
+html.light .vitem:hover{background:rgba(47,111,208,.10);color:var(--txt)}
+html.light .switch{background:rgba(12,26,41,.18)}
+html.light .switch::after{background:#fff}
+html.light .fp.on{color:#1d4f8f}
+html.light .hint code{background:rgba(12,26,41,.06)}
+html.light .kpi{background:rgba(12,26,41,.035)}
+html.light .srctbl td{border-bottom-color:rgba(12,26,41,.06)}
+html.light .srctbl tr.is-main td{background:rgba(47,111,208,.06)}
+html.light .sbar i{background:linear-gradient(90deg,#4a7fd0,#7ba6e8)}
+html.light .wtag{background:rgba(47,111,208,.10);border-color:rgba(47,111,208,.28);color:#1d4f8f}
+
+/* 震度速報 电文卡（和事件卡同一个位置，一起换成浅底） */
+html.light .obs{
+  background:linear-gradient(180deg,rgba(255,255,255,.97),rgba(246,250,254,.98));
+  box-shadow:0 12px 34px rgba(24,52,80,.16),inset 0 1px 0 #fff;
+}
+html.light .obs-hd{border-bottom-color:rgba(18,42,68,.16)}
+html.light .obs-hd b{color:#122435}
+html.light .obs-no,html.light .obs-issue,html.light .obs-max i,html.light .obs-grp h4{color:var(--dim)}
+html.light .obs-quake{color:#1d3247}
+html.light .obs-grp p{color:#22364a}
+html.light .obs-none,html.light .obs-foot{color:var(--dim)}
+html.light .obs-x{color:var(--dim)}
+html.light .obs-x:hover{background:rgba(12,26,41,.07);color:var(--txt)}
+html.light .obs-max{background:rgba(12,26,41,.04)}
+
+/* 右上角实时最大震度 */
+html.light .lm.hot{background:rgba(255,226,220,.85);border-color:rgba(217,45,32,.30);
+  box-shadow:0 8px 22px rgba(217,45,32,.10)}
+html.light .lm b{color:#33465a}
+
+/* 海啸面板 */
+html.light .tsun{background:linear-gradient(180deg,rgba(255,255,255,.97),rgba(240,249,255,.97));
+  border-color:rgba(56,150,200,.30);box-shadow:0 12px 34px rgba(24,52,80,.16)}
+html.light .tsun-main b{color:#0b6a8a}
+html.light .tsun-row{color:#33465a}
+html.light .tsun-row span{color:#122435}
+html.light .tsun-row i{color:#5c7288}
+html.light .tsun-row b{color:#8a5a00}
+html.light .tsun-scale span{color:#3b4f63}
+
+/* 主题按钮：深色时显示太阳（点它变浅色），浅色时显示月亮 */
+#btnTheme .th-moon{display:none}
+html.light #btnTheme .th-sun{display:none}
+html.light #btnTheme .th-moon{display:block}
+
+html.light .hero-meta .estchip.solo{margin-left:auto}
+.hero-meta .estchip.solo{margin-left:auto}
+
+/* 浅色底下这几处琥珀色（原本为深底挑的）对比度不够，压深一档 */
+html.light .rec .mg,
+html.light .hrow .mag,
+html.light .hrow .l2 b{color:#9a5b00}
+html.light #heroSerial{color:#8a5a00}
+html.light .altchip.back{color:#8a5a00}
+html.light .recent-list::-webkit-scrollbar-thumb{background:rgba(12,26,41,.14)}
+
+html.light .mapfoot{opacity:.95}
+html.light .qchip.q-S,html.light .qmini.q-S{color:#8a5a00}
+html.light .qchip.q-A,html.light .qmini.q-A{color:#12703a}
+html.light .qchip.q-B,html.light .qmini.q-B{color:#1d4f8f}
+html.light .qchip.q-C,html.light .qmini.q-C{color:#4a6076}
+html.light .qchip.q-D,html.light .qmini.q-D{color:#5b6b7c}

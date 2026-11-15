@@ -110,6 +110,26 @@
     set(k, v) { try { localStorage.setItem(LS._key(k), JSON.stringify(v)); } catch (e) { } },
   };
 
+  // ---------------- 深色 / 浅色 ----------------
+  // 挂在 <html> 上而不是 <body>：index.html 的 <head> 里有一段同步脚本，
+  // 首帧之前就把 class 打好，否则每次启动都会先闪一下深色再变白。
+  const THEME_KEY = 'eew.theme';
+  function themeNow() {
+    try { return localStorage.getItem(THEME_KEY) === 'light' ? 'light' : 'dark'; } catch (e) { return 'dark'; }
+  }
+  function applyTheme(t, save) {
+    const light = t === 'light';
+    document.documentElement.classList.toggle('light', light);
+    const b = document.querySelector('#btnTheme');
+    if (b) {
+      b.classList.toggle('on', light);
+      b.title = light ? '切到深色 (T)' : '切到浅色 (T)';
+      b.setAttribute('aria-label', b.title);
+    }
+    if (save !== false) { try { localStorage.setItem(THEME_KEY, light ? 'light' : 'dark'); } catch (e) { } }
+    syncPalette();
+  }
+
   const state = {
     offset: 0,
     sources: [],
@@ -639,20 +659,50 @@
     }
   }
 
+  // 底图配色：深色 / 浅色两套。浅色模式下海是浅灰蓝、陆是近白，
+  // 经纬网、海岸线、国界都换成深一点的灰蓝，免得整张图糊成一片白。
+  const MPAL = {
+    dark: {
+      sea: ['#081320', '#060d16', '#04090f'],
+      grid: 'rgba(120,180,225,.075)', gridTxt: 'rgba(120,150,190,.28)',
+      land: '#152230', land2: '#18293a',
+      coast: 'rgba(96,142,188,.55)', coast2: 'rgba(104,152,200,.6)',
+      border: 'rgba(158,198,236,.62)', scs: 'rgba(140,178,214,.55)',
+      pref: 'rgba(158,203,240,', gq: 'rgba(122,168,210,.30)',
+      chip: 'rgba(6,10,16,.82)', knock: 'rgba(4,8,13,.45)',
+      tagBg: 'rgba(8,13,20,.86)', tagFg: '#ffd7cf',
+    },
+    light: {
+      sea: ['#eef4fa', '#e6eef7', '#dfe9f3'],
+      grid: 'rgba(70,110,155,.13)', gridTxt: 'rgba(60,90,125,.55)',
+      land: '#fcfdfe', land2: '#f8fafc',
+      coast: 'rgba(120,150,180,.62)', coast2: 'rgba(110,142,175,.66)',
+      border: 'rgba(60,100,150,.60)', scs: 'rgba(90,120,160,.55)',
+      pref: 'rgba(90,125,165,', gq: 'rgba(90,120,155,.32)',
+      chip: 'rgba(255,255,255,.90)', knock: 'rgba(255,255,255,.55)',
+      tagBg: 'rgba(255,255,255,.94)', tagFg: '#8a2f22',
+    },
+  };
+  let PAL = MPAL.dark;
+  function syncPalette() {
+    PAL = document.documentElement.classList.contains('light') ? MPAL.light : MPAL.dark;
+    baseDirty = fieldDirty = true;
+  }
+
   function drawBase() {
     const g = baseCanvas.getContext('2d');
     g.setTransform(view.dpr, 0, 0, view.dpr, 0, 0);
     g.clearRect(0, 0, view.w, view.h);
 
     const grad = g.createLinearGradient(0, 0, 0, view.h);
-    grad.addColorStop(0, '#081320');
-    grad.addColorStop(.6, '#060d16');
-    grad.addColorStop(1, '#04090f');
+    grad.addColorStop(0, PAL.sea[0]);
+    grad.addColorStop(.6, PAL.sea[1]);
+    grad.addColorStop(1, PAL.sea[2]);
     g.fillStyle = grad;
     g.fillRect(0, 0, view.w, view.h);
 
     // 网格：经度按可视范围动态生成（地图左右无缝，网格要跟着绕圈）
-    g.strokeStyle = 'rgba(120,180,225,.075)';
+    g.strokeStyle = PAL.grid;
     g.lineWidth = 1;
     g.beginPath();
     const lonA = lonAt(0), lonB = lonAt(view.w);
@@ -664,7 +714,7 @@
     g.stroke();
 
     g.font = '9px ui-monospace,monospace';
-    g.fillStyle = 'rgba(120,150,190,.28)';
+    g.fillStyle = PAL.gridTxt;
     for (let lon = Math.ceil(lonA / 20) * 20; lon <= lonB; lon += 20) {
       const x = px(lon) + 3;
       if (x < 40 || x > view.w - 60) continue;
@@ -728,19 +778,19 @@
           g.fill('nonzero');
         }
       };
-      if (window.GEOW) drawLand(window.GEOW.land, '#152230', 'rgba(96,142,188,.55)', 0.7);
+      if (window.GEOW) drawLand(window.GEOW.land, PAL.land, PAL.coast, 0.7);
       // 东亚精细层：全球视野下和 50m 层几乎重合，缩得太小就省掉（省一半绘制量）
       if (window.GEO && window.GEO.land && zRel > 1.4)
-        drawLand(window.GEO.land, '#18293a', 'rgba(104,152,200,.6)', 0.75);
+        drawLand(window.GEO.land, PAL.land2, PAL.coast2, 0.75);
       // DataV 中国岛礁（海南/台湾/港澳/南海诸岛/钓鱼岛等，物理陆地缺的小环）
       if (window.GEO && window.GEO.cnisl && window.GEO.cnisl.length)
-        drawLand(window.GEO.cnisl, '#18293a', 'rgba(104,152,200,.6)', 0.75);
+        drawLand(window.GEO.cnisl, PAL.land2, PAL.coast2, 0.75);
 
       // 中国国界线（DataV 标准数据：官方藏南边界，只描线不填充）
       if (window.GEO && window.GEO.cn) {
         const cn = window.GEO.cn, bb = ringBB(cn);
         if (!(px(bb[1]) + dx < x0 || px(bb[0]) + dx > x1)) {
-          g.strokeStyle = 'rgba(158,198,236,.62)';
+          g.strokeStyle = PAL.border;
           g.lineWidth = 1;
           g.lineJoin = 'round';
           g.beginPath();
@@ -754,7 +804,7 @@
 
       // 南海九段线（DataV 100000_JD 标准要素）
       if (window.GEO && window.GEO.scs && window.GEO.scs.length) {
-        g.strokeStyle = 'rgba(140,178,214,.55)';
+        g.strokeStyle = PAL.scs;
         g.lineWidth = 0.9;
         g.setLineDash([5, 4]);
         g.beginPath();
@@ -774,7 +824,7 @@
       if (window.GEOJP) {
         const z = view.s / (homeScale() || 1);
         const a = clamp(0.10 + Math.max(0, z - 1) * 0.16, 0.10, 0.46);
-        g.strokeStyle = 'rgba(158,203,240,' + a.toFixed(3) + ')';
+        g.strokeStyle = PAL.pref + a.toFixed(3) + ')';
         g.lineWidth = z > 2.4 ? 1 : 0.7;
         g.beginPath();
         for (const p of window.GEOJP.prefs) tracePref(g, p, dx);
@@ -783,7 +833,7 @@
 
       // GlobalQuake 全球测站：静态灰点画进底层（拖动/缩放时才重绘，几万个点也不卡）
       if (state.layers.gqst && state.gqSt.length) {
-        g.fillStyle = 'rgba(122,168,210,.30)';
+        g.fillStyle = PAL.gq;
         const r = view.s / homeScale() > 2.5 ? 2 : 1.4;
         for (const s of state.gqSt) {
           const x = px(s[2]) + dx, y = py(s[1]);
@@ -2728,7 +2778,7 @@
       OCC.push([x - r, y - r, r * 2, r * 2]);
       ctx.beginPath();
       ctx.arc(x, y, r, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(6,10,16,.82)';
+      ctx.fillStyle = PAL.chip;
       ctx.fill();
       ctx.strokeStyle = RISK[it.risk];
       ctx.lineWidth = 1.2;
@@ -2779,12 +2829,12 @@
     ctx.font = '600 11px system-ui,"PingFang SC","Hiragino Sans",sans-serif';
     const w = ctx.measureText(label).width;
     const bx = x + 13, by = y - 26;
-    ctx.fillStyle = 'rgba(8,13,20,.86)';
+    ctx.fillStyle = PAL.tagBg;
     ctx.strokeStyle = 'rgba(255,90,70,.22)';
     ctx.lineWidth = 1;
     roundRect(ctx, bx, by, w + 14, 19, 6);
     ctx.fill(); ctx.stroke();
-    ctx.fillStyle = ev.isSim ? '#ffc46b' : '#ffd7cf';
+    ctx.fillStyle = ev.isSim ? '#ffc46b' : PAL.tagFg;
     ctx.fillText(label, bx + 7, by + 13);
   }
 
@@ -3798,12 +3848,14 @@
     const qEl = $('#heroQual');
     if (qEl) {
       const q = ev.kind === 'gq' ? ev.gq_quality : null;
-      if (q) {
+      if (ev.kind === 'gq') {
+        // 质量评级是 GQ 解算质量（S 最好 → D 最差）。归档包里偶尔没有这一项，
+        // 那就显示「质量 —」，别把整颗胶囊藏起来——它本身就是「这条是全球台网检测」的标志。
         qEl.hidden = false;
-        qEl.textContent = '质量 ' + q;
-        qEl.className = 'qchip q-' + q;
-        qEl.title = 'GlobalQuake 质量评级 ' + q +
-          (ev.gq_maxpga != null ? ' · 峰值 PGA ' + ev.gq_maxpga : '');
+        qEl.textContent = '质量 ' + (q || '—');
+        qEl.className = 'qchip' + (q ? ' q-' + q : '');
+        qEl.title = (q ? 'GlobalQuake 质量评级 ' + q : 'GlobalQuake 这一报没有带质量评级') +
+          (ev.gq_maxpga != null ? ' · 峰值 PGA ' + ev.gq_maxpga + ' cm/s²' : '');
       } else {
         qEl.hidden = true;
       }
@@ -3821,6 +3873,8 @@
     const mxEl = $('#heroMax'), mxVal = $('#heroMaxVal');
     if (mxEl) {
       let mx = ev.max_intensity;
+      // 全球台网这类没有官方震度的写到 '?'：别在卡上顶一个「最大 震度?」
+      if (!mx || mx === '?' || mx === '—') mx = '';
       // 演练：最大预想震度与区块同源（各县多边形推算的最大档），
       // 不然区块升上去了卡片还停在台站算出来的旧档
       if ((ev.isSim || ev.training) && usesShindo(ev)) {
@@ -3837,6 +3891,26 @@
         mxVal.style.color = '#fff';
       } else {
         mxEl.hidden = true;
+      }
+    }
+    // GQ 没有官方震度（max_intensity 永远是 ?）：按报文震源给一个震中烈度估算，
+    // 用虚线小胶囊标「估算」，不冒充气象厅/台网的官方数。
+    const estEl = $('#heroEst'), estVal = $('#heroEstVal');
+    if (estEl) {
+      let lab = '';
+      if (ev.kind === 'gq' && !hist && ev.lat && ev.lon && (ev.mag || 0) > 0) {
+        const c = estimate(srcOf(ev), ev.lat, ev.lon);
+        lab = usesShindo(ev) ? ('震度' + c.label) : c.label;
+        estEl.title = 'GlobalQuake 只给震源和台站振幅，没有官方烈度：按 M' +
+          (ev.mag || 0).toFixed(1) + ' / 深 ' + Math.round(ev.depth || 10) +
+          ' km 用司・翠川(1999) 衰减式估算震中烈度' +
+          (ev.gq_maxpga != null ? '；GQ 报的峰值 PGA ' + ev.gq_maxpga + ' cm/s²' : '');
+      }
+      estEl.hidden = !lab;
+      if (lab) {
+        estVal.textContent = lab;
+        // 没有「最大震度」胶囊时自己靠右，别孤零零贴在左边
+        estEl.classList.toggle('solo', !!(mxEl && mxEl.hidden));
       }
     }
     const intEl = $('#heroInt');
@@ -5496,6 +5570,10 @@
     $('#btnSound').classList.toggle('on', on);
     $('#btnSound').classList.toggle('muted', !on);
   }
+  const btnTheme = $('#btnTheme');
+  if (btnTheme) btnTheme.addEventListener('click', () => {
+    applyTheme(themeNow() === 'light' ? 'dark' : 'light');
+  });
   $('#btnSound').addEventListener('click', () => {
     state.settings.sound = !state.settings.sound;
     if (state.settings.sound) audio();
@@ -6149,6 +6227,7 @@
     if (t && t.matches && t.matches('input,textarea,select')) return;
     const k = e.key.toLowerCase();
     if (k === 'm') $('#btnSound').click();
+    if (k === 't') applyTheme(themeNow() === 'light' ? 'dark' : 'light');
     if (k === 's') $('#btnSettings').click();
     if (k === 'f') toggleFull();
     if (k === 'r') fitView();
@@ -6161,6 +6240,7 @@
   window.addEventListener('resize', () => resize());
 
   // ---------------- 启动 ----------------
+  applyTheme(themeNow(), false);   // 首帧那一下由 head 里的同步脚本顶着，这里补齐按钮/底图配色
   renderLegend();
   paintFocus();
   paintWatches();
