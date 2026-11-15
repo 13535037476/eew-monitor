@@ -1,4 +1,5 @@
 :root{
+  color-scheme:dark;          /* 原生滚动条/下拉框跟着深色，不然弹窗右边会挂一条白条 */
   --bg:#070a0f;
   --glass:rgba(14,18,25,.74);
   --glass2:rgba(17,22,30,.86);
@@ -848,6 +849,7 @@ body.obs-on .quiet{display:none}
    底图配色由 app.js 的 MPAL 同步切换；这里管的是所有浮层。
    原则：白/浅灰打底、深色字，强调色压深一档，红色告警卡保留但换成浅粉底。 */
 html.light{
+  color-scheme:light;
   --bg:#eef3f9;
   --glass:rgba(255,255,255,.88);
   --glass2:rgba(255,255,255,.96);
@@ -1008,3 +1010,21 @@ html.light .qchip.q-A,html.light .qmini.q-A{color:#12703a}
 html.light .qchip.q-B,html.light .qmini.q-B{color:#1d4f8f}
 html.light .qchip.q-C,html.light .qmini.q-C{color:#4a6076}
 html.light .qchip.q-D,html.light .qmini.q-D{color:#5b6b7c}
+
+/* 弹窗内的滚动条：Edge 用的是系统原生滚动条，color-scheme 不一定管得住，
+   这里显式接管，免得深色弹窗右边挂一条白条。 */
+dialog::-webkit-scrollbar,
+dialog ::-webkit-scrollbar{width:10px;height:10px}
+dialog::-webkit-scrollbar-track,
+dialog ::-webkit-scrollbar-track{background:transparent}
+dialog::-webkit-scrollbar-thumb,
+dialog ::-webkit-scrollbar-thumb{background:rgba(255,255,255,.16);border-radius:5px;
+  border:2px solid transparent;background-clip:padding-box}
+dialog ::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.28);background-clip:padding-box}
+html.light dialog ::-webkit-scrollbar-thumb{background:rgba(18,42,68,.20);background-clip:padding-box}
+html.light dialog ::-webkit-scrollbar-thumb:hover{background:rgba(18,42,68,.32);background-clip:padding-box}
+
+/* 页面自身的滚动条（弹窗把 html 撑出溢出时会出现）直接隐藏：
+   界面本来就是满屏固定布局，滚动条只会挂一条浅色竖条在窗口右边。 */
+html{scrollbar-width:none}
+html::-webkit-scrollbar{width:0;height:0}

@@ -127,6 +127,11 @@
       b.setAttribute('aria-label', b.title);
     }
     if (save !== false) { try { localStorage.setItem(THEME_KEY, light ? 'light' : 'dark'); } catch (e) { } }
+    // 设置面板里的分段控件跟着一起亮（从 HUD 按钮或 T 键切换时也要同步）
+    const seg = document.querySelector('#themeSeg');
+    if (seg) for (const sb of seg.querySelectorAll('button[data-theme]')) {
+      sb.classList.toggle('on', (sb.dataset.theme === 'light') === light);
+    }
     syncPalette();
   }
 
@@ -5573,6 +5578,11 @@
   const btnTheme = $('#btnTheme');
   if (btnTheme) btnTheme.addEventListener('click', () => {
     applyTheme(themeNow() === 'light' ? 'dark' : 'light');
+  });
+  const themeSeg = $('#themeSeg');
+  if (themeSeg) themeSeg.addEventListener('click', e => {
+    const b = e.target.closest('button[data-theme]');
+    if (b) applyTheme(b.dataset.theme);
   });
   $('#btnSound').addEventListener('click', () => {
     state.settings.sound = !state.settings.sound;

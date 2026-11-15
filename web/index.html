@@ -6,7 +6,7 @@
 <title>震线 EEW · 中日地震预警</title>
 <script>/* 首帧前定主题，避免启动时先闪一下深色 */
 try{if(localStorage.getItem('eew.theme')==='light')document.documentElement.classList.add('light')}catch(e){}</script>
-<link rel="stylesheet" href="style.css?v=234">
+<link rel="stylesheet" href="style.css?v=235">
 </head>
 <body>
 
@@ -322,6 +322,19 @@ try{if(localStorage.getItem('eew.theme')==='light')document.documentElement.clas
       </div>
 
       <div class="sec">
+        <h3>外观</h3>
+        <div class="row between">
+          <label>主题</label>
+          <div class="seg" id="themeSeg">
+            <button type="button" data-theme="dark">深色</button>
+            <button type="button" data-theme="light">浅色</button>
+          </div>
+        </div>
+        <p class="hint">浅色模式会把面板和底图一起换成浅底深字（强度色、震度配色不变）。
+          也可以点右上角的太阳/月亮按钮或按 <b>T</b> 键切换；选择记在这台设备上。</p>
+      </div>
+
+      <div class="sec">
         <h3>地图</h3>
         <div class="row between">
           <label>同时显示波前的地震数</label>
@@ -559,6 +572,6 @@ try{if(localStorage.getItem('eew.theme')==='light')document.documentElement.clas
 <script src="geo.js?v=207"></script>
 <script src="geo_jp.js?v=176"></script>
 <script src="geo_world.js?v=207"></script>
-<script src="app.js?v=287"></script>
+<script src="app.js?v=288"></script>
 </body>
 </html>
