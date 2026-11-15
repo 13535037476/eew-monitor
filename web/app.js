@@ -1632,7 +1632,7 @@
     if (ev && simFinalAge(ev) < 12) drawEpicenter(ev, live);
     if (live && !state.historyEvent) drawOtherEvents(ev);
     // 绿框放最后画：震中标靶正好压在台站簇中心，先画就被它整个盖住了
-    drawShakeHints();
+    drawShakeHints(ev);
     drawFocus(ev);
     if (state.simPick.on) drawSimPick();
     if (state.layers.labels) drawLabels();
@@ -1993,6 +1993,96 @@
     return best ? { p: best, km: bd } : null;
   }
 
+  // ---------------- 台站震动包络（点开台站看的那条线） ----------------
+  // kmoni 每秒给一个计测震度，攒最近两分钟就是一条真实的震动包络；
+  // 没有实测（演练/推算/海底站）时，用同一套衰减式按时间采样一条推算包络。
+  const HIST = new Map();          // code → [[秒, 計測震度], ...]
+  function histPush(code, v, t) {
+    let a = HIST.get(code);
+    if (!a) { a = []; HIST.set(code, a); }
+    const last = a[a.length - 1];
+    if (last && t - last[0] < 0.7) { a[a.length - 1] = [t, v]; return; }  // 同一帧内不重复
+    a.push([t, v]);
+    while (a.length > 160) a.shift();
+    while (a.length && t - a[0][0] > 150) a.shift();
+  }
+  function histOf(code) { return HIST.get(code) || null; }
+
+  // 纵轴范围跟着数据走：kmoni 原始值可能是 -3.0 到 2.x，按震度档画就成了一根压底的直线，
+  // 看不出「有没有在动」。lo/hi 传进来就按它画，不传就按数据自适应。
+  function sparkSvg(pts, note, lo, hi) {
+    if (!pts || pts.length < 4) return '';
+    const W = 214, H = 42, P = 3;
+    let mn = Infinity, mx = -Infinity;
+    for (const p of pts) { mn = Math.min(mn, p[1]); mx = Math.max(mx, p[1]); }
+    if (lo === undefined) lo = Math.min(0, Math.floor(mn));
+    if (hi === undefined) hi = Math.max(2, Math.ceil(mx));
+    if (hi - lo < 1) hi = lo + 1;
+    const X = i => P + (W - P * 2) * i / Math.max(1, pts.length - 1);
+    const Y = r => H - P - (H - P * 2) * (Math.min(hi, Math.max(lo, r)) - lo) / (hi - lo);
+    let d = '';
+    for (let i = 0; i < pts.length; i++) {
+      d += (i ? 'L' : 'M') + X(i).toFixed(1) + ' ' + Y(pts[i][1]).toFixed(1);
+    }
+    const step = (hi - lo) > 5 ? 2 : 1;
+    let grid = '';
+    for (let r = Math.ceil(lo); r <= hi; r += step) {
+      if (r === lo) continue;
+      grid += '<line x1="' + P + '" y1="' + Y(r).toFixed(1) + '" x2="' + (W - P) +
+        '" y2="' + Y(r).toFixed(1) + '"/>';
+    }
+    return '<div class="wave"><svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none">' +
+      '<g class="wv-grid">' + grid + '</g>' +
+      '<path class="wv-line" d="' + d + '"/></svg>' +
+      '<i>' + note + '</i></div>';
+  }
+
+  // 推算包络：按时间采样一遍 shakeLevel，横轴是发震后秒数
+  function estWavePts(ev, st) {
+    const est = estOf(ev, st);
+    if (!est) return null;
+    const mag = srcOf(ev).mag || 5, jp = usesShindo(ev);
+    // 窗口要盖住这个站自己的 S 波到达（远站 90 秒才摇），否则整条线是平的
+    const span = Math.max(30, Math.min(260, (est.ts || 0) + 45, Math.max(60, elapsedOf(ev) + 45)));
+    const pts = [];
+    for (let i = 0; i <= 45; i++) {
+      const t = span * i / 45;
+      const lv = shakeLevel(est, t, mag, jp);
+      pts.push([t, !lv ? 0 : (lv.dim ? 0.35 : Math.min(9, lv.risk))]);
+    }
+    return pts;   // 横轴 0~span 秒（发震后）
+  }
+
+  function waveBlock(st, ev) {
+    // 演练优先看「这一场会怎么摇」，别看现实世界的平静直线
+    if (ev && ev.isSim) {
+      const p0 = estWavePts(ev, st);
+      if (p0) return sparkSvg(p0, '演练 · 震度包络（真值推算）');
+    }
+    if (st.country === 'JP' && !st.sea) {
+      const a = histOf(st.code);
+      if (a && a.length >= 6) {
+        const t1 = a[a.length - 1][0];
+        const pts = a.filter(p => t1 - p[0] <= 120);
+        const hold = pts.length && (nowSec() - t1 > 8);   // 断流了就别假装还在更新
+        if (pts.length >= 6 && !hold) {
+          let mn = Infinity, mx = -Infinity;
+          for (const p of pts) { mn = Math.min(mn, p[1]); mx = Math.max(mx, p[1]); }
+          const lo = Math.min(-1, Math.floor(mn)), hi = Math.max(1.5, Math.ceil(mx * 2) / 2);
+          return sparkSvg(pts, '实时 · 计测震度包络（近 2 分钟）', lo, hi);
+        }
+      }
+    }
+    if (ev && !state.historyEvent) {
+      const pts = estWavePts(ev, st);
+      if (pts) {
+        return sparkSvg(pts, (ev.isSim ? '演练' : '推算') + ' · 震度包络（' +
+          (ev.isSim ? '真值推算' : '衰减式') + '）');
+      }
+    }
+    return '';
+  }
+
   function stationInfoHtml(st) {
     const ev = eventForMap();
     const o = state.obs;
@@ -2006,7 +2096,7 @@
       (st.sea ? ' · 海底' + (st.depth_m ? ' ' + st.depth_m + ' m' : '') : '') + '</span>';
     if (st.sea) {
       h += '<br><span class="dimx">NIED 海底地震津波観測網 · 位置来自官方名册；' +
-        'kmoni 实时取色只解陆地站点，这里只给推算震动</span>';
+        'kmoni 的震度图不含海底符号，这里给的是推算震动</span>';
     }
     // ⓪ kmoni 实时计测震度（逐秒，NIED K-NET/KiK-net 才有）
     if (jp && kmoniFresh()) {
@@ -2063,6 +2153,7 @@
         }
       }
     }
+    h += waveBlock(st, ev);
     return h;
   }
 
@@ -2459,7 +2550,8 @@
   // 真发展起来（站更多、两站过 1.5），autoHypo 那套才会接管去找震源。
   const SHAKE = { lv: 0.7, minSt: 2, hz: 4.6, max: 14 };
 
-  function shakeHits() {
+  let hitKey = '', hitAt = 0, hitCache = [];
+  function shakeHits(ev) {
     const hits = [];
     if (kmoniFresh()) {
       const lv = state.kmoni.lv || {};
@@ -2483,7 +2575,22 @@
         hits.push({ lat: s.y, lon: s.x, v: v });
       }
     }
-    return hits;
+    if (hits.length) return hits;
+    // 没有实测数据（kmoni 没帧、P-Alert 没值）时，推算/演练也照给绿框：
+    // 每 0.5 秒算一次，别每帧把 2000 多个站重算一遍。
+    if (!ev || state.historyEvent) return hits;
+    const key = ev.uid + '#' + (ev.serial || 0);
+    const now = nowSec();
+    if (key === hitKey && now - hitAt < 0.5) return hitCache;
+    const el = elapsedOf(ev), mag = srcOf(ev).mag || 5, jp = usesShindo(ev);
+    const out = [];
+    for (const st of state.stations) {
+      const lv = shakeLevel(estOf(ev, st), el, mag, jp);
+      if (!lv || lv.risk < 1) continue;
+      out.push({ lat: st.lat, lon: st.lon, v: SHAKE.lv + lv.risk });
+    }
+    hitKey = key; hitAt = now; hitCache = out;
+    return out;
   }
 
   // 演练：把「已经报到摇了」的台站一个个点亮（服务端每报下发 sim_det）。
@@ -2556,11 +2663,11 @@
     flyTo(cLat, cLon, Math.max(view.s, target), 650);
   }
 
-  function drawShakeHints() {
+  function drawShakeHints(ev) {
     if (!state.layers.stations && state.layers.palert === 0) return;
-    const hits = shakeHits();
+    const hits = shakeHits(ev);
     state.shakeN = hits.length;
-    try { autoFrameShake(hits); } catch (e) { }
+    if (!ev) { try { autoFrameShake(hits); } catch (e) { } }
     if (hits.length < SHAKE.minSt) return;   // 单站跳一下不算，至少两个站同时
     // 东亚视野下日本只有几十像素宽，几十个框会糊成一团绿。按强度取前 N 个，
     // 且彼此屏幕距离不足 9px 的只留最强那个——放大后照样一个站一个框。
@@ -4967,7 +5074,9 @@
           const lv = {};
           let n = 0;
           for (const st of state.stations) {
-            if (st.country !== 'JP' || st.sea) continue;   // kmoni 只覆盖陆地日本站点
+            // 海底站不在这里取色：jma_s 震度图上整片海域是全黑（实测扫过，没有海底符号），
+            // 硬取只会读到岸边陆站的像素。海底站的震动用推算值（见 stationInfoHtml）。
+            if (st.country !== 'JP' || st.sea) continue;
             const [bx, by] = kmPixel(st.lon, st.lat);
             if (bx < 0 || by < 0 || bx >= KMONI_IMG_W || by >= KMONI_IMG_H) continue;  // 图幅外（冲绳）
             // 逐台站取色：先打正中心，打空就在 1~2 px 环上找最近的实心像素
@@ -4980,7 +5089,10 @@
               v = kmoniValOf(d[i], d[i + 1], d[i + 2]);
               if (v !== null && v !== undefined) break;
             }
-            if (v !== null && v !== undefined) { lv[st.code] = v; n++; }
+            if (v !== null && v !== undefined) {
+              lv[st.code] = v; n++;
+              histPush(st.code, v, nowSec());
+            }
           }
           if (n > 800)   // 命中过少说明取色坐标或图片异常，丢弃这帧
             state.kmoni = { ok: true, at: nowSec(), ts: lastTs, lv, n };

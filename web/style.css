@@ -1045,3 +1045,15 @@ html::-webkit-scrollbar{width:0;height:0}
 html.light .log-item{background:rgba(12,26,41,.03)}
 html.light .log-ver{color:#1d4f8f}
 html.light .log-ver.infra{color:#8a5a00}
+
+/* 台站卡片里的震动包络（SVG 折线） */
+.tip .wave{margin-top:7px;width:216px}
+.tip .wave svg{display:block;width:216px;height:42px}
+.tip .wave .wv-grid line{stroke:rgba(255,255,255,.13);stroke-width:1;stroke-dasharray:2 3}
+.tip .wave .wv-line{fill:none;stroke:#4ade80;stroke-width:1.5;
+  stroke-linejoin:round;stroke-linecap:round}
+.tip .wave i{display:block;margin-top:2px;font-style:normal;font-size:9.5px;
+  color:#8b95a5;letter-spacing:.02em;white-space:nowrap}
+html.light .tip .wave .wv-grid line{stroke:rgba(18,42,68,.16)}
+html.light .tip .wave .wv-line{stroke:#13934a}
+html.light .tip .wave i{color:#6b8095}
