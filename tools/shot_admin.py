@@ -13,14 +13,18 @@ import tempfile
 import time
 import urllib.request
 
+
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import shot  # noqa: E402
 
 BASE = os.environ.get("EEW_BASE") or "http://127.0.0.1:8899"
 PORT = int(os.environ.get("EEW_CDP") or 9336)
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "shots")
-USER = sys.argv[1] if len(sys.argv) > 1 else "_mgrtest"
-PWD = sys.argv[2] if len(sys.argv) > 2 else "REDACTED"
+USER = sys.argv[1] if len(sys.argv) > 1 else os.environ.get("EEW_USER", "")
+PWD = sys.argv[2] if len(sys.argv) > 2 else os.environ.get("EEW_PWD", "")
+if not USER or not PWD:
+    sys.exit("用法：python tools/shot_admin.py <账号> <密码>，或设 EEW_USER / EEW_PWD 环境变量")
+
 
 
 def login():
