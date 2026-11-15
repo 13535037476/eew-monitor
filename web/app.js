@@ -2000,9 +2000,14 @@
     const obs = nearestObsPoint(st, 8);
     const age = o && o.origin_ts ? Math.max(0, nowSec() - o.origin_ts) : 1e9;
     const fresh = age < 1800;                 // 半小时内的电文才算「这一次」
-    let h = '<b>' + st.name + '</b> <span class="dimx">' + (st.region || '') + '</span>';
+    let h = '<b>' + st.name + '</b> <span class="dimx">' + (st.region || st.area || '') + '</span>';
     h += '<br><span class="dimx">' + (st.net || '代表点') + ' · ' + st.code + ' · ' +
-      st.lat.toFixed(2) + '°N ' + st.lon.toFixed(2) + '°E</span>';
+      st.lat.toFixed(2) + '°N ' + st.lon.toFixed(2) + '°E' +
+      (st.sea ? ' · 海底' + (st.depth_m ? ' ' + st.depth_m + ' m' : '') : '') + '</span>';
+    if (st.sea) {
+      h += '<br><span class="dimx">NIED 海底地震津波観測網 · 位置来自官方名册；' +
+        'kmoni 实时取色只解陆地站点，这里只给推算震动</span>';
+    }
     // ⓪ kmoni 实时计测震度（逐秒，NIED K-NET/KiK-net 才有）
     if (jp && kmoniFresh()) {
       const v = state.kmoni.lv[st.code];
@@ -2631,6 +2636,7 @@
       if (!a) batch.set(key, a = []);
       a.push(x, y);
     };
+    const sea = [];                            // 海底站：单独画方点
     const lvCnt = new Array(10).fill(0);      // 各档台站数，供调试观察衰减
     window.__lvCount = lvCnt;
     for (const st of state.stations) {
@@ -2641,8 +2647,9 @@
 
       if (mode === 'idle') {
         // 震度速报已是「地域」级：台站只当底网点缀，不冒充每个点都测到了
-        push(x, y, st.country === 'JP' ? 'rgba(136,168,204,.26)' : 'rgba(132,164,200,.20)',
-          1.9, st.country !== 'JP');
+        const col = st.country === 'JP' ? 'rgba(136,168,204,.26)' : 'rgba(132,164,200,.20)';
+        if (st.sea) { sea.push([x, y, col, 1.9, 0, -1]); continue; }
+        push(x, y, col, 1.9, st.country !== 'JP');
         continue;
       }
 
@@ -2716,6 +2723,10 @@
         }
       }
 
+      // 海底站：颜色/强度照上面算，但不画圆点——它们是埋在海床上的，
+      // 和水面站点不是一类东西，留到最后统一画成方块。
+      if (st.sea) { sea.push([x, y, color, r, hot ? 1 : 0, numG]); continue; }
+
       // 震度 1 以上：画「圆底 + 数字」的徽章，半径放大到能塞下字
       if (numG >= 1) {
         flush();
@@ -2751,6 +2762,23 @@
       ctx.stroke();
     }
     flush();
+
+    // 海底台站（S-net / DONET / N-net / 相模湾，243 站）：方点。
+    // 平时是个半透明小方框，摇起来按同一套震度色填充、放大，强震描白边。
+    if (sea.length) {
+      for (const q of sea) {
+        const s2 = Math.max(2.1, q[3] * 1.02);
+        ctx.beginPath();
+        ctx.rect(q[0] - s2, q[1] - s2, s2 * 2, s2 * 2);
+        ctx.fillStyle = q[2];
+        ctx.fill();
+        // 方点常驻一道细边：太小的时候圆点/方点看着都一样，有了边才认得出是「海里的站」
+        ctx.strokeStyle = q[4] ? 'rgba(255,255,255,.75)' : 'rgba(150,182,214,.55)';
+        ctx.lineWidth = q[4] ? 1 : .7;
+        ctx.stroke();
+      }
+    }
+
     // kmoni 模式下，气象厅电文观测点仍然叠在最上层（带地名标签，更醒目）
     if (real && mode === 'kmoni') drawRealStations(real, ev);
   }
@@ -4939,7 +4967,7 @@
           const lv = {};
           let n = 0;
           for (const st of state.stations) {
-            if (st.country !== 'JP') continue;   // kmoni 只覆盖日本
+            if (st.country !== 'JP' || st.sea) continue;   // kmoni 只覆盖陆地日本站点
             const [bx, by] = kmPixel(st.lon, st.lat);
             if (bx < 0 || by < 0 || bx >= KMONI_IMG_W || by >= KMONI_IMG_H) continue;  // 图幅外（冲绳）
             // 逐台站取色：先打正中心，打空就在 1~2 px 环上找最近的实心像素

@@ -1,4 +1,4 @@
-"""内置台站（城市代表点）+ NIED K-NET/KiK-net 真实强震观测点
+"""内置台站（城市代表点）+ NIED K-NET/KiK-net 真实强震观测点 + 海底台网
 
 - K-NET/KiK-net：官方台站名册（data/knet_stations.json，约 1750 个，含精确坐标），
   是日本地图上铺开的那层真实台网。
@@ -132,6 +132,10 @@ MAJOR_JP = {"東京", "大阪", "名古屋", "札幌", "仙台", "福岡", "広�
 # 一层是气象厅震度电文里报上来的观测点（见 sources.norm_jma_obs → points）。
 # 这张表只在「两者都还没有」时用于推算。
 KNET = []          # K-NET / KiK-net 真实观测点，由 load_knet() 填充
+# 海底台网：S-net / DONET / N-net / 相模湾（NIED 海底地震津波観測網，243 站）。
+# 这些站在海里，既不在 K-NET 名册里，也不会出现在气象厅的震度速報电文中，
+# 但 NIED 的实时监测是收它们的——地图上单独画成方点，和水面站点区分开。
+SEAFLOOR = []      # 由 load_seafloor() 填充
 
 
 def load_knet(path):
@@ -157,6 +161,41 @@ def load_knet(path):
 for _p in (os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "knet_stations.json"),
            os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "knet_stations.json")):
     if load_knet(_p):
+        break
+
+
+def load_seafloor(path):
+    """读 data/seafloor_stations.json（NIED 海底台网名册），返回加进来的个数"""
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            rows = json.load(f).get("stations") or []
+    except Exception:
+        return 0
+    del SEAFLOOR[:]
+    for r in rows:
+        try:
+            lat = float(r["lat"]); lon = float(r["lon"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        SEAFLOOR.append({
+            "code": r.get("code") or "",
+            "name": r.get("name") or r.get("code") or "",
+            "country": "JP",
+            # 海域站点不属于任何都道府县：region 留空，震度速報按县聚合时会自动跳过
+            "region": "",
+            "lat": round(lat, 4), "lon": round(lon, 4),
+            "net": r.get("net") or "海底",
+            "area": r.get("area") or "",
+            "depth_m": r.get("depth"),
+            "sea": True,
+            "major": False, "custom": False,
+        })
+    return len(SEAFLOOR)
+
+
+for _p in (os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "seafloor_stations.json"),
+           os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "seafloor_stations.json")):
+    if load_seafloor(_p):
         break
 
 
@@ -189,7 +228,7 @@ def _build():
     return out
 
 
-STATIONS = _build() + KNET          # 代表点在前，真实强震台网在后
+STATIONS = _build() + KNET + SEAFLOOR   # 代表点 → 陆上台网 → 海底台网
 
 
 def distance_km(lat1, lon1, lat2, lon2):

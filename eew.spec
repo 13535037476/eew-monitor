@@ -7,7 +7,7 @@
 """
 from PyInstaller.utils.hooks import collect_all
 
-datas = [("web", "web"), ("data/jp_places.json", "data"), ("data/coast_places.json", "data"), ("data/knet_stations.json", "data"), ("data/palert_stations.json", "data"), ("data/tokens.json", "data"), ("data/fe_regions.json", "data"), ("data/tt_ak135.json", "data"), ("data/tt_jma2001.json", "data")]
+datas = [("web", "web"), ("data/jp_places.json", "data"), ("data/coast_places.json", "data"), ("data/knet_stations.json", "data"), ("data/seafloor_stations.json", "data"), ("data/palert_stations.json", "data"), ("data/tokens.json", "data"), ("data/fe_regions.json", "data"), ("data/tt_ak135.json", "data"), ("data/tt_jma2001.json", "data")]
 binaries = []
 hiddenimports = []
 

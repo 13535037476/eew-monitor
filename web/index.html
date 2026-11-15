@@ -428,8 +428,9 @@ try{if(localStorage.getItem('eew.theme')==='light')document.documentElement.clas
       <div class="sec">
         <h3>台站（仅地图点位）</h3>
         <p class="hint">日本：NIED K-NET/KiK-net 真实强震观测点 <b>1749</b> 个（官方台站名册，
-          有预警时按 P/S 波到达逐点亮）＋气象厅震度电文报到的观测点（实测，收到几个画几个）。
-          震度 0 不显示。<br>
+          有预警时按 P/S 波到达逐点亮）＋<b>海底台网 243 个</b>（S-net 150 · DONET1/2 51 ·
+          N-net 36 · 相模湾 6，画成方点，位置取自 NIED 观测点名册）＋气象厅震度电文报到的
+          观测点（实测，收到几个画几个）。震度 0 不显示。<br>
           中国：内置代表点，只在没有实测电文时打点。
           点颜色 = 震动强度（浅蓝最强 · 绿 = 刚够震度 0）。<br>
           CSV 每行：<code>code,name,country,lat,lon</code></p>
@@ -572,6 +573,6 @@ try{if(localStorage.getItem('eew.theme')==='light')document.documentElement.clas
 <script src="geo.js?v=207"></script>
 <script src="geo_jp.js?v=176"></script>
 <script src="geo_world.js?v=207"></script>
-<script src="app.js?v=288"></script>
+<script src="app.js?v=290"></script>
 </body>
 </html>

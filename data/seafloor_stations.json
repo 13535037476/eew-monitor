@@ -1,0 +1,2196 @@
+{
+ "source": "NIED 海底地震津波観測網 観測点情報",
+ "url": "https://www.seafloor.bosai.go.jp/st_info/",
+ "fetched": "2026-11-15",
+ "note": "S-net 150 / DONET1 22 / DONET2 29 / 相模湾 6 / N-net 36；depth 为设置水深(m)",
+ "count": 243,
+ "stations": [
+  {
+   "code": "S1N01",
+   "name": "S1N01",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 35.8968,
+   "lon": 141.0535,
+   "depth": 169
+  },
+  {
+   "code": "S1N02",
+   "name": "S1N02",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 35.8424,
+   "lon": 141.3772,
+   "depth": 1466
+  },
+  {
+   "code": "S1N03",
+   "name": "S1N03",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 35.7203,
+   "lon": 141.6451,
+   "depth": 2591
+  },
+  {
+   "code": "S1N04",
+   "name": "S1N04",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 35.6036,
+   "lon": 141.9041,
+   "depth": 2612
+  },
+  {
+   "code": "S1N05",
+   "name": "S1N05",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 35.4047,
+   "lon": 142.0531,
+   "depth": 5836
+  },
+  {
+   "code": "S1N06",
+   "name": "S1N06",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 35.2277,
+   "lon": 141.8692,
+   "depth": 5567
+  },
+  {
+   "code": "S1N07",
+   "name": "S1N07",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 35.2773,
+   "lon": 141.5902,
+   "depth": 3285
+  },
+  {
+   "code": "S1N08",
+   "name": "S1N08",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 35.4536,
+   "lon": 141.3898,
+   "depth": 1387
+  },
+  {
+   "code": "S1N09",
+   "name": "S1N09",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 35.227,
+   "lon": 141.3068,
+   "depth": 1583
+  },
+  {
+   "code": "S1N10",
+   "name": "S1N10",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 35.0925,
+   "lon": 141.2021,
+   "depth": 2554
+  },
+  {
+   "code": "S1N11",
+   "name": "S1N11",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 35.1203,
+   "lon": 140.9682,
+   "depth": 1670
+  },
+  {
+   "code": "S1N12",
+   "name": "S1N12",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 35.0228,
+   "lon": 140.8091,
+   "depth": 1239
+  },
+  {
+   "code": "S1N13",
+   "name": "S1N13",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 34.8788,
+   "lon": 140.9627,
+   "depth": 2210
+  },
+  {
+   "code": "S1N14",
+   "name": "S1N14",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 34.6407,
+   "lon": 141.0907,
+   "depth": 4861
+  },
+  {
+   "code": "S1N15",
+   "name": "S1N15",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 34.5256,
+   "lon": 141.3512,
+   "depth": 6569
+  },
+  {
+   "code": "S1N16",
+   "name": "S1N16",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 34.3686,
+   "lon": 141.5402,
+   "depth": 6978
+  },
+  {
+   "code": "S1N17",
+   "name": "S1N17",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 34.1956,
+   "lon": 141.3341,
+   "depth": 6805
+  },
+  {
+   "code": "S1N18",
+   "name": "S1N18",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 34.262,
+   "lon": 141.0316,
+   "depth": 5111
+  },
+  {
+   "code": "S1N19",
+   "name": "S1N19",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 34.2269,
+   "lon": 140.7311,
+   "depth": 3274
+  },
+  {
+   "code": "S1N20",
+   "name": "S1N20",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 34.2592,
+   "lon": 140.4159,
+   "depth": 2513
+  },
+  {
+   "code": "S1N21",
+   "name": "S1N21",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 34.4231,
+   "lon": 140.203,
+   "depth": 2869
+  },
+  {
+   "code": "S1N22",
+   "name": "S1N22",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 34.6443,
+   "lon": 140.0906,
+   "depth": 2512
+  },
+  {
+   "code": "S2N01",
+   "name": "S2N01",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 37.8428,
+   "lon": 141.3845,
+   "depth": 102
+  },
+  {
+   "code": "S2N02",
+   "name": "S2N02",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 37.6922,
+   "lon": 141.6387,
+   "depth": 239
+  },
+  {
+   "code": "S2N03",
+   "name": "S2N03",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 37.7073,
+   "lon": 141.965,
+   "depth": 462
+  },
+  {
+   "code": "S2N04",
+   "name": "S2N04",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 37.6739,
+   "lon": 142.2975,
+   "depth": 786
+  },
+  {
+   "code": "S2N05",
+   "name": "S2N05",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 37.6016,
+   "lon": 142.6236,
+   "depth": 1781
+  },
+  {
+   "code": "S2N06",
+   "name": "S2N06",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 37.5259,
+   "lon": 142.935,
+   "depth": 2945
+  },
+  {
+   "code": "S2N07",
+   "name": "S2N07",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 37.429,
+   "lon": 143.2266,
+   "depth": 4767
+  },
+  {
+   "code": "S2N08",
+   "name": "S2N08",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 37.222,
+   "lon": 143.07,
+   "depth": 4353
+  },
+  {
+   "code": "S2N09",
+   "name": "S2N09",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 37.0741,
+   "lon": 142.8188,
+   "depth": 4226
+  },
+  {
+   "code": "S2N10",
+   "name": "S2N10",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 37.0948,
+   "lon": 142.4979,
+   "depth": 2417
+  },
+  {
+   "code": "S2N11",
+   "name": "S2N11",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 37.1931,
+   "lon": 142.1998,
+   "depth": 1447
+  },
+  {
+   "code": "S2N12",
+   "name": "S2N12",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 37.2772,
+   "lon": 141.879,
+   "depth": 591
+  },
+  {
+   "code": "S2N13A",
+   "name": "S2N13A",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 37.3003,
+   "lon": 141.5709,
+   "depth": 212
+  },
+  {
+   "code": "S2N14",
+   "name": "S2N14",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 37.0952,
+   "lon": 141.3703,
+   "depth": 162
+  },
+  {
+   "code": "S2N15",
+   "name": "S2N15",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 36.8344,
+   "lon": 141.3307,
+   "depth": 264
+  },
+  {
+   "code": "S2N16",
+   "name": "S2N16",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 36.662,
+   "lon": 141.5207,
+   "depth": 874
+  },
+  {
+   "code": "S2N17",
+   "name": "S2N17",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 36.6337,
+   "lon": 141.8389,
+   "depth": 2247
+  },
+  {
+   "code": "S2N18",
+   "name": "S2N18",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 36.6824,
+   "lon": 142.1445,
+   "depth": 2460
+  },
+  {
+   "code": "S2N19",
+   "name": "S2N19",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 36.5986,
+   "lon": 142.4389,
+   "depth": 3425
+  },
+  {
+   "code": "S2N20",
+   "name": "S2N20",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 36.3885,
+   "lon": 142.6164,
+   "depth": 5770
+  },
+  {
+   "code": "S2N21",
+   "name": "S2N21",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 36.1577,
+   "lon": 142.5553,
+   "depth": 6230
+  },
+  {
+   "code": "S2N22",
+   "name": "S2N22",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 35.9463,
+   "lon": 142.4014,
+   "depth": 4492
+  },
+  {
+   "code": "S2N23",
+   "name": "S2N23",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 35.9677,
+   "lon": 142.1138,
+   "depth": 3881
+  },
+  {
+   "code": "S2N24",
+   "name": "S2N24",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 35.9976,
+   "lon": 141.7944,
+   "depth": 2310
+  },
+  {
+   "code": "S2N25",
+   "name": "S2N25",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 36.0729,
+   "lon": 141.5095,
+   "depth": 1887
+  },
+  {
+   "code": "S2N26",
+   "name": "S2N26",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 36.1442,
+   "lon": 141.2021,
+   "depth": 730
+  },
+  {
+   "code": "S3N01",
+   "name": "S3N01",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 39.4497,
+   "lon": 142.4578,
+   "depth": 940
+  },
+  {
+   "code": "S3N02",
+   "name": "S3N02",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 39.3746,
+   "lon": 142.7918,
+   "depth": 1622
+  },
+  {
+   "code": "S3N03",
+   "name": "S3N03",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 39.3231,
+   "lon": 143.1206,
+   "depth": 1890
+  },
+  {
+   "code": "S3N04",
+   "name": "S3N04",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 39.2958,
+   "lon": 143.4544,
+   "depth": 2490
+  },
+  {
+   "code": "S3N05",
+   "name": "S3N05",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 39.1906,
+   "lon": 143.7499,
+   "depth": 4308
+  },
+  {
+   "code": "S3N06",
+   "name": "S3N06",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 39.0459,
+   "lon": 143.9305,
+   "depth": 5440
+  },
+  {
+   "code": "S3N07",
+   "name": "S3N07",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 38.8308,
+   "lon": 143.7846,
+   "depth": 5231
+  },
+  {
+   "code": "S3N08",
+   "name": "S3N08",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 38.7826,
+   "lon": 143.4769,
+   "depth": 2465
+  },
+  {
+   "code": "S3N09",
+   "name": "S3N09",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 38.7739,
+   "lon": 143.1437,
+   "depth": 1779
+  },
+  {
+   "code": "S3N10",
+   "name": "S3N10",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 38.8668,
+   "lon": 142.8212,
+   "depth": 1310
+  },
+  {
+   "code": "S3N11",
+   "name": "S3N11",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 38.9349,
+   "lon": 142.4873,
+   "depth": 1168
+  },
+  {
+   "code": "S3N12",
+   "name": "S3N12",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 38.8412,
+   "lon": 142.1816,
+   "depth": 558
+  },
+  {
+   "code": "S3N13",
+   "name": "S3N13",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 38.5901,
+   "lon": 142.1816,
+   "depth": 573
+  },
+  {
+   "code": "S3N14",
+   "name": "S3N14",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 38.4993,
+   "lon": 142.5002,
+   "depth": 1092
+  },
+  {
+   "code": "S3N15",
+   "name": "S3N15",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 38.4487,
+   "lon": 142.8376,
+   "depth": 1472
+  },
+  {
+   "code": "S3N16",
+   "name": "S3N16",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 38.4262,
+   "lon": 143.1703,
+   "depth": 2420
+  },
+  {
+   "code": "S3N17",
+   "name": "S3N17",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 38.3978,
+   "lon": 143.5139,
+   "depth": 3020
+  },
+  {
+   "code": "S3N18",
+   "name": "S3N18",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 38.3063,
+   "lon": 143.781,
+   "depth": 5528
+  },
+  {
+   "code": "S3N19",
+   "name": "S3N19",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 38.0594,
+   "lon": 143.7441,
+   "depth": 5591
+  },
+  {
+   "code": "S3N20",
+   "name": "S3N20",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 37.9311,
+   "lon": 143.5675,
+   "depth": 5225
+  },
+  {
+   "code": "S3N21",
+   "name": "S3N21",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 37.9713,
+   "lon": 143.2454,
+   "depth": 2779
+  },
+  {
+   "code": "S3N22",
+   "name": "S3N22",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 37.9838,
+   "lon": 142.9072,
+   "depth": 1645
+  },
+  {
+   "code": "S3N23",
+   "name": "S3N23",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 38.027,
+   "lon": 142.5735,
+   "depth": 1220
+  },
+  {
+   "code": "S3N24",
+   "name": "S3N24",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 38.0569,
+   "lon": 142.234,
+   "depth": 849
+  },
+  {
+   "code": "S3N25",
+   "name": "S3N25",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 38.0972,
+   "lon": 141.8957,
+   "depth": 230
+  },
+  {
+   "code": "S3N26",
+   "name": "S3N26",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 38.106,
+   "lon": 141.5572,
+   "depth": 128
+  },
+  {
+   "code": "S4N01",
+   "name": "S4N01",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 40.7881,
+   "lon": 141.7895,
+   "depth": 139
+  },
+  {
+   "code": "S4N02",
+   "name": "S4N02",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 40.9069,
+   "lon": 142.1057,
+   "depth": 858
+  },
+  {
+   "code": "S4N03",
+   "name": "S4N03",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 41.0156,
+   "lon": 142.4314,
+   "depth": 1425
+  },
+  {
+   "code": "S4N04",
+   "name": "S4N04",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 41.0762,
+   "lon": 142.7706,
+   "depth": 1798
+  },
+  {
+   "code": "S4N05",
+   "name": "S4N05",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 41.0443,
+   "lon": 143.1138,
+   "depth": 1940
+  },
+  {
+   "code": "S4N06",
+   "name": "S4N06",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 40.9718,
+   "lon": 143.4481,
+   "depth": 1970
+  },
+  {
+   "code": "S4N07",
+   "name": "S4N07",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 40.882,
+   "lon": 143.7746,
+   "depth": 2613
+  },
+  {
+   "code": "S4N08",
+   "name": "S4N08",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 40.7805,
+   "lon": 144.0905,
+   "depth": 5060
+  },
+  {
+   "code": "S4N09",
+   "name": "S4N09",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 40.5521,
+   "lon": 144.1332,
+   "depth": 5095
+  },
+  {
+   "code": "S4N10",
+   "name": "S4N10",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 40.4327,
+   "lon": 143.8887,
+   "depth": 3897
+  },
+  {
+   "code": "S4N11",
+   "name": "S4N11",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 40.4353,
+   "lon": 143.543,
+   "depth": 2273
+  },
+  {
+   "code": "S4N12",
+   "name": "S4N12",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 40.4515,
+   "lon": 143.2015,
+   "depth": 1711
+  },
+  {
+   "code": "S4N13",
+   "name": "S4N13",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 40.5196,
+   "lon": 142.9617,
+   "depth": 1537
+  },
+  {
+   "code": "S4N14",
+   "name": "S4N14",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 40.5927,
+   "lon": 142.634,
+   "depth": 1393
+  },
+  {
+   "code": "S4N15",
+   "name": "S4N15",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 40.5933,
+   "lon": 142.2844,
+   "depth": 816
+  },
+  {
+   "code": "S4N16",
+   "name": "S4N16",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 40.3295,
+   "lon": 142.2673,
+   "depth": 559
+  },
+  {
+   "code": "S4N17",
+   "name": "S4N17",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 40.1165,
+   "lon": 142.3926,
+   "depth": 681
+  },
+  {
+   "code": "S4N18",
+   "name": "S4N18",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 40.1088,
+   "lon": 142.6222,
+   "depth": 969
+  },
+  {
+   "code": "S4N19",
+   "name": "S4N19",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 40.0904,
+   "lon": 142.9695,
+   "depth": 1256
+  },
+  {
+   "code": "S4N20",
+   "name": "S4N20",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 40.0743,
+   "lon": 143.321,
+   "depth": 1329
+  },
+  {
+   "code": "S4N21",
+   "name": "S4N21",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 40.0863,
+   "lon": 143.6572,
+   "depth": 2456
+  },
+  {
+   "code": "S4N22",
+   "name": "S4N22",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 40.026,
+   "lon": 143.9547,
+   "depth": 4107
+  },
+  {
+   "code": "S4N23",
+   "name": "S4N23",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 39.7718,
+   "lon": 143.9259,
+   "depth": 4358
+  },
+  {
+   "code": "S4N24",
+   "name": "S4N24",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 39.6388,
+   "lon": 143.7154,
+   "depth": 2936
+  },
+  {
+   "code": "S4N25",
+   "name": "S4N25",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 39.6976,
+   "lon": 143.3749,
+   "depth": 2228
+  },
+  {
+   "code": "S4N26",
+   "name": "S4N26",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 39.7245,
+   "lon": 143.0384,
+   "depth": 1569
+  },
+  {
+   "code": "S4N27",
+   "name": "S4N27",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 39.7445,
+   "lon": 142.6903,
+   "depth": 914
+  },
+  {
+   "code": "S4N28",
+   "name": "S4N28",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 39.7385,
+   "lon": 142.3408,
+   "depth": 569
+  },
+  {
+   "code": "S5N01",
+   "name": "S5N01",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 42.7688,
+   "lon": 145.7115,
+   "depth": 2052
+  },
+  {
+   "code": "S5N02",
+   "name": "S5N02",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 42.6403,
+   "lon": 145.4063,
+   "depth": 2042
+  },
+  {
+   "code": "S5N03",
+   "name": "S5N03",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 42.4802,
+   "lon": 145.1433,
+   "depth": 1985
+  },
+  {
+   "code": "S5N04",
+   "name": "S5N04",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 42.2286,
+   "lon": 145.204,
+   "depth": 3149
+  },
+  {
+   "code": "S5N05",
+   "name": "S5N05",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 42.0615,
+   "lon": 145.437,
+   "depth": 3813
+  },
+  {
+   "code": "S5N06",
+   "name": "S5N06",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 41.884,
+   "lon": 145.6544,
+   "depth": 5619
+  },
+  {
+   "code": "S5N07",
+   "name": "S5N07",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 41.6637,
+   "lon": 145.5291,
+   "depth": 5953
+  },
+  {
+   "code": "S5N08",
+   "name": "S5N08",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 41.5301,
+   "lon": 145.2483,
+   "depth": 5980
+  },
+  {
+   "code": "S5N09",
+   "name": "S5N09",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 41.521,
+   "lon": 144.905,
+   "depth": 5100
+  },
+  {
+   "code": "S5N10",
+   "name": "S5N10",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 41.6541,
+   "lon": 144.6716,
+   "depth": 4103
+  },
+  {
+   "code": "S5N11",
+   "name": "S5N11",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 41.9072,
+   "lon": 144.6955,
+   "depth": 2093
+  },
+  {
+   "code": "S5N12",
+   "name": "S5N12",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 42.0784,
+   "lon": 144.6375,
+   "depth": 1772
+  },
+  {
+   "code": "S5N13",
+   "name": "S5N13",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 41.9792,
+   "lon": 144.3445,
+   "depth": 1607
+  },
+  {
+   "code": "S5N14",
+   "name": "S5N14",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 41.7475,
+   "lon": 144.1779,
+   "depth": 1592
+  },
+  {
+   "code": "S5N15",
+   "name": "S5N15",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 41.4961,
+   "lon": 144.0879,
+   "depth": 1950
+  },
+  {
+   "code": "S5N16",
+   "name": "S5N16",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 41.3742,
+   "lon": 143.8006,
+   "depth": 2380
+  },
+  {
+   "code": "S5N17",
+   "name": "S5N17",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 41.3643,
+   "lon": 143.453,
+   "depth": 2023
+  },
+  {
+   "code": "S5N18",
+   "name": "S5N18",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 41.4351,
+   "lon": 143.1264,
+   "depth": 1509
+  },
+  {
+   "code": "S5N19",
+   "name": "S5N19",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 41.5607,
+   "lon": 142.8177,
+   "depth": 986
+  },
+  {
+   "code": "S5N20",
+   "name": "S5N20",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 41.6095,
+   "lon": 142.4787,
+   "depth": 1165
+  },
+  {
+   "code": "S5N21",
+   "name": "S5N21",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 41.4248,
+   "lon": 142.2193,
+   "depth": 1189
+  },
+  {
+   "code": "S5N22",
+   "name": "S5N22",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 41.1989,
+   "lon": 142.0271,
+   "depth": 1029
+  },
+  {
+   "code": "S5N23",
+   "name": "S5N23",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 40.954,
+   "lon": 141.8762,
+   "depth": 529
+  },
+  {
+   "code": "S6N01",
+   "name": "S6N01",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 42.8064,
+   "lon": 146.0211,
+   "depth": 2427
+  },
+  {
+   "code": "S6N02",
+   "name": "S6N02",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 42.5807,
+   "lon": 146.078,
+   "depth": 2830
+  },
+  {
+   "code": "S6N03",
+   "name": "S6N03",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 42.0943,
+   "lon": 146.2316,
+   "depth": 5710
+  },
+  {
+   "code": "S6N04",
+   "name": "S6N04",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 41.6653,
+   "lon": 146.1747,
+   "depth": 6950
+  },
+  {
+   "code": "S6N05",
+   "name": "S6N05",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 41.3717,
+   "lon": 145.6053,
+   "depth": 6680
+  },
+  {
+   "code": "S6N06",
+   "name": "S6N06",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 40.8999,
+   "lon": 145.3929,
+   "depth": 6012
+  },
+  {
+   "code": "S6N07",
+   "name": "S6N07",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 40.536,
+   "lon": 144.9381,
+   "depth": 6160
+  },
+  {
+   "code": "S6N08",
+   "name": "S6N08",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 40.0319,
+   "lon": 144.8089,
+   "depth": 5900
+  },
+  {
+   "code": "S6N09",
+   "name": "S6N09",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 39.5172,
+   "lon": 144.7191,
+   "depth": 6054
+  },
+  {
+   "code": "S6N10",
+   "name": "S6N10",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 39.0072,
+   "lon": 144.5915,
+   "depth": 6160
+  },
+  {
+   "code": "S6N11",
+   "name": "S6N11",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 38.499,
+   "lon": 144.4536,
+   "depth": 6118
+  },
+  {
+   "code": "S6N12",
+   "name": "S6N12",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 37.9879,
+   "lon": 144.3357,
+   "depth": 6111
+  },
+  {
+   "code": "S6N13",
+   "name": "S6N13",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 37.4862,
+   "lon": 144.1757,
+   "depth": 6174
+  },
+  {
+   "code": "S6N14",
+   "name": "S6N14",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 37.012,
+   "lon": 143.9557,
+   "depth": 6228
+  },
+  {
+   "code": "S6N15",
+   "name": "S6N15",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 36.5748,
+   "lon": 143.6059,
+   "depth": 6433
+  },
+  {
+   "code": "S6N16",
+   "name": "S6N16",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 36.1262,
+   "lon": 143.2823,
+   "depth": 6513
+  },
+  {
+   "code": "S6N17",
+   "name": "S6N17",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 35.6745,
+   "lon": 142.9688,
+   "depth": 6625
+  },
+  {
+   "code": "S6N18",
+   "name": "S6N18",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 35.2114,
+   "lon": 142.6799,
+   "depth": 6319
+  },
+  {
+   "code": "S6N19",
+   "name": "S6N19",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 34.7118,
+   "lon": 142.5208,
+   "depth": 6284
+  },
+  {
+   "code": "S6N20",
+   "name": "S6N20",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 34.2604,
+   "lon": 142.2389,
+   "depth": 7830
+  },
+  {
+   "code": "S6N21",
+   "name": "S6N21",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 33.9619,
+   "lon": 141.7291,
+   "depth": 7797
+  },
+  {
+   "code": "S6N22",
+   "name": "S6N22",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 33.8601,
+   "lon": 141.1281,
+   "depth": 3941
+  },
+  {
+   "code": "S6N23",
+   "name": "S6N23",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 33.9448,
+   "lon": 140.5189,
+   "depth": 1723
+  },
+  {
+   "code": "S6N24",
+   "name": "S6N24",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 34.1773,
+   "lon": 139.9814,
+   "depth": 1276
+  },
+  {
+   "code": "S6N25",
+   "name": "S6N25",
+   "net": "S-net",
+   "area": "日本海溝",
+   "lat": 34.6696,
+   "lon": 139.8167,
+   "depth": 2411
+  },
+  {
+   "code": "KMA01",
+   "name": "KMA01",
+   "net": "DONET1",
+   "area": "南海トラフ",
+   "lat": 33.8048,
+   "lon": 136.557,
+   "depth": 2039
+  },
+  {
+   "code": "KMA02",
+   "name": "KMA02",
+   "net": "DONET1",
+   "area": "南海トラフ",
+   "lat": 33.7524,
+   "lon": 136.6488,
+   "depth": 2011
+  },
+  {
+   "code": "KMA03",
+   "name": "KMA03",
+   "net": "DONET1",
+   "area": "南海トラフ",
+   "lat": 33.6484,
+   "lon": 136.6037,
+   "depth": 2063
+  },
+  {
+   "code": "KMA04",
+   "name": "KMA04",
+   "net": "DONET1",
+   "area": "南海トラフ",
+   "lat": 33.6781,
+   "lon": 136.4674,
+   "depth": 2054
+  },
+  {
+   "code": "KMB05",
+   "name": "KMB05",
+   "net": "DONET1",
+   "area": "南海トラフ",
+   "lat": 33.4772,
+   "lon": 136.9264,
+   "depth": 1998
+  },
+  {
+   "code": "KMB06",
+   "name": "KMB06",
+   "net": "DONET1",
+   "area": "南海トラフ",
+   "lat": 33.3584,
+   "lon": 136.9216,
+   "depth": 2499
+  },
+  {
+   "code": "KMB07",
+   "name": "KMB07",
+   "net": "DONET1",
+   "area": "南海トラフ",
+   "lat": 33.3613,
+   "lon": 136.8072,
+   "depth": 1980
+  },
+  {
+   "code": "KMB08",
+   "name": "KMB08",
+   "net": "DONET1",
+   "area": "南海トラフ",
+   "lat": 33.4664,
+   "lon": 136.8039,
+   "depth": 1924
+  },
+  {
+   "code": "KMC09",
+   "name": "KMC09",
+   "net": "DONET1",
+   "area": "南海トラフ",
+   "lat": 33.0584,
+   "lon": 136.8313,
+   "depth": 3511
+  },
+  {
+   "code": "KMC10",
+   "name": "KMC10",
+   "net": "DONET1",
+   "area": "南海トラフ",
+   "lat": 33.0533,
+   "lon": 136.9335,
+   "depth": 4247
+  },
+  {
+   "code": "KMC11",
+   "name": "KMC11",
+   "net": "DONET1",
+   "area": "南海トラフ",
+   "lat": 33.0033,
+   "lon": 136.779,
+   "depth": 4378
+  },
+  {
+   "code": "KMC12",
+   "name": "KMC12",
+   "net": "DONET1",
+   "area": "南海トラフ",
+   "lat": 33.1279,
+   "lon": 136.8188,
+   "depth": 3784
+  },
+  {
+   "code": "KMC21",
+   "name": "KMC21",
+   "net": "DONET1",
+   "area": "南海トラフ",
+   "lat": 32.9506,
+   "lon": 136.7417,
+   "depth": 4449
+  },
+  {
+   "code": "KMD13",
+   "name": "KMD13",
+   "net": "DONET1",
+   "area": "南海トラフ",
+   "lat": 33.2201,
+   "lon": 136.6903,
+   "depth": 2441
+  },
+  {
+   "code": "KMD14",
+   "name": "KMD14",
+   "net": "DONET1",
+   "area": "南海トラフ",
+   "lat": 33.1727,
+   "lon": 136.577,
+   "depth": 2350
+  },
+  {
+   "code": "KMD15",
+   "name": "KMD15",
+   "net": "DONET1",
+   "area": "南海トラフ",
+   "lat": 33.2331,
+   "lon": 136.5631,
+   "depth": 1909
+  },
+  {
+   "code": "KMD16",
+   "name": "KMD16",
+   "net": "DONET1",
+   "area": "南海トラフ",
+   "lat": 33.3045,
+   "lon": 136.5958,
+   "depth": 1970
+  },
+  {
+   "code": "KME17",
+   "name": "KME17",
+   "net": "DONET1",
+   "area": "南海トラフ",
+   "lat": 33.485,
+   "lon": 136.4451,
+   "depth": 2054
+  },
+  {
+   "code": "KME18",
+   "name": "KME18",
+   "net": "DONET1",
+   "area": "南海トラフ",
+   "lat": 33.386,
+   "lon": 136.3828,
+   "depth": 2052
+  },
+  {
+   "code": "KME19",
+   "name": "KME19",
+   "net": "DONET1",
+   "area": "南海トラフ",
+   "lat": 33.4459,
+   "lon": 136.2564,
+   "depth": 1909
+  },
+  {
+   "code": "KME20",
+   "name": "KME20",
+   "net": "DONET1",
+   "area": "南海トラフ",
+   "lat": 33.5444,
+   "lon": 136.3325,
+   "depth": 1977
+  },
+  {
+   "code": "KME22",
+   "name": "KME22",
+   "net": "DONET1",
+   "area": "南海トラフ",
+   "lat": 33.3303,
+   "lon": 136.2702,
+   "depth": 1841
+  },
+  {
+   "code": "MRA01",
+   "name": "MRA01",
+   "net": "DONET2",
+   "area": "南海トラフ",
+   "lat": 33.4085,
+   "lon": 134.7449,
+   "depth": 1375
+  },
+  {
+   "code": "MRA02",
+   "name": "MRA02",
+   "net": "DONET2",
+   "area": "南海トラフ",
+   "lat": 33.3393,
+   "lon": 134.8641,
+   "depth": 1360
+  },
+  {
+   "code": "MRA03",
+   "name": "MRA03",
+   "net": "DONET2",
+   "area": "南海トラフ",
+   "lat": 33.249,
+   "lon": 134.7691,
+   "depth": 1352
+  },
+  {
+   "code": "MRA04",
+   "name": "MRA04",
+   "net": "DONET2",
+   "area": "南海トラフ",
+   "lat": 33.3205,
+   "lon": 134.6724,
+   "depth": 1372
+  },
+  {
+   "code": "MRB05",
+   "name": "MRB05",
+   "net": "DONET2",
+   "area": "南海トラフ",
+   "lat": 33.3222,
+   "lon": 135.0667,
+   "depth": 1470
+  },
+  {
+   "code": "MRB06",
+   "name": "MRB06",
+   "net": "DONET2",
+   "area": "南海トラフ",
+   "lat": 33.2252,
+   "lon": 135.1698,
+   "depth": 1388
+  },
+  {
+   "code": "MRB07",
+   "name": "MRB07",
+   "net": "DONET2",
+   "area": "南海トラフ",
+   "lat": 33.1755,
+   "lon": 135.0964,
+   "depth": 1077
+  },
+  {
+   "code": "MRB08",
+   "name": "MRB08",
+   "net": "DONET2",
+   "area": "南海トラフ",
+   "lat": 33.275,
+   "lon": 134.9869,
+   "depth": 1262
+  },
+  {
+   "code": "MRC09",
+   "name": "MRC09",
+   "net": "DONET2",
+   "area": "南海トラフ",
+   "lat": 33.228,
+   "lon": 135.4585,
+   "depth": 1555
+  },
+  {
+   "code": "MRC10",
+   "name": "MRC10",
+   "net": "DONET2",
+   "area": "南海トラフ",
+   "lat": 33.1251,
+   "lon": 135.5249,
+   "depth": 1720
+  },
+  {
+   "code": "MRC11",
+   "name": "MRC11",
+   "net": "DONET2",
+   "area": "南海トラフ",
+   "lat": 33.0837,
+   "lon": 135.4121,
+   "depth": 2001
+  },
+  {
+   "code": "MRC12",
+   "name": "MRC12",
+   "net": "DONET2",
+   "area": "南海トラフ",
+   "lat": 33.1752,
+   "lon": 135.3414,
+   "depth": 1317
+  },
+  {
+   "code": "MRD13",
+   "name": "MRD13",
+   "net": "DONET2",
+   "area": "南海トラフ",
+   "lat": 33.1594,
+   "lon": 135.7557,
+   "depth": 2353
+  },
+  {
+   "code": "MRD14",
+   "name": "MRD14",
+   "net": "DONET2",
+   "area": "南海トラフ",
+   "lat": 33.1359,
+   "lon": 135.8584,
+   "depth": 2398
+  },
+  {
+   "code": "MRD15",
+   "name": "MRD15",
+   "net": "DONET2",
+   "area": "南海トラフ",
+   "lat": 33.142,
+   "lon": 135.9586,
+   "depth": 2244
+  },
+  {
+   "code": "MRD16",
+   "name": "MRD16",
+   "net": "DONET2",
+   "area": "南海トラフ",
+   "lat": 33.0299,
+   "lon": 135.8401,
+   "depth": 2415
+  },
+  {
+   "code": "MRD17",
+   "name": "MRD17",
+   "net": "DONET2",
+   "area": "南海トラフ",
+   "lat": 33.0915,
+   "lon": 135.7144,
+   "depth": 2700
+  },
+  {
+   "code": "MRE18",
+   "name": "MRE18",
+   "net": "DONET2",
+   "area": "南海トラフ",
+   "lat": 32.927,
+   "lon": 135.7747,
+   "depth": 3548
+  },
+  {
+   "code": "MRE19",
+   "name": "MRE19",
+   "net": "DONET2",
+   "area": "南海トラフ",
+   "lat": 32.892,
+   "lon": 135.8336,
+   "depth": 3456
+  },
+  {
+   "code": "MRE20",
+   "name": "MRE20",
+   "net": "DONET2",
+   "area": "南海トラフ",
+   "lat": 32.8017,
+   "lon": 135.7733,
+   "depth": 3603
+  },
+  {
+   "code": "MRE21",
+   "name": "MRE21",
+   "net": "DONET2",
+   "area": "南海トラフ",
+   "lat": 32.8603,
+   "lon": 135.667,
+   "depth": 3534
+  },
+  {
+   "code": "MRF22",
+   "name": "MRF22",
+   "net": "DONET2",
+   "area": "南海トラフ",
+   "lat": 32.988,
+   "lon": 135.225,
+   "depth": 2104
+  },
+  {
+   "code": "MRF23",
+   "name": "MRF23",
+   "net": "DONET2",
+   "area": "南海トラフ",
+   "lat": 32.8827,
+   "lon": 135.3082,
+   "depth": 2646
+  },
+  {
+   "code": "MRF24",
+   "name": "MRF24",
+   "net": "DONET2",
+   "area": "南海トラフ",
+   "lat": 32.8545,
+   "lon": 135.1916,
+   "depth": 2393
+  },
+  {
+   "code": "MRF25",
+   "name": "MRF25",
+   "net": "DONET2",
+   "area": "南海トラフ",
+   "lat": 32.8919,
+   "lon": 135.1538,
+   "depth": 2278
+  },
+  {
+   "code": "MRG26",
+   "name": "MRG26",
+   "net": "DONET2",
+   "area": "南海トラフ",
+   "lat": 32.7615,
+   "lon": 134.5167,
+   "depth": 1855
+  },
+  {
+   "code": "MRG27",
+   "name": "MRG27",
+   "net": "DONET2",
+   "area": "南海トラフ",
+   "lat": 32.7089,
+   "lon": 134.5996,
+   "depth": 2494
+  },
+  {
+   "code": "MRG28",
+   "name": "MRG28",
+   "net": "DONET2",
+   "area": "南海トラフ",
+   "lat": 32.6251,
+   "lon": 134.5164,
+   "depth": 2499
+  },
+  {
+   "code": "MRG29",
+   "name": "MRG29",
+   "net": "DONET2",
+   "area": "南海トラフ",
+   "lat": 32.6752,
+   "lon": 134.4334,
+   "depth": 2141
+  },
+  {
+   "code": "ST1H",
+   "name": "ST1H",
+   "net": "相模湾",
+   "area": "相模湾",
+   "lat": 34.5956,
+   "lon": 139.9183,
+   "depth": 2197
+  },
+  {
+   "code": "ST2H",
+   "name": "ST2H",
+   "net": "相模湾",
+   "area": "相模湾",
+   "lat": 34.7396,
+   "lon": 139.8393,
+   "depth": 2339
+  },
+  {
+   "code": "ST3H",
+   "name": "ST3H",
+   "net": "相模湾",
+   "area": "相模湾",
+   "lat": 34.7983,
+   "lon": 139.6435,
+   "depth": 902
+  },
+  {
+   "code": "ST4H",
+   "name": "ST4H",
+   "net": "相模湾",
+   "area": "相模湾",
+   "lat": 34.8931,
+   "lon": 139.5711,
+   "depth": 933
+  },
+  {
+   "code": "ST5H",
+   "name": "ST5H",
+   "net": "相模湾",
+   "area": "相模湾",
+   "lat": 34.9413,
+   "lon": 139.4213,
+   "depth": 1486
+  },
+  {
+   "code": "ST6H",
+   "name": "ST6H",
+   "net": "相模湾",
+   "area": "相模湾",
+   "lat": 35.0966,
+   "lon": 139.3778,
+   "depth": 1130
+  },
+  {
+   "code": "NAE01",
+   "name": "NAE01",
+   "net": "N-net",
+   "area": "南海トラフ",
+   "lat": 32.7687,
+   "lon": 134.2661,
+   "depth": 1563
+  },
+  {
+   "code": "NAE02",
+   "name": "NAE02",
+   "net": "N-net",
+   "area": "南海トラフ",
+   "lat": 32.4154,
+   "lon": 134.3346,
+   "depth": 2598
+  },
+  {
+   "code": "NAE03",
+   "name": "NAE03",
+   "net": "N-net",
+   "area": "南海トラフ",
+   "lat": 32.1712,
+   "lon": 134.274,
+   "depth": 3920
+  },
+  {
+   "code": "NAE04",
+   "name": "NAE04",
+   "net": "N-net",
+   "area": "南海トラフ",
+   "lat": 32.0348,
+   "lon": 133.9599,
+   "depth": 3691
+  },
+  {
+   "code": "NAE05",
+   "name": "NAE05",
+   "net": "N-net",
+   "area": "南海トラフ",
+   "lat": 31.7849,
+   "lon": 133.6553,
+   "depth": 4294
+  },
+  {
+   "code": "NAE06",
+   "name": "NAE06",
+   "net": "N-net",
+   "area": "南海トラフ",
+   "lat": 31.5924,
+   "lon": 133.3376,
+   "depth": 4556
+  },
+  {
+   "code": "NAE07",
+   "name": "NAE07",
+   "net": "N-net",
+   "area": "南海トラフ",
+   "lat": 31.5061,
+   "lon": 133.1083,
+   "depth": 3286
+  },
+  {
+   "code": "NAE08",
+   "name": "NAE08",
+   "net": "N-net",
+   "area": "南海トラフ",
+   "lat": 31.288,
+   "lon": 132.7613,
+   "depth": 3280
+  },
+  {
+   "code": "NAE09",
+   "name": "NAE09",
+   "net": "N-net",
+   "area": "南海トラフ",
+   "lat": 31.1387,
+   "lon": 132.324,
+   "depth": 1815
+  },
+  {
+   "code": "NAE10",
+   "name": "NAE10",
+   "net": "N-net",
+   "area": "南海トラフ",
+   "lat": 31.1019,
+   "lon": 131.913,
+   "depth": 1399
+  },
+  {
+   "code": "NAE11",
+   "name": "NAE11",
+   "net": "N-net",
+   "area": "南海トラフ",
+   "lat": 31.3942,
+   "lon": 132.0465,
+   "depth": 1189
+  },
+  {
+   "code": "NAE12",
+   "name": "NAE12",
+   "net": "N-net",
+   "area": "南海トラフ",
+   "lat": 31.5881,
+   "lon": 132.4506,
+   "depth": 2278
+  },
+  {
+   "code": "NAE13",
+   "name": "NAE13",
+   "net": "N-net",
+   "area": "南海トラフ",
+   "lat": 31.7433,
+   "lon": 132.8114,
+   "depth": 2360
+  },
+  {
+   "code": "NAE14",
+   "name": "NAE14",
+   "net": "N-net",
+   "area": "南海トラフ",
+   "lat": 31.9701,
+   "lon": 133.0367,
+   "depth": 2014
+  },
+  {
+   "code": "NAE15",
+   "name": "NAE15",
+   "net": "N-net",
+   "area": "南海トラフ",
+   "lat": 32.1818,
+   "lon": 132.7916,
+   "depth": 1380
+  },
+  {
+   "code": "NAE16",
+   "name": "NAE16",
+   "net": "N-net",
+   "area": "南海トラフ",
+   "lat": 31.9429,
+   "lon": 132.5561,
+   "depth": 1812
+  },
+  {
+   "code": "NAE17",
+   "name": "NAE17",
+   "net": "N-net",
+   "area": "南海トラフ",
+   "lat": 31.7484,
+   "lon": 132.4602,
+   "depth": 2403
+  },
+  {
+   "code": "NAE18",
+   "name": "NAE18",
+   "net": "N-net",
+   "area": "南海トラフ",
+   "lat": 31.3256,
+   "lon": 131.7281,
+   "depth": 845
+  },
+  {
+   "code": "NBE01",
+   "name": "NBE01",
+   "net": "N-net",
+   "area": "南海トラフ",
+   "lat": 33.277,
+   "lon": 134.331,
+   "depth": 1174
+  },
+  {
+   "code": "NBE02",
+   "name": "NBE02",
+   "net": "N-net",
+   "area": "南海トラフ",
+   "lat": 33.0371,
+   "lon": 134.2809,
+   "depth": 860
+  },
+  {
+   "code": "NBE03",
+   "name": "NBE03",
+   "net": "N-net",
+   "area": "南海トラフ",
+   "lat": 32.8219,
+   "lon": 134.0795,
+   "depth": 880
+  },
+  {
+   "code": "NBE04",
+   "name": "NBE04",
+   "net": "N-net",
+   "area": "南海トラフ",
+   "lat": 32.9192,
+   "lon": 133.6611,
+   "depth": 1020
+  },
+  {
+   "code": "NBE05",
+   "name": "NBE05",
+   "net": "N-net",
+   "area": "南海トラフ",
+   "lat": 32.5604,
+   "lon": 133.7211,
+   "depth": 974
+  },
+  {
+   "code": "NBE06",
+   "name": "NBE06",
+   "net": "N-net",
+   "area": "南海トラフ",
+   "lat": 32.4456,
+   "lon": 134.0502,
+   "depth": 1831
+  },
+  {
+   "code": "NBE07",
+   "name": "NBE07",
+   "net": "N-net",
+   "area": "南海トラフ",
+   "lat": 32.2196,
+   "lon": 133.956,
+   "depth": 2463
+  },
+  {
+   "code": "NBE08",
+   "name": "NBE08",
+   "net": "N-net",
+   "area": "南海トラフ",
+   "lat": 32.1551,
+   "lon": 133.7177,
+   "depth": 2125
+  },
+  {
+   "code": "NBE09",
+   "name": "NBE09",
+   "net": "N-net",
+   "area": "南海トラフ",
+   "lat": 31.9977,
+   "lon": 133.3759,
+   "depth": 1960
+  },
+  {
+   "code": "NBE10",
+   "name": "NBE10",
+   "net": "N-net",
+   "area": "南海トラフ",
+   "lat": 32.149,
+   "lon": 133.2199,
+   "depth": 1299
+  },
+  {
+   "code": "NBE11",
+   "name": "NBE11",
+   "net": "N-net",
+   "area": "南海トラフ",
+   "lat": 32.4758,
+   "lon": 133.4332,
+   "depth": 989
+  },
+  {
+   "code": "NBE12",
+   "name": "NBE12",
+   "net": "N-net",
+   "area": "南海トラフ",
+   "lat": 32.3797,
+   "lon": 133.1779,
+   "depth": 1080
+  },
+  {
+   "code": "NBE13",
+   "name": "NBE13",
+   "net": "N-net",
+   "area": "南海トラフ",
+   "lat": 32.3314,
+   "lon": 132.8255,
+   "depth": 1100
+  },
+  {
+   "code": "NBE14",
+   "name": "NBE14",
+   "net": "N-net",
+   "area": "南海トラフ",
+   "lat": 32.452,
+   "lon": 132.5221,
+   "depth": 1488
+  },
+  {
+   "code": "NBE15",
+   "name": "NBE15",
+   "net": "N-net",
+   "area": "南海トラフ",
+   "lat": 32.3444,
+   "lon": 132.2392,
+   "depth": 1547
+  },
+  {
+   "code": "NBE16",
+   "name": "NBE16",
+   "net": "N-net",
+   "area": "南海トラフ",
+   "lat": 31.9702,
+   "lon": 132.1595,
+   "depth": 1575
+  },
+  {
+   "code": "NBE17",
+   "name": "NBE17",
+   "net": "N-net",
+   "area": "南海トラフ",
+   "lat": 31.7707,
+   "lon": 132.0585,
+   "depth": 1326
+  },
+  {
+   "code": "NBE18",
+   "name": "NBE18",
+   "net": "N-net",
+   "area": "南海トラフ",
+   "lat": 31.6569,
+   "lon": 131.7726,
+   "depth": 471
+  }
+ ]
+}
