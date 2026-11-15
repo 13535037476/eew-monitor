@@ -81,7 +81,7 @@ def user_dir(name):
 
 def user_file(name, fn):
     return os.path.join(user_dir(name), fn)
-VERSION = "1.20.0"
+VERSION = "1.20.1"
 
 # ---------------- 站点所有者 ----------------
 # 这套东西默认是本机一家人用，账号管理（建号/改密/踢设备/替人配密钥）
@@ -3045,6 +3045,48 @@ def boot(host="127.0.0.1", port=8765, tls_cert=None, tls_key=None):
     return srv
 
 
+# 不需要 WebView 的窗口方案：拿系统里装好的 Edge / Chrome 的 --app 模式开一个
+# 没地址栏、没标签页的窗口，看起来和桌面应用一样，但完全不依赖 WebView2 运行时。
+BROWSER_CANDIDATES = [
+    r"C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe",
+    r"C:/Program Files/Microsoft/Edge/Application/msedge.exe",
+    r"C:/Program Files/Google/Chrome/Application/chrome.exe",
+    r"C:/Program Files (x86)/Google/Chrome/Application/chrome.exe",
+    os.path.expandvars(r"%LOCALAPPDATA%\Google\Chrome\Application\chrome.exe"),
+    os.path.expandvars(r"%LOCALAPPDATA%\Microsoft\Edge\Application\msedge.exe"),
+]
+
+
+def find_browser():
+    for exe in BROWSER_CANDIDATES:
+        try:
+            if exe and os.path.exists(exe):
+                return exe
+        except Exception:
+            continue
+    return ""
+
+
+def open_app_window(url, exe=None, dry=False):
+    """用 Edge/Chrome 的 --app 模式开窗；找不到浏览器就退回默认浏览器。
+
+    返回实际用的可执行文件路径（空字符串表示退回了默认浏览器）。
+    """
+    exe = exe if exe is not None else find_browser()
+    if not exe:
+        if not dry:
+            webbrowser.open(url)
+        return ""
+    if dry:
+        return exe
+    import subprocess as _sp
+    # --window-size 只是首窗大小，用户拖过之后浏览器会记住
+    _sp.Popen([exe, "--app=" + url, "--window-size=1520,940",
+               "--no-first-run", "--no-default-browser-check"],
+              stdout=_sp.DEVNULL, stderr=_sp.DEVNULL)
+    return exe
+
+
 def main():
     try:
         sys.stdout.reconfigure(encoding="utf-8")
@@ -3055,6 +3097,8 @@ def main():
     ap.add_argument("--port", type=int, default=8765)
     ap.add_argument("--host", default="127.0.0.1")
     ap.add_argument("--no-browser", action="store_true")
+    ap.add_argument("--app", action="store_true",
+                    help="用 Edge/Chrome 的 --app 模式开无边框窗口（不依赖 WebView2）")
     ap.add_argument("--tls-cert", help="HTTPS 证书（PEM）；与 --tls-key 一起用")
     ap.add_argument("--tls-key", help="HTTPS 私钥（PEM）")
     args = ap.parse_args()
@@ -3070,7 +3114,13 @@ def main():
     print("  按 Ctrl+C 退出")
     print("=" * 56)
     if not args.no_browser:
-        threading.Timer(1.0, lambda: webbrowser.open(url)).start()
+        if args.app:
+            b = open_app_window(url, dry=True)
+            print("  窗口：%s" % (("浏览器 app 模式 · " + os.path.basename(b)) if b
+                                 else "没找到 Edge/Chrome，用默认浏览器打开"))
+            threading.Timer(1.0, lambda: open_app_window(url, exe=b or None)).start()
+        else:
+            threading.Timer(1.0, lambda: webbrowser.open(url)).start()
     try:
         srv.serve_forever()
     except KeyboardInterrupt:
