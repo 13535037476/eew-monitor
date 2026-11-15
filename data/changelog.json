@@ -3,6 +3,16 @@
  "count": 20,
  "entries": [
   {
+   "ver": "1.24.1",
+   "date": "2026-11-15",
+   "title": "GQ 收不到地震的修复",
+   "kind": "release",
+   "items": [
+    "GQ 写线程单次 send 失败就整体退出：之后服务器还在推测站包（看着「已连接」），但震源/归档请求再也不发，事件列表一直是空的",
+    "写线程改为容错重试；事件库为空时每 30 秒补要一次归档（切机、握手刚完被掐、服务器重启都能自愈）"
+   ]
+  },
+  {
    "ver": "1.24.0",
    "date": "2026-11-15",
    "title": "震源推算补全",
@@ -194,15 +204,6 @@
    "title": "云平台部署支持",
    "items": [
     "新增 Dockerfile / Procfile / render.yaml，可部署到 Render / Railway / Koyeb 等平台"
-   ],
-   "kind": "infra"
-  },
-  {
-   "ver": "",
-   "date": "2026-11-14",
-   "title": "桌面打包",
-   "items": [
-    "PyInstaller + pywebview(WebView2) 打成单文件 exe，双击即用，不启外部浏览器"
    ],
    "kind": "infra"
   }

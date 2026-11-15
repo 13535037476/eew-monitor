@@ -833,23 +833,33 @@ class GQClient:
         （抓包实测官方客户端顺序：握手 → EarthquakesRequest →
           ArchivedQuakesRequest → 心跳10s → 请求20s）"""
         def writer():
-            self._send(sock, pkt_quakes())
-            self._send(sock, pkt_stations())
-            self._send(sock, pkt_archived())
+            # 单次 send 失败不能把整个写线程带走：以前一个异常就让这个会话
+            # 再也不发请求，服务器还在推测站包（看着「已连接」），但归档事件
+            # 一次都拉不到——表现就是「GQ 收不到地震」。
+            def safe(pkt):
+                try:
+                    self._send(sock, pkt)
+                except Exception:
+                    pass
+            safe(pkt_quakes())
+            safe(pkt_stations())
+            safe(pkt_archived())
             next_hb = time.time() + 10
             next_q = time.time() + 20
-            try:
-                while True:
-                    time.sleep(1.0)
-                    now = time.time()
-                    if now >= next_hb:
-                        self._send(sock, pkt_heartbeat())
-                        next_hb += 10
-                    if now >= next_q:
-                        self._send(sock, pkt_quakes())
-                        next_q += 20
-            except Exception:
-                pass
+            next_arch = time.time() + 45
+            while True:
+                time.sleep(1.0)
+                now = time.time()
+                if now >= next_hb:
+                    safe(pkt_heartbeat()); next_hb += 10
+                if now >= next_q:
+                    safe(pkt_quakes()); next_q += 20
+                if now >= next_arch:
+                    # 归档只在连上时要过一次。要是那一次丢了（切机、握手刚完就
+                    # 被掐、服务器重启），事件列表会一直空着，这里兜底补要。
+                    if not self.events:
+                        safe(pkt_archived()); safe(pkt_stations())
+                    next_arch = now + 30
 
         wt = threading.Thread(target=writer, name="gq-writer", daemon=True)
         wt.start()
