@@ -69,11 +69,23 @@
     if (v00 < 0 || v01 < 0 || v10 < 0 || v11 < 0) return null;
     const top = v00 + (v01 - v00) * bd[1];
     const bot = v10 + (v11 - v10) * bd[1];
-    return top + (bot - top) * bh[1];
+    let out = top + (bot - top) * bh[1];
+    // 浅源修正：表里最浅两档是 0 与 15km（JMA2001 是 0 与 10km），线性插值在近距
+    // 会低估走时。把深度换成「震源距」去查 0km 那一行，再按深度比例混合：
+    // 0km 处两者重合，到 15km 归位到表值，1~10km 这些浅震的 P/S 才不再偏。
+    const h = Math.max(0, depth || 0);
+    if (out != null && H.length > 1 && h > 0 && h < H[1]) {
+      const t0 = ttInterp(model, phase, Math.hypot(km, h), 0);
+      if (t0 != null) {
+        const w = h / H[1];
+        out = t0 * (1 - w) + out * w;
+      }
+    }
+    return out;
   }
 
   // 反解：走了 t 秒 → 震中距（km）
-  function ttInvert(model, phase, t, depth) {
+  function ttInvertRaw(model, phase, t, depth) {
     const tab = ttTabOf(model);
     if (!tab) return null;
     const rows = tab[phase], D = tab.dist, H = tab.depth;
@@ -96,6 +108,23 @@
     const a = at(lo), b = at(hi);
     const f = b > a ? (t - a) / (b - a) : 0;
     return ttToKm(tab, D[lo] + (D[hi] - D[lo]) * f);
+  }
+
+  // 反解也走同一套浅源修正（和正演对称），否则波前圈会和台站到达时间对不上
+  function ttInvert(model, phase, t, depth) {
+    const v = ttInvertRaw(model, phase, t, depth);
+    const tab = ttTabOf(model);
+    const H = tab && tab.depth;
+    const h = Math.max(0, depth || 0);
+    if (v != null && H && H.length > 1 && h > 0 && h < H[1]) {
+      const hyp = ttInvertRaw(model, phase, t, 0);
+      if (hyp != null) {
+        const kmH = Math.sqrt(Math.max(0, hyp * hyp - h * h));
+        const w = h / H[1];
+        return kmH * (1 - w) + v * w;
+      }
+    }
+    return v;
   }
 
   // 按账号隔离：eew.<用户名>.<键>。登录页会在跳转前写入 eew.user，

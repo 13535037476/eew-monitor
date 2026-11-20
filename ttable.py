@@ -11,6 +11,7 @@
 """
 import json
 import math
+import math
 import os
 
 KM_PER_DEG = 6371.0 * math.pi / 180.0     # 111.1949 km/°
@@ -143,21 +144,43 @@ def time(phase, deg, depth, model="ak135"):
 
 
 def time_km(phase, km, depth, model="ak135"):
-    """走时（秒）。km 为震中距（km）。ak135 内部换算成度。"""
+    """走时（秒）。km 为震中距（km）。ak135 内部换算成度。
+
+    浅源修正：表里最浅两档是 0 与 15km（JMA2001 是 0 与 10km），直接线性插值在
+    近距会明显低估走时（1~10km 的浅震尤其明显）。这里把深度换成「震源距」去查
+    0km 那一行，再按深度比例与表值混合——0km 处两者重合，到 15km 归位到表值。
+    """
     _load()
     d = _M.get(model)
     if not d:
         return None
-    return _time(d, phase, km, depth)
+    v = _time(d, phase, km, depth)
+    hs = d.get("depth") or []
+    h = max(0.0, float(depth or 0.0))
+    if v is not None and len(hs) > 1 and 0 < h < hs[1]:
+        t0 = _time(d, phase, math.hypot(km, h), 0.0)
+        if t0 is not None:
+            w = h / hs[1]
+            v = t0 * (1.0 - w) + v * w
+    return v
 
 
 def dist_km(phase, t, depth, model="ak135"):
-    """反解震中距（km）"""
+    """反解震中距（km）——浅源同样走「震源距」那一支，和 time_km 对称。"""
     _load()
     d = _M.get(model)
     if not d:
         return None
-    return _dist(d, phase, t, depth)
+    v = _dist(d, phase, t, depth)
+    hs = d.get("depth") or []
+    h = max(0.0, float(depth or 0.0))
+    if v is not None and len(hs) > 1 and 0 < h < hs[1]:
+        hyp = _dist(d, phase, t, 0.0)
+        if hyp is not None:
+            km_h = math.sqrt(max(0.0, hyp * hyp - h * h))
+            w = h / hs[1]
+            v = km_h * (1.0 - w) + v * w
+    return v
 
 
 def dist(phase, t, depth, model="ak135"):

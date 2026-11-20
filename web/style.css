@@ -1098,3 +1098,22 @@ html.light .hero-meta .pschip b{color:#1d4f8f}
 .throw span{font-size:12px;color:var(--txt2)}
 .throw input{width:74px}
 html.light .thtbl{background:rgba(12,26,41,.03)}
+
+/* ===== 设置/统计/日志/管理：从右侧滑出的抽屉（原来是居中弹窗） ===== */
+dialog{
+  position:fixed; top:0; right:0; left:auto; bottom:0;
+  margin:0; height:100vh; max-height:100vh;
+  width:min(480px,96vw); max-width:none;
+  border-radius:0; border:0; border-left:1px solid var(--line2);
+  box-shadow:-24px 0 70px rgba(0,0,0,.55);
+  transform:none;
+}
+dialog[open]{ animation:drawerIn .26s cubic-bezier(.2,.9,.3,1) both; }
+@keyframes drawerIn{ from{ transform:translateX(36px); opacity:.55 } to{ transform:none; opacity:1 } }
+dialog::backdrop{ background:rgba(2,4,8,.42); backdrop-filter:blur(2px) }
+#statsDlg{ width:min(560px,96vw) }
+.dlg{ height:100%; max-height:100vh; }
+.dlg-body{ padding-bottom:24px; }
+.dlg-hd{ padding-top:18px; }
+@media (max-width:640px){ dialog{ width:100vw } }
+html.light dialog{ box-shadow:-24px 0 70px rgba(24,52,80,.20) }
