@@ -6,7 +6,7 @@
 <title>震线 EEW · 中日地震预警</title>
 <script>/* 首帧前定主题，避免启动时先闪一下深色 */
 try{if(localStorage.getItem('eew.theme')==='light')document.documentElement.classList.add('light')}catch(e){}</script>
-<link rel="stylesheet" href="style.css?v=240">
+<link rel="stylesheet" href="style.css?v=241">
 </head>
 <body>
 
@@ -46,7 +46,12 @@ try{if(localStorage.getItem('eew.theme')==='light')document.documentElement.clas
   </div>
 </header>
 
-<div class="recdot" id="recDot" hidden><i></i>REC<span id="recLeft"></span></div>
+<div class="recpill" id="recPill" hidden>
+  <i class="rpt-dot"></i><b>REC</b>
+  <span class="rpt-time" id="recTime">00:00</span>
+  <span class="rpt-lbl" id="recLbl"></span>
+  <button type="button" class="rpt-stop" id="recStop" title="停止并保存">停止</button>
+</div>
 
 <div class="tsualert" id="tsuAlert" hidden>
   <b id="tsuAlertTitle">津波警報</b>
@@ -471,10 +476,9 @@ try{if(localStorage.getItem('eew.theme')==='light')document.documentElement.clas
         <div class="row between"><label>开启自动录屏</label>
           <input type="checkbox" id="optRec" class="switch"></div>
         <div class="row">
-          <label style="flex:none;width:76px">时长(秒)</label>
-          <input id="optRecDur" class="input mono" style="width:72px" value="60">
-          <label style="flex:none;width:74px">码率(kbps)</label>
+          <label style="flex:none;width:76px">码率(kbps)</label>
           <input id="optRecKbps" class="input mono" style="width:84px" value="2500">
+          <span class="hint" style="margin:0">录到你自己点「停止」为止；顶部胶囊随时可停。</span>
         </div>
         <p class="hint" style="margin:6px 0 2px">每个源各设两条线：<b>震级</b>和<b>强度</b>，两条都过才录。
           强度填震度档（3 = 震度3、5.5 = 5強），中国填烈度（4 = Ⅳ度）；用的是该事件自己的最大震度，不看关注点。</p>
@@ -495,14 +499,6 @@ try{if(localStorage.getItem('eew.theme')==='light')document.documentElement.clas
         </div>
 
 
-        <div class="row between"><label>分段录屏（每一报录一段）</label>
-          <input type="checkbox" id="optRecSeg" class="switch"></div>
-        <div class="row">
-          <label style="flex:none;width:76px">每段时长</label>
-          <input id="optRecSegDur" class="input mono" style="width:76px" value="12">
-          <span class="hint" style="margin:0">同一场地震每来一报（第 1 報 / 第 2 報…）各录一段，
-            文件名带 <code>_R2報</code>；关掉则整场只录一段（用上面的时长）。</span>
-        </div>
         <div class="row">
           <label style="flex:none;width:76px">保存目录</label>
           <input id="optRecDir" class="input" placeholder="留空 = data/recordings">
@@ -649,6 +645,6 @@ try{if(localStorage.getItem('eew.theme')==='light')document.documentElement.clas
 <script src="geo.js?v=207"></script>
 <script src="geo_jp.js?v=176"></script>
 <script src="geo_world.js?v=207"></script>
-<script src="app.js?v=298"></script>
+<script src="app.js?v=299"></script>
 </body>
 </html>

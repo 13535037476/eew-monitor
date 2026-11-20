@@ -4461,8 +4461,9 @@
   // 为什么录画布而不是整窗：浏览器拿不到整窗截图权限（getDisplayMedia 每次都要选窗口），
   // 而 #map 是纯 canvas，captureStream 直接可用、无需任何授权。震级/地点/时间
   // 用 canvas 画成叠加条，所以画面里一定看得到关键信息。
-  const REC = { mr: null, cv: null, c2: null, timer: 0, stopAt: 0, ev: null,
+  const REC = { mr: null, cv: null, c2: null, timer: 0, startAt: 0, ev: null,
     key: '', seen: new Set(), queue: null, seg: false };
+  const REC_CAP = 900;          // 安全上限 15 分钟：忘了停也不至于录爆磁盘
 
   // 数据源归类 → 取该源的门槛
   function srcKeyOf(ev) {
@@ -4578,8 +4579,8 @@
 
   function stopRec() {
     if (REC.timer) { clearInterval(REC.timer); REC.timer = 0; }
-    const dot = $('#recDot');
-    if (dot) dot.hidden = true;
+    const pill = $('#recPill');
+    if (pill) pill.hidden = true;
     const mr = REC.mr;
     REC.mr = null;
     if (!mr) return;
@@ -4595,8 +4596,6 @@
     cv.width = map.width; cv.height = map.height;
     const c2 = cv.getContext('2d');
     const fps = 15;
-    const want = durSec || state.settings.recDur;
-    const dur = Math.max(3, Math.min(600, parseFloat(want) || 60));
     const kbps = Math.max(400, Math.min(20000, parseInt(state.settings.recKbps, 10) || 2500));
     let stream;
     try { stream = cv.captureStream(fps); } catch (e) { toast('拿不到画布流：' + e.message); return; }
@@ -4622,22 +4621,42 @@
       if (q) setTimeout(() => { if (!REC.mr) startRec(q.ev, q.dur); }, 400);
     };
     REC.mr = mr; REC.cv = cv; REC.c2 = c2; REC.ev = ev;
-    REC.stopAt = nowSec() + dur;
+    REC.startAt = nowSec();
+    const mmss = t => {
+      const s2 = Math.max(0, Math.floor(t));
+      return String(Math.floor(s2 / 60)).padStart(2, '0') + ':' +
+        String(s2 % 60).padStart(2, '0');
+    };
     const frame = () => {
       if (!REC.mr) return;
       try { c2.drawImage(map, 0, 0); } catch (e) { }
       try { recHud(c2, REC.ev || ev, cv.width, cv.height); } catch (e) { }
-      const left = Math.max(0, Math.ceil(REC.stopAt - nowSec()));
-      const l = $('#recLeft');
-      if (l) l.textContent = left + 's';
-      if (nowSec() >= REC.stopAt) stopRec();
+      const el = nowSec() - REC.startAt;
+      const tEl = $('#recTime');
+      if (tEl) tEl.textContent = mmss(el);
+      if (el >= REC_CAP) {                 // 安全上限
+        stopRec();
+        toast('录屏已达 15 分钟上限，自动停止并保存', 6000);
+      }
     };
     try { mr.start(1000); } catch (e) { toast('开始录制失败：' + e.message); return; }
     REC.timer = setInterval(frame, 1000 / fps);
     frame();
-    const dot = $('#recDot');
-    if (dot) dot.hidden = false;
-    toast('开始自动录屏（' + dur + 's · ' + kbps + 'kbps）', 4000);
+    // 顶部胶囊：红点 + 计时 + 停止
+    const pill = $('#recPill');
+    if (pill) {
+      pill.hidden = false;
+      const lbl = $('#recLbl');
+      if (lbl) lbl.textContent = 'M' + (ev.mag || 0).toFixed(1) + ' · ' + (ev.place || '');
+      const tEl = $('#recTime');
+      if (tEl) tEl.textContent = '00:00';
+      const btn = $('#recStop');
+      if (btn && !btn.dataset.bound) {
+        btn.dataset.bound = '1';
+        btn.addEventListener('click', () => stopRec());
+      }
+    }
+    toast('开始录屏（' + kbps + 'kbps）· 点顶部「停止」保存', 4000);
   }
 
   // 每 250ms 由主循环调一次：够格就开录，一场地震只录一次
@@ -4645,8 +4664,7 @@
     if (!state.settings.recOn) return;
     if (state.historyEvent) return;
     const now = nowSec();
-    const seg = state.settings.recSeg !== false;
-    const segDur = Math.max(3, Math.min(120, parseFloat(state.settings.recSegDur) || 12));
+    const seg = false;
     // 不只看「当前显示的那一起」：主卡被别的事件占着时，其它源的新报也要照录。
     const list = (state.eewList || []).slice();
     if (state.autoEv) list.push(state.autoEv);
@@ -4658,9 +4676,8 @@
       if (evIntenNum(e) < (th.int || 0)) continue;   // 强度用事件自身的最大震度
       if (!recSrcOn(e)) continue;
       if (now - (e.report_ts || e.origin_ts || 0) > 30) continue;      // 老报不补录
-      // 分段：以「事件 + 第几报」为单位，每来一报录一段；
-      // 不分段：整场只录一次（按 uid 去重）
-      const key = seg ? (e.uid + '#' + (e.serial || 0)) : String(e.uid);
+      // 整场只录一次（按 uid 去重），录多久由用户点「停止」决定
+      const key = String(e.uid);
       if (REC.seen.has(key)) continue;
       if (!pick || (e.mag || 0) > (pick.mag || 0)) { pick = e; pickKey = key; }
     }
@@ -4670,13 +4687,9 @@
       const first = REC.seen.values().next().value;
       REC.seen.delete(first);
     }
-    const dur = seg ? segDur : (state.settings.recDur || 60);
-    if (REC.mr) {                                  // 正在录：记下最新一报，录完接着
-      REC.queue = { ev: pick, dur: dur };
-      return;
-    }
-    REC.seg = seg;
-    startRec(pick, dur);
+    if (REC.mr) return;                            // 正在录就不重复开
+    REC.seg = false;
+    startRec(pick);
   }
 
   function tickReactions() {
@@ -5933,24 +5946,20 @@
   }
   // ---- 自动录屏设置 ----
   const recEls = {
-    on: $('#optRec'), mag: $('#optRecMag'), dur: $('#optRecDur'), kbps: $('#optRecKbps'),
+    on: $('#optRec'), kbps: $('#optRecKbps'),
     dir: $('#optRecDir'), jp: $('#optRecJP'), cn: $('#optRecCN'),
     tw: $('#optRecTW'), gq: $('#optRecGQ'),
-    seg: $('#optRecSeg'), segDur: $('#optRecSegDur'),
   };
   function syncRecUI() {
     const st = state.settings, src = st.recSrc || {};
     if (recEls.on) recEls.on.checked = !!st.recOn;
     if (recEls.mag) recEls.mag.value = String(st.recMag ?? 4);
-    if (recEls.dur) recEls.dur.value = String(st.recDur ?? 60);
     if (recEls.kbps) recEls.kbps.value = String(st.recKbps ?? 2500);
     if (recEls.dir) recEls.dir.value = st.recDir || '';
     if (recEls.jp) recEls.jp.checked = src.jp !== false;
     if (recEls.cn) recEls.cn.checked = !!src.cn;
     if (recEls.tw) recEls.tw.checked = !!src.tw;
     if (recEls.gq) recEls.gq.checked = !!src.gq;
-    if (recEls.seg) recEls.seg.checked = st.recSeg !== false;
-    if (recEls.segDur) recEls.segDur.value = String(st.recSegDur ?? 12);
   }
   function recSaveSoon() { LS.set('settings', state.settings); }
   if (recEls.on) {
@@ -5973,12 +5982,6 @@
       });
     };
     num(recEls.mag, 'recMag', 1, 9, 4);
-    num(recEls.segDur, 'recSegDur', 3, 120, 12);
-    if (recEls.seg) recEls.seg.addEventListener('change', e => {
-      state.settings.recSeg = e.target.checked;
-      recSaveSoon();
-      toast(e.target.checked ? '分段录屏：每一报录一段' : '分段录屏已关闭（整场只录一段）');
-    });
     num(recEls.dur, 'recDur', 5, 600, 60);
     num(recEls.kbps, 'recKbps', 400, 20000, 2500);
     if (recEls.dir) recEls.dir.addEventListener('change', e => {

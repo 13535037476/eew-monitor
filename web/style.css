@@ -1066,20 +1066,28 @@ html.light .tip .wave i{color:#6b8095}
 html.light .hero-meta .pschip{border-color:rgba(47,111,208,.35);background:rgba(47,111,208,.08)}
 html.light .hero-meta .pschip b{color:#1d4f8f}
 
-/* 自动录屏：录制中的红点 */
-.recdot{
-  position:fixed;right:20px;bottom:44px;z-index:46;display:flex;align-items:center;gap:6px;
-  padding:5px 10px 6px;border-radius:999px;font:700 10.5px/1 var(--mono);letter-spacing:.10em;
-  color:#ffd9d4;background:rgba(120,16,14,.82);border:1px solid rgba(255,90,70,.5);
-  box-shadow:0 8px 24px rgba(120,0,0,.35);backdrop-filter:blur(10px);
+/* 自动录屏：顶部浮动胶囊（类灵动岛），随时可停 */
+.recpill{
+  position:fixed;left:50%;top:78px;transform:translateX(-50%);z-index:70;
+  display:flex;align-items:center;gap:8px;padding:6px 8px 6px 12px;border-radius:999px;
+  background:rgba(12,14,18,.92);border:1px solid rgba(255,90,70,.42);
+  box-shadow:0 10px 30px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.06);
+  backdrop-filter:blur(18px) saturate(140%);
+  animation:recIn .22s ease-out;
 }
-.recdot[hidden]{display:none!important}
-.recdot i{width:7px;height:7px;border-radius:50%;background:#ff453a;
-  box-shadow:0 0 8px rgba(255,69,58,.9);animation:recBlink 1.1s infinite}
-.recdot span{margin-left:2px;color:rgba(255,217,212,.75);letter-spacing:.04em}
+.recpill[hidden]{display:none!important}
+@keyframes recIn{from{opacity:0;transform:translate(-50%,-8px)}to{opacity:1;transform:translate(-50%,0)}}
+.recpill b{font:800 11px/1 var(--mono);letter-spacing:.14em;color:#ffd9d4}
+.rpt-dot{width:7px;height:7px;border-radius:50%;background:#ff453a;
+  box-shadow:0 0 9px rgba(255,69,58,.9);animation:recBlink 1.1s infinite}
+.rpt-time{font:600 12px/1 var(--mono);color:#fff;font-variant-numeric:tabular-nums;min-width:44px}
+.rpt-lbl{font-size:11px;color:rgba(255,255,255,.62);max-width:220px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rpt-stop{border:0;border-radius:999px;padding:5px 12px 6px;cursor:pointer;
+  font-size:11.5px;font-weight:700;color:#2a0505;background:linear-gradient(180deg,#ff8f7a,#ff5340)}
+.rpt-stop:hover{filter:brightness(1.08)}
+.rpt-stop:active{transform:scale(.97)}
 @keyframes recBlink{0%,100%{opacity:1}50%{opacity:.25}}
-.recck{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;color:var(--txt2);white-space:nowrap}
-.recck input{accent-color:var(--accent)}
 
 /* 每个数据源的震级 / 强度门槛表 */
 .thtbl{display:flex;flex-direction:column;gap:4px;margin:4px 0 10px;padding:9px 12px;
