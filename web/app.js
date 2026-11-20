@@ -3823,7 +3823,9 @@
   // 震度速报（实测）也念一句：没有紧急地震速报的日本地震、或者速报已经结束，
   // 这时候台站是实实在在观测到了震度，一样该出声
   function announceObs(o) {
-    if (!o || !state.settings.voice || state.settings.stVoice === false) return;
+    // 震度速報/震度結果是「这一场」的播报，不是台站提示音：
+    // 只受「事件语音播报」控制，别被「测站震度音」开关连带静音。
+    if (!o || !state.settings.voice) return;
     if (!state.settings.sound) return;
     const risk = SCALE_RISK[o.max_scale] || 0;
     if (risk < 1) return;
