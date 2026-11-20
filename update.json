@@ -1,6 +1,6 @@
 {
   "version": "1.35.0",
-  "url": "https://github.com/13535037476/eew-monitor/releases/latest/download/震线EEW-Setup-1.35.0.exe",
+  "url": "https://github.com/13535037476/eew-monitor/releases/latest/download/ZhenXianEEW-Setup-1.35.0.exe",
   "size": 49936622,
   "notes": "· 设置新增「网盘备份」：开启后每次地震录像（webm）自动上传到 WebDAV 网盘\n· 推荐坚果云：填 https://dav.jianguoyun.com.cn/dav/ + 应用密码；其他 WebDAV（Alist 等）也能用\n· 带连接测试、立即补传；启动时自动补传上次没传成功的录像，失败原因会显示在状态栏",
   "published": "2026-11-21"
