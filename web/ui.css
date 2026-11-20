@@ -1,0 +1,899 @@
+/* ============================================================================
+   震线 EEW · 视觉打磨 第一步  /  只动「圆角、阴影、玻璃厚度、字距」
+   ----------------------------------------------------------------------------
+   布局、配色、功能一律不动；这一步是给后面的调整打底：
+     · 圆角统一成 20 / 14 / 10 / 8 四档，面板更圆、控件更软
+     · 阴影改成中性两层落影，去掉蓝/红发光，不再像霓虹灯
+     · 玻璃从 blur(20~24px) 降到 blur(14px)，饱和度收敛，字更清楚
+     · 微标签和数值字距、行高抬一档，减少「密度很高但看不清」
+   style.css 仍在前面负责布局；这里只做视觉覆盖，方便一步步改。
+   ========================================================================== */
+
+:root{
+  --r-xl:22px;                 /* 大面板 / 抽屉 */
+  --r-lg:20px;                 /* 事件卡 / 列表 / 图例 */
+  --r-md:14px;                 /* 小面板 / 弹层 */
+  --r-sm:10px;                 /* 按钮 / 输入 / 条目 */
+  --r-xs:8px;                  /* 小胶囊 / 标签 */
+  --ease:cubic-bezier(.2,.7,.3,1);
+  --shadow-1:0 2px 6px rgba(0,0,0,.16),0 14px 34px rgba(0,0,0,.22);
+  --shadow-2:0 4px 10px rgba(0,0,0,.20),0 26px 64px rgba(0,0,0,.30);
+  /* 弹层底色：.srcpop 一直在用它，但以前压根没定义过 —— 于是面板是全透明的，
+     压在底图上字和海岸线糊在一起。这里补上。 */
+  --panel-3:rgba(16,20,26,.97);
+}
+html.light{
+  --shadow-1:0 2px 6px rgba(80,70,50,.07),0 14px 34px rgba(80,70,50,.10);
+  --shadow-2:0 4px 10px rgba(80,70,50,.08),0 26px 64px rgba(80,70,50,.13);
+  --panel-3:#fffdf7;
+}
+
+/* ---------- 玻璃：降模糊、提不透明度 ---------- */
+.hud{
+  border-radius:18px;
+  background:rgba(14,18,25,.82);
+  backdrop-filter:blur(14px) saturate(120%);
+  box-shadow:var(--shadow-1);
+}
+.hero{
+  border-radius:var(--r-lg);
+  background:linear-gradient(180deg,rgba(20,25,34,.92),rgba(13,17,24,.94));
+  backdrop-filter:blur(16px) saturate(120%);
+  box-shadow:var(--shadow-2),inset 0 1px 0 rgba(255,255,255,.06);
+  animation:heroIn .2s var(--ease);
+}
+.hero.alert{
+  background:linear-gradient(180deg,rgba(120,16,14,.94),rgba(48,9,9,.96));
+  box-shadow:var(--shadow-2),inset 0 1px 0 rgba(255,255,255,.08);
+}
+.hero.hist{
+  background:linear-gradient(180deg,rgba(14,32,44,.94),rgba(10,17,24,.95));
+}
+.obs{
+  border-radius:var(--r-lg);
+  background:linear-gradient(180deg,rgba(19,24,33,.95),rgba(10,14,20,.96));
+  backdrop-filter:blur(16px) saturate(120%);
+  box-shadow:var(--shadow-2),inset 0 1px 0 rgba(255,255,255,.05);
+}
+.recent{
+  border-radius:var(--r-lg);
+  background:rgba(14,18,25,.84);
+  backdrop-filter:blur(16px) saturate(120%);
+  box-shadow:var(--shadow-2);
+}
+.legend{
+  border-radius:var(--r-md);
+  background:rgba(14,18,25,.84);
+  backdrop-filter:blur(14px) saturate(120%);
+  box-shadow:var(--shadow-1);
+}
+.tools{
+  border-radius:18px;
+  background:rgba(14,18,25,.84);
+  backdrop-filter:blur(14px) saturate(120%);
+  box-shadow:var(--shadow-1);
+  gap:3px;padding:6px;
+}
+.pop{
+  border-radius:var(--r-md);
+  background:rgba(17,22,30,.95);
+  backdrop-filter:blur(14px) saturate(120%);
+  box-shadow:var(--shadow-1);
+}
+.lm{
+  border-radius:var(--r-md);
+  backdrop-filter:blur(12px) saturate(115%);
+  transition:border-color .18s var(--ease),background .18s var(--ease),box-shadow .18s var(--ease);
+}
+.tsun{
+  border-radius:18px;
+  backdrop-filter:blur(14px) saturate(120%);
+  box-shadow:var(--shadow-1);
+}
+.quiet{
+  border-radius:999px;
+  backdrop-filter:blur(12px) saturate(115%);
+}
+.tip{
+  border-radius:12px;
+  box-shadow:var(--shadow-1);
+}
+.toast{
+  border-radius:14px;
+  box-shadow:var(--shadow-1);
+}
+.sheet-panel{
+  border-radius:26px 26px 0 0;
+  box-shadow:0 -10px 44px rgba(0,0,0,.46);
+}
+dialog{
+  border-radius:var(--r-xl) 0 0 var(--r-xl);
+  box-shadow:-16px 0 52px rgba(0,0,0,.46);
+}
+#statsDlg,#logDlg,#adminDlg{border-radius:var(--r-xl) 0 0 var(--r-xl)}
+.recpill{border-radius:999px;box-shadow:var(--shadow-1)}
+.sok{filter:none}
+.sok-card{
+  border-radius:0 var(--r-md) var(--r-md) var(--r-md);
+  box-shadow:0 12px 30px rgba(0,0,0,.34);
+}
+.sok-tag{border-radius:var(--r-sm) var(--r-sm) 0 0}
+.sok-int{border-radius:var(--r-xs)}
+.sok-strip{border-radius:6px}
+
+/* ---------- 控件圆角 ---------- */
+.btn,.input,.select{border-radius:var(--r-sm)}
+.seg{border-radius:var(--r-md)}
+.seg button{border-radius:var(--r-sm)}
+.seg.mini{border-radius:var(--r-sm)}
+.seg.mini button{border-radius:var(--r-xs)}
+.vitem{border-radius:var(--r-sm)}
+.fp{border-radius:999px}
+.wtag{border-radius:999px}
+.tag{border-radius:var(--r-xs)}
+.qchip{border-radius:var(--r-xs)}
+.qmini{border-radius:4px}
+.hero-meta .maxchip{border-radius:var(--r-xs)}
+.hero-meta .estchip,.hero-meta .pschip{border-radius:var(--r-xs)}
+.num b.chip-int{border-radius:12px}
+.altchip{border-radius:var(--r-xs)}
+.badge{border-radius:var(--r-xs)}
+.wch{border-radius:var(--r-sm)}
+.wch b{border-radius:6px}
+.ph i{border-radius:6px}
+.bar,.bar span{border-radius:3px}
+.lg-bar{border-radius:5px}
+.lg-bar .cell i,.legend .cell i{border-radius:2px}
+.rec{border-radius:12px}
+.hrow{border-radius:12px}
+.srctbl .gqsw,.srctbl .gqauto{border-radius:7px}
+.thtbl,.mytok,.atshared,.acct,.kpi,.log-item,.mach,.dev{border-radius:12px}
+.ok,.err,.warn{border-radius:50%}
+
+/* ---------- 去发光：阴影只留中性 ---------- */
+.srcdots .sd.ok,.srcdots .sd.err{box-shadow:none}
+.lm.hot{box-shadow:0 8px 24px rgba(0,0,0,.18)}
+.bar em.s{box-shadow:none}
+.lm-dot,.srcdots .sd{box-shadow:none}
+.recpill{box-shadow:var(--shadow-1)}
+.tip.pin{box-shadow:var(--shadow-1)}
+.tools button:hover{box-shadow:none}
+
+/* ---------- 字号 / 字距：把密度放松一点 ---------- */
+.name{font-size:16px;letter-spacing:.01em}
+.clock b{font-size:14px}
+.hero-place{font-size:19.5px;letter-spacing:-.005em;line-height:1.28}
+.hero-meta{font-size:11.5px;gap:4px 13px}
+.num b{font-size:34px;letter-spacing:-.025em}
+.num b.chip-int{font-size:30px;padding:3px 12px 6px}
+.num i{font-size:10.5px}
+.phases{margin-top:12px;padding-top:9px}
+.ph{font-size:11px}
+.ph b{font-size:12.5px}
+.calc{font-size:11px;line-height:1.7}
+.calc-hd{font-size:10px}
+.rec{padding:8px 9px}
+.rec .pl{font-size:12px}
+.rec .tm{font-size:10.5px}
+.rec .mg{font-size:11.5px}
+.recent-hd{font-size:11px;padding:12px 15px 9px}
+.recent-list{max-height:210px}
+.lm b{font-size:22px}
+.lm i{font-size:10px}
+.lm em{font-size:10.5px}
+.lg-hd{font-size:10px}
+.legend-cap{font-size:9.5px}
+.dlg-hd h2{font-size:16px}
+.sec{padding:16px 0}
+.sec h3{font-size:12.5px}
+.row.between label{font-size:13px}
+.hint{font-size:11.5px;line-height:1.7}
+.btn{font-size:12px;padding:8px 14px}
+.input,.select{font-size:12.5px}
+.srctbl{font-size:12px}
+.srctbl th{font-size:10px}
+.log-title{font-size:12.5px}
+.log-item ul{font-size:11.5px}
+
+/* ---------- 间距：卡片内部松半档 ---------- */
+.hero{padding:13px 16px 12px}
+.obs{padding:12px 14px 11px}
+.hero-hd{margin-bottom:8px}
+.hero-nums{margin:12px 0 10px;gap:12px}
+.hero-foot{gap:11px}
+.dlg-body{padding:6px 22px 20px}
+.row{margin-bottom:9px;gap:9px}
+.tools button{width:34px;height:34px;border-radius:9px}
+.recent-hd{padding:12px 15px 9px}
+.legend{padding:10px 13px 9px;gap:7px}
+.lm{padding:9px 13px 10px}
+.mapfoot{bottom:14px}
+
+/* ---------- 过渡：不要硬切 ---------- */
+.btn,.vitem,.fp,.seg button,.rec,.hrow,.tools button,.icon,.pill,.altchip,.userchip button{
+  transition:background-color .16s var(--ease),color .16s var(--ease),
+             border-color .16s var(--ease),opacity .16s var(--ease);
+}
+.btn:hover,.tools button:hover,.icon:hover,.pill:hover{transform:none}
+
+/* ---------- 浅色：圆角与落影同步变软 ---------- */
+html.light .hud{
+  background:rgba(255,255,255,.86);
+  box-shadow:var(--shadow-1);
+}
+html.light .hero{
+  background:linear-gradient(180deg,rgba(255,255,255,.96),rgba(246,250,254,.97));
+  box-shadow:var(--shadow-2),inset 0 1px 0 #fff;
+}
+html.light .hero.alert{
+  background:linear-gradient(180deg,#fff3f1,#ffe6e2);
+  box-shadow:var(--shadow-2);
+}
+html.light .hero.hist{
+  background:linear-gradient(180deg,#f2f8ff,#e9f2fc);
+}
+html.light .obs{
+  background:linear-gradient(180deg,rgba(255,255,255,.97),rgba(246,250,254,.98));
+  box-shadow:var(--shadow-2),inset 0 1px 0 #fff;
+}
+html.light .recent{
+  background:rgba(255,255,255,.88);
+  box-shadow:var(--shadow-2);
+}
+html.light .legend,html.light .tools,html.light .pop{
+  background:rgba(255,255,255,.90);
+  box-shadow:var(--shadow-1);
+}
+html.light .sheet-panel{
+  background:linear-gradient(180deg,#fff,#f4f8fc);
+  box-shadow:0 -10px 44px rgba(24,52,80,.16);
+}
+html.light dialog{
+  box-shadow:-16px 0 52px rgba(24,52,80,.18);
+}
+html.light .tip,html.light .toast{
+  box-shadow:var(--shadow-1);
+}
+html.light .lm{background:rgba(255,255,255,.88)}
+html.light .lm.hot{
+  background:rgba(255,226,220,.88);
+  box-shadow:0 8px 22px rgba(217,45,32,.08);
+}
+html.light .sok-card{box-shadow:0 12px 30px rgba(24,52,80,.22)}
+html.light .recpill{box-shadow:var(--shadow-1)}
+html.light .bar em.s{box-shadow:none}
+
+/* 小屏保持同样的圆角语言 */
+@media (max-width:640px){
+  .hud{border-radius:16px}
+  .hero,.obs{border-radius:var(--r-lg)}
+  .recent{border-radius:var(--r-lg)}
+  dialog{border-radius:var(--r-xl) 0 0 var(--r-xl)}
+}
+
+/* ============================================================================
+   配色 v2 · 炭黑 / 米白 / 信号琥珀
+   ----------------------------------------------------------------------------
+   原来那套「深蓝底 + 亮蓝强调」是最典型的 AI 仪表盘配色，换掉。
+   现在：暖炭黑面板 + 米白字，强调色只用信号琥珀；告警红保留给地震/海啸，
+   震度色仍是 JMA 官方十色——三套颜色各管一件事，不互相抢。
+   浅色是暖纸白，不是冷蓝白。
+   ========================================================================== */
+:root{
+  --bg:#0d0c0a;
+  --glass:rgba(23,21,18,.84);
+  --glass2:rgba(29,26,22,.94);
+  --line:rgba(236,226,206,.09);
+  --line2:rgba(236,226,206,.17);
+  --txt:#eee8db;
+  --txt2:#c4bba9;
+  --dim:#8d8678;
+  --accent:#e2a63a;
+  --accent-2:#f2bf63;
+  --accent-rgb:226,166,58;
+  --accent-ink:#1a1408;
+  --alert:#e05038;
+  --amber:#e2a63a;
+  --ok:#7fae6a;
+  --hist:#8fa6a4;
+}
+html.light{
+  --bg:#e9e4d8;
+  --glass:rgba(250,247,238,.88);
+  --glass2:rgba(255,252,244,.96);
+  --line:rgba(58,48,32,.12);
+  --line2:rgba(58,48,32,.22);
+  --txt:#1c1913;
+  --txt2:#4b453a;
+  --dim:#7b7466;
+  --accent:#8a5a12;
+  --accent-2:#6f4708;
+  --accent-rgb:138,90,18;
+  --accent-ink:#fff8e8;
+  --alert:#b8341f;
+  --amber:#8a5a12;
+  --ok:#3f6f45;
+  --hist:#4a6a68;
+}
+
+/* 底色：暖炭黑 / 暖纸白 */
+html:not(.light) .stage{background:#090806}
+html.light .stage{background:#e6e0d2}
+html:not(.light) body{background:var(--bg)}
+
+/* 深色：面板保持暖灰，不要回蓝 */
+.hud{background:rgba(23,21,18,.84)}
+.hero{background:linear-gradient(180deg,rgba(29,26,22,.94),rgba(20,18,15,.96))}
+.hero.alert{background:linear-gradient(180deg,rgba(104,30,22,.95),rgba(42,16,12,.96))}
+.hero.hist{background:linear-gradient(180deg,rgba(27,30,28,.95),rgba(18,22,21,.96))}
+.obs{background:linear-gradient(180deg,rgba(27,24,20,.96),rgba(18,16,13,.97))}
+.recent{background:rgba(23,21,18,.86)}
+.legend,.tools,.pop{background:rgba(23,21,18,.86)}
+.lm{background:rgba(23,21,18,.84)}
+.tsun{background:rgba(20,18,15,.96)}
+
+/* 浅色：暖纸，不是冷白 */
+html.light .hud{background:rgba(250,247,238,.88)}
+html.light .hero{background:linear-gradient(180deg,rgba(255,252,244,.97),rgba(247,242,230,.98))}
+html.light .hero.alert{background:linear-gradient(180deg,#fff2ed,#ffe4dc)}
+html.light .hero.hist{background:linear-gradient(180deg,#f4f1e8,#ebe6d8);border-color:rgba(74,106,104,.30)}
+html.light .obs{background:linear-gradient(180deg,rgba(255,252,244,.98),rgba(247,242,230,.98))}
+html.light .recent{background:rgba(250,247,238,.90)}
+html.light .legend,html.light .tools,html.light .pop{background:rgba(250,247,238,.92)}
+html.light .lm{background:rgba(250,247,238,.90)}
+html.light .lm.hot{background:rgba(255,232,224,.90)}
+html.light .sheet-panel{background:linear-gradient(180deg,#fdfaf2,#f2ede1)}
+html.light dialog{background:linear-gradient(180deg,#fdfaf2,#f5f0e4)}
+html.light .tip,html.light .toast{background:rgba(253,250,242,.98)}
+html.light .tsun{background:linear-gradient(180deg,rgba(255,252,244,.98),rgba(247,242,230,.98))}
+
+/* 把旧的蓝色强调改成琥珀（含浅色主题里写死的蓝） */
+button:focus-visible{outline-color:var(--accent)}
+.ph i{background:rgba(var(--accent-rgb),.16);color:var(--accent)}
+.hero.hist .phases{border-top-color:rgba(143,166,164,.28)}
+.tools button.on{background:rgba(var(--accent-rgb),.12);color:var(--accent)}
+.seg button.on{background:rgba(var(--accent-rgb),.16);color:var(--accent)}
+.vitem:hover{background:rgba(var(--accent-rgb),.10);border-color:rgba(var(--accent-rgb),.35);color:var(--txt)}
+.srctbl tr.is-main td{background:rgba(var(--accent-rgb),.06)}
+.srctbl tr.is-main td:first-child{color:var(--accent)}
+.srctbl .gqsw:hover,.srctbl .gqauto:hover{color:var(--accent);border-color:rgba(var(--accent-rgb),.50);background:rgba(var(--accent-rgb),.14)}
+.hrow.on{background:rgba(var(--accent-rgb),.10)}
+.input:focus{border-color:rgba(var(--accent-rgb),.65)}
+.btn.primary{background:rgba(var(--accent-rgb),.16);border-color:rgba(var(--accent-rgb),.45);color:var(--accent)}
+.fp.on{background:rgba(var(--accent-rgb),.16);border-color:rgba(var(--accent-rgb),.50);color:var(--accent)}
+body.focus-map #btnFull{background:rgba(var(--accent-rgb),.12)}
+.wtag{background:rgba(var(--accent-rgb),.10);border-color:rgba(var(--accent-rgb),.28);color:var(--accent)}
+.mytok{border-color:rgba(var(--accent-rgb),.18);background:rgba(var(--accent-rgb),.04)}
+.atshared{border-color:rgba(var(--accent-rgb),.22);background:rgba(var(--accent-rgb),.05)}
+.acct.me{border-color:rgba(var(--accent-rgb),.40);background:rgba(var(--accent-rgb),.06)}
+.tag.adm{color:var(--accent);border-color:rgba(var(--accent-rgb),.50);background:rgba(var(--accent-rgb),.12)}
+.dev.me{border-color:rgba(var(--accent-rgb),.30);background:rgba(var(--accent-rgb),.07)}
+.log-ver{color:var(--accent);background:rgba(var(--accent-rgb),.14)}
+.hero-meta .pschip{border-color:rgba(var(--accent-rgb),.35);background:rgba(var(--accent-rgb),.08)}
+.hero-meta .pschip b{color:var(--accent)}
+.calc-note{color:#e8d3a8}
+.hero.alert .calc-note{color:#f0cdb8}
+
+/* 浅色主题里那些写死的蓝，逐个压成琥珀 */
+html.light button:focus-visible{outline-color:var(--accent)}
+html.light .altchip.on{background:rgba(var(--accent-rgb),.14);border-color:rgba(var(--accent-rgb),.38);color:var(--accent)}
+html.light .hrow.on{background:rgba(var(--accent-rgb),.10)}
+html.light .tip.pin{border-color:rgba(var(--accent-rgb),.40)}
+html.light .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+html.light .seg button.on{background:var(--accent);color:var(--accent-ink)}
+html.light .vitem:hover{background:rgba(var(--accent-rgb),.08)}
+html.light .srctbl tr.is-main td{background:rgba(var(--accent-rgb),.06)}
+html.light .wtag{background:rgba(var(--accent-rgb),.10);border-color:rgba(var(--accent-rgb),.28);color:var(--accent)}
+html.light .hero-meta .pschip{border-color:rgba(var(--accent-rgb),.35);background:rgba(var(--accent-rgb),.06)}
+html.light .hero-meta .pschip b{color:var(--accent)}
+html.light .calc-note{color:#7a4a12}
+
+/* 蓝色系徽章/等级不要和新主色打架 */
+.qchip.q-B,html.light .qchip.q-B,.qmini.q-B{color:#7fa8c9}
+.qchip.q-C,.qmini.q-C{color:#9aa3a0}
+
+/* 告警红在暖底上压深一点，别和琥珀混 */
+html.light .hero.alert .badge{background:var(--alert);color:#fff}
+html.light .hero.alert .link{color:var(--alert)}
+
+/* 暖色底上的冷色残留：逐一压回暖灰，别让局部还是蓝白 */
+.num b.chip-int.zero{background:rgba(236,226,206,.10);color:var(--txt2)}
+html.light .num b.chip-int.zero{background:rgba(58,48,32,.07);color:#4b453a}
+.lm b{color:var(--dim)}
+.lm.net b{color:var(--txt2)}
+.obs-hd b{color:var(--txt)}
+.obs-issue,.obs-no{color:var(--dim)}
+.obs-quake{color:var(--txt2)}
+.obs-max i,.obs-max em{color:var(--dim)}
+.obs-grp h4{color:var(--dim)}
+.obs-grp p{color:var(--txt2)}
+.obs-none,.obs-foot{color:var(--dim)}
+.obs-x{color:var(--dim)}
+.obs-x:hover{background:rgba(236,226,206,.08);color:var(--txt)}
+html.light .obs-hd b{color:var(--txt)}
+html.light .obs-issue,html.light .obs-no,html.light .obs-max i,html.light .obs-max em{color:var(--dim)}
+html.light .obs-quake,html.light .obs-grp p{color:var(--txt2)}
+html.light .obs-none,html.light .obs-foot{color:var(--dim)}
+html.light .obs-x{color:var(--dim)}
+html.light .obs-x:hover{background:rgba(58,48,32,.07);color:var(--txt)}
+
+/* 海啸面板：原来是青蓝，改成低饱和的暖青，仍能一眼认出是“水” */
+.tsun-badge{background:rgba(95,150,145,.22);color:#a9d4cf;border:1px solid rgba(122,180,172,.35)}
+.tsun-main b{color:#d9ece8}
+.tsun-unit{color:#8fc4bd}
+.tsun-main i,.tsun-main em{color:var(--dim)}
+.tsun-row em{color:#9fd0c8}
+.tsun-row b{color:var(--accent)}
+.tsun-row.reach b{color:var(--ok)}
+.tsun-scale i{opacity:.9}
+html.light .tsun-badge{background:rgba(74,106,104,.12);color:#3f6a67;border-color:rgba(74,106,104,.30)}
+html.light .tsun-main b{color:var(--txt)}
+html.light .tsun-unit{color:#3f6a67}
+html.light .tsun-row em{color:#3f6a67}
+
+/* ============================================================================
+   字体 v1 · 技术无衬线 + 宋体地名 + 等宽读数
+   ----------------------------------------------------------------------------
+   · 拉丁/数字：Bahnschrift（Windows 自带的 DIN 风可变字体）+ Consolas
+   · 中文正文：苹方 / 微软雅黑，只保留 400/500/600 三档字重
+   · 地名/抽屉标题：Noto Serif SC（系统已装）→ 思源宋体 → 宋体
+   · 字阶固定：10 / 11 / 12.5 / 14 / 16 / 22 / 36，不再出现 18.5、11.5 这种碎号
+   ========================================================================== */
+:root{
+  --font-ui:"Bahnschrift","Segoe UI Variable Text","Segoe UI","Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif;
+  --font-serif:"Noto Serif SC","Source Han Serif SC","Songti SC",SimSun,serif;
+  --mono:"Cascadia Mono","Consolas","SFMono-Regular",ui-monospace,monospace;
+}
+body{font-family:var(--font-ui);font-size:14px;line-height:1.55}
+button,input,select,textarea{font-family:var(--font-ui)}
+.mono,.clock b,.num b,.rec .mg,.lm b,.hero-meta,.phases,.calc,.mapfoot,.badge,.srcname,.recent-hd,.lg-hd,.log-ver{
+  font-family:var(--mono);
+  font-variant-numeric:tabular-nums;
+}
+
+/* 地名/标题：宋体，和数据拉开气质 */
+.hero-place{
+  font-family:var(--font-serif);font-weight:600;font-size:22px;
+  line-height:1.32;letter-spacing:.01em;
+}
+.dlg-hd h2{
+  font-family:var(--font-serif);font-weight:600;font-size:17px;
+  letter-spacing:.02em;
+}
+.hrow .l1{
+  font-family:var(--font-serif);font-weight:500;font-size:13px;
+  letter-spacing:.01em;
+}
+
+/* 字重收敛：读数用 700，标题 600，标签 500 */
+.name{font-weight:600;font-size:16px;letter-spacing:.02em}
+.num b{font-weight:700;font-size:36px;letter-spacing:-.035em}
+.num b.chip-int{font-size:32px;padding:3px 13px 6px}
+.num i{font-size:10.5px;letter-spacing:.04em}
+.hero-meta{font-size:11.5px;line-height:1.5;letter-spacing:.01em}
+.hero-meta b{font-weight:600}
+.rec .pl{font-size:12.5px;line-height:1.4}
+.rec .tm{font-size:10.5px}
+.rec .mg{font-size:12px;font-weight:600}
+.lm b{font-size:22px;font-weight:600}
+.lm em{font-size:10.5px}
+.badge{font-weight:700;font-size:9px;letter-spacing:.12em}
+.srcname{font-weight:500;font-size:10px;letter-spacing:.04em}
+.recent-hd{font-weight:600;font-size:11px;letter-spacing:.12em}
+.lg-hd{font-weight:600;font-size:10px;letter-spacing:.08em}
+.ph b{font-weight:600}
+.hint{font-size:11.5px;line-height:1.72}
+.sec h3{font-size:12.5px;letter-spacing:.04em}
+.row.between label{font-size:13px}
+.clock b{font-size:14px;font-weight:600}
+.name em{font-family:var(--mono);font-weight:600;letter-spacing:.16em}
+
+/* 小标签的行距与字距，别再挤在一起 */
+.badge,.srcname,.rec .tm,.lm i,.lm u,.legend .cell,.mapfoot{letter-spacing:.04em}
+.hero-meta > span{letter-spacing:.01em}
+
+/* 浅色下宋体标题不要发灰 */
+html.light .hero-place{color:var(--txt)}
+html.light .dlg-hd h2{color:var(--txt)}
+html.light .hrow .l1{color:var(--txt)}
+
+/* ============================================================================
+   浅色模式 · 深度适配（不是把深色调成反色）
+   ----------------------------------------------------------------------------
+   深色是「暖炭黑 + 玻璃」；浅色改成「纸 + 墨」：
+     · 更暖的纸底，面板用实体纸白而不是半透明白
+     · 面板加 1px 暖墨边框 + 双层落影，和浅色地图分开
+     · 顶栏按钮改成墨色描边，图标用墨色，不再是一片浅灰
+     · 事件卡的读数、chip、进度条重新给一套浅色层次
+     · 设置抽屉用暖灰表头 + 纸白表单，主按钮琥珀、次按钮墨线
+   ========================================================================== */
+html.light{
+  --bg:#e6e0d3;
+  --glass:rgba(253,250,242,.94);
+  --glass2:rgba(255,252,245,.98);
+  --line:rgba(58,48,32,.15);
+  --line2:rgba(58,48,32,.28);
+  --txt:#171410;
+  --txt2:#454035;
+  --dim:#6f6758;
+  --accent:#8a5a12;
+  --accent-2:#6f4708;
+  --accent-rgb:138,90,18;
+  --accent-ink:#fff8e8;
+  --alert:#b8341f;
+  --ok:#3f6f45;
+  --hist:#4a6a68;
+  --shadow-1:0 2px 5px rgba(70,60,40,.08),0 12px 28px rgba(70,60,40,.12);
+  --shadow-2:0 4px 10px rgba(70,60,40,.10),0 20px 44px rgba(70,60,40,.16);
+}
+html.light body{background:var(--bg)}
+html.light .stage{background:#ddd6c6}
+
+/* 顶栏：纸底 + 墨色控件 */
+html.light .hud{
+  background:rgba(253,250,242,.94);
+  border-bottom:1px solid var(--line2);
+  box-shadow:0 4px 18px rgba(70,60,40,.10);
+  backdrop-filter:blur(10px) saturate(110%);
+}
+html.light .name{color:#14110c}
+html.light .name em{color:var(--accent);border-color:var(--accent)}
+html.light .ver{color:#6f6758;border-color:var(--line2);background:transparent}
+html.light .clock{border-left-color:var(--line)}
+html.light .clock b{color:#14110c}
+html.light .clock i{color:#6f6758}
+html.light .hud-btns{border-left-color:var(--line)}
+html.light .pill{
+  background:#fdfaf2;border-color:rgba(28,25,19,.55);color:#1c1913;
+}
+html.light .pill:hover{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+html.light .icon{color:#3a352b;border-color:transparent}
+html.light .icon:hover{background:rgba(58,48,32,.07);border-color:var(--line2);color:#14110c}
+html.light .icon.on{color:var(--accent);border-color:var(--accent)}
+html.light .userchip{color:#3a352b;border-left-color:var(--line)}
+html.light .userchip button{color:#3a352b;border-color:var(--line2);background:#fdfaf2}
+html.light .userchip button:hover{background:var(--alert);border-color:var(--alert);color:#fff}
+html.light .srcdots .sd{background:#b8b0a0}
+html.light .srcdots .sd.ok{background:var(--ok)}
+html.light .srcdots .sd.err{background:var(--alert)}
+html.light .srcdots .sd.wait{background:var(--accent)}
+html.light .srcdots .sd:hover::after{background:#fffdf7;border-color:var(--line2);color:var(--txt2)}
+
+/* 面板：实体纸白，不再半透明 */
+html.light .hero,
+html.light .obs,
+html.light .recent,
+html.light .legend,
+html.light .tools,
+html.light .pop,
+html.light .lm,
+html.light .tsun{
+  background:#fdfaf2;
+  border:1px solid var(--line2);
+  box-shadow:var(--shadow-2);
+}
+html.light .hero{border-radius:var(--r-lg)}
+html.light .hero.alert{
+  background:#fff0ea;
+  border-color:rgba(184,41,27,.32);
+  box-shadow:0 4px 10px rgba(184,41,27,.06),0 20px 44px rgba(184,41,27,.12);
+}
+html.light .hero.hist{
+  background:#f7f3e8;
+  border-color:rgba(74,106,104,.30);
+}
+html.light .obs{background:#fdfaf2}
+html.light .recent{background:#fdfaf2}
+html.light .legend,html.light .tools,html.light .pop{background:#fdfaf2}
+html.light .lm{background:#fdfaf2;box-shadow:var(--shadow-1)}
+html.light .lm.net{background:#f4eee1}
+html.light .tsun{background:#fdfaf2}
+html.light .quiet{background:#fdfaf2;border-color:var(--line2)}
+
+/* 事件卡内部：墨字 + 沙色 chip */
+html.light .hero-place{color:#14110c}
+html.light .hero-meta{color:#6f6758;border-top-color:var(--line)}
+html.light .hero-meta b{color:#1c1913}
+html.light .num b{color:#14110c}
+html.light .num i{color:#6f6758}
+html.light .num b.chip-int{background:#efe9dc;color:#1c1913;border:1px solid rgba(58,48,32,.10)}
+html.light .num b.chip-int.zero{background:#efe9dc;color:#5c5546;border-color:rgba(58,48,32,.10)}
+html.light .hero-meta .maxchip{background:#f4eee1;border-color:var(--line2);color:#6f6758}
+html.light .hero-meta .maxchip b{color:#fff}
+html.light .hero-meta .estchip,
+html.light .hero-meta .pschip{background:#f4eee1;border-color:var(--line2);color:#6f6758}
+html.light .hero-meta .estchip b,
+html.light .hero-meta .pschip b{color:#1c1913}
+html.light .badge{background:var(--accent);color:var(--accent-ink)}
+html.light .hero.alert .badge{background:var(--alert);color:#fff}
+html.light .srcname{color:#6f6758}
+html.light .bar{background:rgba(58,48,32,.14)}
+html.light .bar span{background:var(--accent)}
+html.light .bar em.p{background:rgba(58,48,32,.40)}
+html.light .bar em.s{background:var(--accent)}
+html.light .hero.alert .bar{background:rgba(184,41,27,.16)}
+html.light .hero.alert .bar span{background:var(--alert)}
+html.light .calc{background:#f7f2e7;border-color:var(--line)}
+html.light .calc-hd{color:#6f6758}
+html.light .calc-row span{color:#6f6758}
+html.light .calc-row b{color:#2d2a22}
+html.light .calc-note{color:#7a4a12;border-top-color:var(--line)}
+html.light .phases{border-top-color:var(--line)}
+html.light .ph{border-right-color:var(--line);color:#6f6758}
+html.light .ph b{color:#1c1913}
+html.light .ph em{color:#6f6758}
+html.light .ph i{border-color:#b8b0a0;color:#3a352b}
+html.light .ph.s i{border-color:var(--accent);color:var(--accent)}
+html.light .calc-toggle{border-color:var(--line2);color:#6f6758}
+html.light .wch{background:#f4eee1;border-color:var(--line)}
+html.light .wch b{background:var(--accent);color:var(--accent-ink)}
+html.light .link{color:var(--accent)}
+html.light .hero.alert .link{color:var(--alert)}
+
+/* 速报卡/海啸/右上读数 */
+html.light .obs-hd b{color:#14110c}
+html.light .obs-max{background:#f4eee1;border-color:var(--line);border-left:2px solid var(--accent)}
+html.light .obs-max b{color:#14110c}
+html.light .obs-grp p{color:#3a352b}
+html.light .obs-grp h4{color:#6f6758}
+html.light .obs-foot{color:#6f6758;border-top-color:var(--line)}
+html.light .lm b{color:#1c1913}
+html.light .lm em{color:#6f6758}
+html.light .lm i,.html.light .lm u{color:#6f6758}
+html.light .lm.hot{background:#fff0ea;border-color:rgba(184,41,27,.28);box-shadow:inset 2px 0 0 var(--alert)}
+html.light .lm.hot b{color:var(--alert)}
+html.light .lm.net{background:#f4eee1}
+html.light .tsun-main b{color:#14110c}
+html.light .tsun-row{color:#3a352b}
+html.light .tsun-row span{color:#1c1913}
+html.light .tsun-note{color:#6f6758}
+
+/* 工具轨 / 图例 / 最近地震 */
+html.light .tools button{color:#3a352b;border-bottom-color:var(--line)}
+html.light .tools button:hover{background:var(--accent);color:var(--accent-ink)}
+html.light .tools button.on{background:#efe9dc;color:var(--accent);box-shadow:inset 2px 0 0 var(--accent)}
+html.light .pop{background:#fdfaf2}
+html.light .pop label{color:#3a352b}
+html.light .recent-hd{color:#6f6758}
+html.light .recent-hd button{color:var(--accent)}
+html.light .rec .pl{color:#2d2a22}
+html.light .rec .tm{color:#7a7263}
+html.light .rec .mg{color:var(--accent)}
+html.light .rec:hover{background:#f4eee1}
+html.light .lg-hd{color:#6f6758}
+html.light .legend .cell{color:#6f6758}
+html.light .lg-sep{background:var(--line)}
+html.light .mapfoot{color:#6f6758}
+html.light .tip,html.light .toast{background:#fffdf7;border-color:var(--line2);box-shadow:var(--shadow-1)}
+html.light .tip b{color:#14110c}
+html.light .tip .dimx{color:#6f6758}
+html.light .tip.pin{border-color:var(--accent);box-shadow:var(--shadow-1)}
+
+/* 设置 / 统计 / 日志 / 管理：暖灰表头 + 纸白表单 */
+html.light dialog{
+  background:#fdfaf2;
+  border-left:1px solid var(--line2);
+  box-shadow:-18px 0 48px rgba(70,60,40,.16);
+}
+html.light .dlg-hd{background:#f1ebdd;border-bottom:1px solid var(--line2)}
+html.light .dlg-hd h2{color:#14110c}
+html.light .dlg-hd h2::before{color:#6f6758}
+html.light .dlg-ft{background:#f1ebdd;border-top:1px solid var(--line2);color:#6f6758}
+html.light .dlg-body{background:#fdfaf2}
+html.light .sec{border-bottom-color:var(--line)}
+html.light .sec h3{color:#3a352b}
+html.light .hint{color:#6f6758}
+html.light .hint code{background:#f4eee1;border-color:var(--line);color:#3a352b}
+html.light .row.between label{color:#2d2a22}
+html.light .input,html.light .select{
+  background:#fffdf7;border-color:#c9c2b2;color:#171410;
+}
+html.light .input:focus,html.light .select:focus{border-color:var(--accent)}
+html.light .btn{background:#f4eee1;border-color:#c9c2b2;color:#2d2a22}
+html.light .btn:hover{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+html.light .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+html.light .btn.primary:hover{background:var(--accent-2);border-color:var(--accent-2)}
+html.light .btn.danger{background:#fff5f1;border-color:rgba(184,41,27,.35);color:var(--alert)}
+html.light .btn.danger:hover{background:var(--alert);border-color:var(--alert);color:#fff}
+html.light .seg{border-color:#c9c2b2}
+html.light .seg button{color:#6f6758}
+html.light .seg button.on{background:var(--accent);color:var(--accent-ink)}
+html.light .fp{background:#fffdf7;border-color:#c9c2b2;color:#3a352b}
+html.light .fp.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+html.light .vitem{background:#fffdf7;border-color:#d6cfbf;color:#3a352b}
+html.light .vitem:hover{background:#f4eee1;border-color:var(--accent)}
+html.light .switch{background:#fffdf7;border-color:#b8b0a0}
+html.light .switch:checked{background:var(--accent);border-color:var(--accent);box-shadow:inset 0 0 0 4px #fdfaf2}
+html.light .srctbl th{color:#6f6758;border-bottom-color:var(--line2)}
+html.light .srctbl td{color:#3a352b;border-bottom-color:var(--line)}
+html.light .srctbl tr.is-main td{background:rgba(138,90,18,.06)}
+html.light .srctbl tr.is-main td:first-child{color:var(--accent)}
+html.light .mytok,html.light .atshared,html.light .acct,
+html.light .kpi,html.light .log-item,html.light .mach,html.light .dev{
+  background:#fffdf7;border-color:var(--line);
+}
+html.light .mytok{border-color:rgba(138,90,18,.20);background:rgba(138,90,18,.035)}
+html.light .acct.me{border-color:rgba(138,90,18,.35);background:rgba(138,90,18,.05)}
+html.light .tag{background:transparent;border-color:var(--line2);color:#3a352b}
+html.light .tag.adm{color:var(--accent);border-color:var(--accent)}
+html.light .tag.own{color:var(--ok);border-color:var(--ok)}
+html.light .tag.non{color:var(--alert);border-color:var(--alert)}
+html.light .log-item{background:#fffdf7}
+html.light .log-ver{color:var(--accent);border-color:var(--accent);background:transparent}
+html.light .log-title{color:#14110c}
+html.light .log-date{color:#6f6758}
+html.light .log-item ul{color:#3a352b}
+html.light .stats-top,.html.light .kpi{background:#fffdf7}
+html.light .sbar i{background:var(--accent)}
+html.light .sbar em{color:#6f6758}
+
+/* 历史抽屉：纸白 + 墨线 */
+html.light .sheet-bg{background:rgba(60,50,35,.28)}
+html.light .sheet-panel{
+  background:#fdfaf2;border-top:1px solid var(--line2);
+  box-shadow:0 -12px 40px rgba(70,60,40,.16);
+}
+html.light .sheet-hd{border-bottom:1px solid var(--line)}
+html.light .sheet-hd b{color:#14110c}
+html.light .sheet-filters{border-bottom:1px solid var(--line)}
+html.light .sheet-filters select{background:#fffdf7;border-color:#c9c2b2;color:#171410}
+html.light .hrow{border-bottom:1px solid var(--line)}
+html.light .hrow:hover{background:#f4eee1}
+html.light .hrow.on{background:#f4eee1;box-shadow:inset 2px 0 0 var(--accent)}
+html.light .hrow .l1{color:#14110c}
+html.light .hrow .l2{color:#6f6758}
+html.light .hrow .mag{color:var(--accent)}
+
+/* 震度速報闪现卡：官方黄黑不变，只把落影压软 */
+html.light .sok-card{box-shadow:0 12px 30px rgba(70,60,40,.22)}
+
+/* 浅色第二遍：把面板提亮、边框压深，和纸底地图真正分层 */
+html.light{--line:rgba(58,48,32,.18);--line2:rgba(58,48,32,.30)}
+html.light .hud{background:#fffdf7;border-bottom-color:rgba(58,48,32,.30)}
+html.light .hero,
+html.light .obs,
+html.light .recent,
+html.light .legend,
+html.light .tools,
+html.light .pop,
+html.light .lm,
+html.light .tsun{
+  background:#fffdf7;
+  border:1px solid rgba(58,48,32,.30);
+  box-shadow:0 4px 12px rgba(70,60,40,.10),0 18px 40px rgba(70,60,40,.16);
+}
+html.light .hero.alert{
+  background:#fff1ec;
+  border-color:rgba(184,41,27,.38);
+  box-shadow:0 4px 12px rgba(184,41,27,.08),0 18px 40px rgba(184,41,27,.14);
+}
+html.light .hero.hist{background:#f7f3e8;border-color:rgba(74,106,104,.34)}
+html.light .lm{box-shadow:0 3px 10px rgba(70,60,40,.10)}
+html.light .lm.net{background:#f4eee1}
+html.light .quiet{background:#fffdf7;border-color:rgba(58,48,32,.30)}
+html.light .tip,html.light .toast{background:#fffdf7;border-color:rgba(58,48,32,.30)}
+html.light dialog{background:#fffdf7;border-left-color:rgba(58,48,32,.30)}
+html.light .dlg-hd{background:#f1ebdd;border-bottom-color:rgba(58,48,32,.30)}
+html.light .dlg-ft{background:#f1ebdd;border-top-color:rgba(58,48,32,.30)}
+html.light .input,html.light .select{background:#fffefb;border-color:#c9c2b2}
+html.light .vitem,html.light .mytok,html.light .atshared,html.light .acct,
+html.light .kpi,html.light .log-item,html.light .mach,html.light .dev{background:#fffefb}
+html.light .sheet-panel{background:#fffdf7;border-top-color:rgba(58,48,32,.30)}
+html.light .hrow{border-bottom-color:rgba(58,48,32,.18)}
+
+/* ============================================================================
+   顶栏数据源状态格 · 工具轨线性图标 · 事件卡读数格
+   ========================================================================== */
+.hud-l{position:relative}
+
+/* 一排彩点 -> 一个状态格 */
+.srcstat{
+  height:27px;display:flex;align-items:center;gap:7px;padding:0 9px;
+  border:1px solid var(--line2);border-radius:8px;background:transparent;
+  color:var(--dim);cursor:pointer;white-space:nowrap;
+  font:600 9.5px/1 var(--mono);letter-spacing:.04em;
+  transition:border-color .14s var(--ease),color .14s var(--ease),background .14s var(--ease);
+}
+.srcstat:hover{border-color:var(--accent);color:var(--txt)}
+.srcstat.warn{border-color:rgba(var(--accent-rgb),.55)}
+.srcstat.bad{border-color:rgba(224,80,56,.55)}
+.ss-led{width:6px;height:6px;border-radius:50%;background:var(--line2);flex:none}
+.ss-led.ok{background:var(--ok)}
+.ss-led.err{background:var(--alert)}
+.ss-led.wait{background:var(--accent)}
+.srcstat.bad .ss-led{animation:srcPulse 1.4s steps(2,end) infinite}
+@keyframes srcPulse{0%,100%{opacity:1}50%{opacity:.3}}
+.ss-txt b{color:var(--txt);font-weight:700}
+.ss-txt i{font-style:normal;color:var(--dim);margin:0 1px}
+.ss-caret{font-size:7px;color:var(--dim);margin-left:1px}
+.srcpop{
+  position:absolute;top:46px;left:0;z-index:70;width:310px;max-height:360px;
+  overflow:auto;padding:7px;
+  background:var(--panel-3);border:1px solid var(--line2);
+  border-radius:12px;box-shadow:var(--shadow-2);
+}
+.srcpop[hidden]{display:none}
+.srcpop::-webkit-scrollbar{width:6px}
+.srcpop::-webkit-scrollbar-thumb{background:var(--line2);border-radius:0}
+.srcrow{
+  display:grid;grid-template-columns:8px minmax(0,1fr) auto;gap:8px;align-items:center;
+  padding:5px 6px;border-radius:7px;font-size:10px;color:var(--txt2);
+}
+.srcrow:hover{background:rgba(255,255,255,.045)}
+.srcrow i{width:5px;height:5px;border-radius:50%;background:var(--line2)}
+.srcrow.ok i{background:var(--ok)}
+.srcrow.err i{background:var(--alert)}
+.srcrow.wait i{background:var(--accent)}
+.srcrow b{font-weight:500;color:var(--txt2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.srcrow span{font-family:var(--mono);font-size:8.5px;color:var(--dim);white-space:nowrap}
+html.light .srcstat{background:#fdfaf2;border-color:#c9c2b2;color:#3a352b}
+html.light .srcstat:hover{border-color:var(--accent);color:#14110c}
+html.light .srcstat.warn{border-color:rgba(138,90,18,.45)}
+html.light .srcstat.bad{border-color:rgba(184,41,27,.45)}
+html.light .srcpop{background:#fffdf7;border-color:rgba(58,48,32,.30)}
+html.light .srcrow:hover{background:#f4eee1}
+html.light .srcrow b{color:#2d2a22}
+html.light .srcrow span{color:#6f6758}
+
+/* 工具轨：同一套 24 格线性图标 */
+.tools button svg{width:17px;height:17px;stroke-width:1.6;display:block}
+.tools button{display:grid;place-items:center}
+html.light .tools button svg{stroke-width:1.6}
+
+/* 事件卡元信息：两列读数 + 单独一行 chips */
+.hero-meta{
+  display:grid;grid-template-columns:auto auto 1fr;
+  align-items:baseline;gap:4px 12px;
+}
+.hero-meta .hm.mag{grid-area:1/1}
+.hero-meta .hm.depth{grid-area:1/2}
+.hero-meta #heroSerial{grid-area:1/3;justify-self:end}
+.hero-meta #heroTime{grid-area:2/1/2/3}
+.hero-meta .maxchip{grid-area:2/3;justify-self:end;margin-left:0}
+.hero-meta .hm-chips{
+  grid-area:3/1/3/4;display:flex;flex-wrap:wrap;gap:5px;margin-top:1px;
+}
+.hero-meta .hm-chips:not(:has(> span:not([hidden]))){display:none}
+.hero-meta .hm.mag,.hero-meta .hm.depth{white-space:nowrap}
+.hero-meta #heroTime{color:var(--dim)}
+.hero-meta .maxchip{align-self:center}
+@media (max-width:640px){
+  .hero-meta{gap:3px 8px;font-size:10.5px}
+  .hero-meta .maxchip{font-size:8px;padding:1px 5px 2px}
+  .srcstat{padding:0 7px;height:24px}
+  .ss-txt{display:none}
+  .srcpop{width:min(280px,calc(100vw - 24px))}
+}
+
+/* ---------- 台站浮卡：悬停两行，钉住才展开 ---------- */
+.tip .tip-hd{display:flex;align-items:center;gap:6px;font-size:12px;line-height:1.3}
+.tip .tip-hd i{width:7px;height:7px;border-radius:50%;flex:none;box-shadow:none}
+.tip .tip-hd b{font-weight:700;letter-spacing:.01em}
+.tip .tip-hd .tv{margin-left:2px;font-family:var(--mono);font-size:11.5px;font-weight:700;letter-spacing:0}
+.tip .tip-sub{margin-top:3px;font-size:10px;color:#8b95a5;letter-spacing:.02em}
+.tip .tip-sub em{font-style:normal;color:#a8b8ca}
+.tip .tip-sub s{text-decoration:none;color:#6b7688;margin-left:9px}
+.tip.pin{white-space:normal;max-width:268px}
+.tip.pin .tip-hd{display:none}
+html.light .tip .tip-sub{color:var(--dim)}
+html.light .tip .tip-sub em{color:#3d4b5c}
+html.light .tip .tip-sub s{color:#8d8474}
+
+/* ---------- 数据源弹层：宽屏贴左列右侧，窄屏才压卡片 ---------- */
+.srcpop{animation:popIn .15s var(--ease)}
+@keyframes popIn{from{opacity:0;transform:translateY(-4px) scale(.99)}to{opacity:1;transform:none}}
+body.pop-on .hero,
+body.pop-on .obs,
+body.pop-on .quiet{opacity:0;pointer-events:none;transition:opacity .13s var(--ease)}
+
+/* ---------- 设置 · 安装与更新 ---------- */
+.upd-bar{height:5px;border-radius:99px;background:rgba(255,255,255,.09);
+  overflow:hidden;margin:10px 0 4px}
+.upd-bar i{display:block;height:100%;width:0;border-radius:99px;
+  background:linear-gradient(90deg,var(--accent),var(--accent-2));
+  transition:width .28s linear}
+html.light .upd-bar{background:rgba(90,74,48,.13)}
+#updNote{min-height:1.3em}
+#updNote.warn{color:#e6b370}
+html.light #updNote.warn{color:#a3730f}
+#updMode.off{color:#d08a7e}

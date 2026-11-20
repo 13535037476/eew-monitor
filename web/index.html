@@ -6,7 +6,8 @@
 <title>震线 EEW · 中日地震预警</title>
 <script>/* 首帧前定主题，避免启动时先闪一下深色 */
 try{if(localStorage.getItem('eew.theme')==='light')document.documentElement.classList.add('light')}catch(e){}</script>
-<link rel="stylesheet" href="style.css?v=242">
+<link rel="stylesheet" href="style.css?v=243">
+<link rel="stylesheet" href="ui.css?v=11">
 </head>
 <body>
 
@@ -21,7 +22,12 @@ try{if(localStorage.getItem('eew.theme')==='light')document.documentElement.clas
     </svg>
     <div class="name">震线<em>EEW</em></div>
     <span class="ver" id="verChip">v—</span>
-    <div class="srcdots" id="srcDots"></div>
+    <button class="srcstat" id="srcStat" type="button" aria-haspopup="true" aria-expanded="false" title="数据源状态">
+      <span class="ss-led" id="ssLed"></span>
+      <span class="ss-txt">数据源 <b id="ssOk">—</b><i>/</i><i id="ssAll">—</i></span>
+      <span class="ss-caret">▾</span>
+    </button>
+    <div class="srcpop" id="srcPop" hidden></div>
   </div>
 
   <div class="hud-r">
@@ -74,13 +80,15 @@ try{if(localStorage.getItem('eew.theme')==='light')document.documentElement.clas
     <div class="hero-alts" id="heroAlts" hidden></div>
     <h1 class="hero-place" id="heroPlace">—</h1>
     <div class="hero-meta">
-      <span>M <b id="heroMag">—</b></span>
-      <span>深 <b id="heroDepth">—</b> km</span>
+      <span class="hm mag">M <b id="heroMag">—</b></span>
+      <span class="hm depth">深 <b id="heroDepth">—</b> km</span>
       <span id="heroTime">—</span>
       <span id="heroSerial" hidden>第 1 报</span>
       <span class="maxchip" id="heroMax" hidden>最大<b id="heroMaxVal">—</b></span>
-      <span class="estchip" id="heroEst" hidden title=""><i>估算</i><b id="heroEstVal">—</b></span>
-      <span class="pschip" id="heroPS" hidden title="">震中<b id="heroPSv">—</b></span>
+      <div class="hm-chips">
+        <span class="estchip" id="heroEst" hidden title=""><i>估算</i><b id="heroEstVal">—</b></span>
+        <span class="pschip" id="heroPS" hidden title="">震中<b id="heroPSv">—</b></span>
+      </div>
     </div>
     <div class="hero-nums">
       <div class="num">
@@ -161,12 +169,18 @@ try{if(localStorage.getItem('eew.theme')==='light')document.documentElement.clas
   </div>
 
   <div class="tools">
-    <button data-act="zin" title="放大">+</button>
-    <button data-act="zout" title="缩小">−</button>
-    <button data-act="home" title="复位视野 (R)">⌖</button>
-    <button data-act="globe" title="全球视野 (G)">🌍</button>
-    <button data-act="layers" title="图层" id="btnLayers">◈</button>
-    <button data-act="full" title="全屏 (F)" id="btnFull">⛶</button>
+    <button data-act="zin" title="放大" aria-label="放大">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+    <button data-act="zout" title="缩小" aria-label="缩小">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg></button>
+    <button data-act="home" title="复位视野 (R)" aria-label="复位视野">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></button>
+    <button data-act="globe" title="全球视野 (G)" aria-label="全球视野">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3.2 3.8 3.2 14.2 0 18M12 3c-3.2 3.8-3.2 14.2 0 18"/></svg></button>
+    <button data-act="layers" title="图层" id="btnLayers" aria-label="图层">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l9 5-9 5-9-5 9-5z"/><path d="M3 12l9 5 9-5"/><path d="M3 16l9 5 9-5"/></svg></button>
+    <button data-act="full" title="全屏 (F)" id="btnFull" aria-label="全屏">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
   </div>
 
   <div class="pop" id="layerPop" hidden>
@@ -516,6 +530,60 @@ try{if(localStorage.getItem('eew.theme')==='light')document.documentElement.clas
       </div>
 
       <div class="sec">
+        <h3>网盘备份</h3>
+        <p class="hint" style="margin-top:0">地震录像（webm）自动上传到 WebDAV 网盘。推荐坚果云：地址填
+          <span class="mono">https://dav.jianguoyun.com.cn/dav/</span>，密码用「应用密码」（坚果云网页 → 账户信息 → 安全选项），不要用登录密码。</p>
+        <div class="row">
+          <label class="recck"><input type="checkbox" id="optCloud"> 开启自动上传</label>
+        </div>
+        <div class="row">
+          <label style="flex:none;width:76px">服务器地址</label>
+          <input id="optCloudUrl" class="input mono" placeholder="https://dav.jianguoyun.com.cn/dav/">
+        </div>
+        <div class="row">
+          <label style="flex:none;width:76px">远程目录</label>
+          <input id="optCloudFolder" class="input" placeholder="震线EEW">
+        </div>
+        <div class="row">
+          <label style="flex:none;width:76px">账号</label>
+          <input id="optCloudUser" class="input" placeholder="注册邮箱 / 用户名">
+        </div>
+        <div class="row">
+          <label style="flex:none;width:76px">应用密码</label>
+          <input id="optCloudPass" class="input" type="password" placeholder="留空 = 沿用已保存的密码">
+        </div>
+        <div class="row">
+          <button type="button" class="btn" id="btnCloudTest">测试连接</button>
+          <button type="button" class="btn" id="btnCloudSync">立即补传</button>
+          <button type="button" class="btn primary" id="btnCloudSave">保存</button>
+        </div>
+        <p class="hint" style="margin:6px 0 0" id="cloudHint">—</p>
+      </div>
+
+      <div class="sec">
+        <h3>安装与更新</h3>
+        <div class="row between">
+          <label>当前版本</label>
+          <span class="mono" id="updCur">v—</span>
+        </div>
+        <div class="row between">
+          <label>安装状态</label>
+          <span class="hint" id="updMode" style="margin:0">读取中…</span>
+        </div>
+        <p class="hint" id="updNote">—</p>
+        <div class="upd-bar" id="updBar" hidden><i id="updFill"></i></div>
+        <div class="row">
+          <button type="button" class="btn" id="btnUpdCheck">检查更新</button>
+          <button type="button" class="btn primary" id="btnUpdGo" hidden>下载并安装</button>
+          <button type="button" class="btn" id="btnUpdDir">打开安装目录</button>
+        </div>
+        <div class="row" style="margin-top:10px">
+          <button type="button" class="btn danger" id="btnUninstall">卸载</button>
+          <span class="hint" style="margin:0" id="uninstHint">卸载会删除程序文件，可选择保留设置与录像</span>
+        </div>
+      </div>
+
+      <div class="sec">
         <h3>关于</h3>
         <p class="hint">
           数据：日本气象厅 緊急地震速報 / 震源・震度情報；中国地震台网 CENC；中国地震预警（ICL）；
@@ -647,6 +715,6 @@ try{if(localStorage.getItem('eew.theme')==='light')document.documentElement.clas
 <script src="geo.js?v=207"></script>
 <script src="geo_jp.js?v=176"></script>
 <script src="geo_world.js?v=207"></script>
-<script src="app.js?v=303"></script>
+<script src="app.js?v=307"></script>
 </body>
 </html>

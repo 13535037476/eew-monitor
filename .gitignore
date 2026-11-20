@@ -29,3 +29,10 @@ tools/ne10_land.json
 tools/ne50_land.json
 tools/shots/
 jd.html
+
+# ---------- 安装包构建与个人数据（不入库） ----------
+installer/payload/
+data/recordings/
+# 网盘备份配置含 WebDAV 应用密码
+data/cloud.json
+data/cloud_upload.json

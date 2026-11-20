@@ -164,6 +164,7 @@
     syncPalette();
   }
 
+
   const state = {
     offset: 0,
     sources: [],
@@ -240,12 +241,12 @@
   bumpDecay(state.settings);
   try { LS.set('settings', state.settings); } catch (e) { /* 存不下就算了 */ }
 
-  const RISK = ['#42536b', '#3b82f6', '#06b6d4', '#22c55e', '#facc15',
+  const RISK = ['#9aa5b1', '#3b82f6', '#06b6d4', '#22c55e', '#facc15',
     '#fb923c', '#f97316', '#ef4444', '#dc2626', '#a21caf'];
-  const RISK_FILL = ['rgba(66,83,107,0)', 'rgba(59,130,246,.30)', 'rgba(6,182,212,.36)',
+  const RISK_FILL = ['rgba(154,165,177,0)', 'rgba(59,130,246,.30)', 'rgba(6,182,212,.36)',
     'rgba(34,197,94,.44)', 'rgba(250,204,21,.52)', 'rgba(251,146,60,.58)',
     'rgba(249,115,22,.64)', 'rgba(239,68,68,.70)', 'rgba(220,38,38,.74)', 'rgba(162,28,175,.78)'];
-  const RISK_RGB = [[66, 83, 107], [59, 130, 246], [6, 182, 212], [34, 197, 94], [250, 204, 21],
+  const RISK_RGB = [[154, 165, 177], [59, 130, 246], [6, 182, 212], [34, 197, 94], [250, 204, 21],
     [251, 146, 60], [249, 115, 22], [239, 68, 68], [220, 38, 38], [162, 28, 175]];
   const RISK_ALPHA = [0, .30, .36, .44, .52, .58, .64, .70, .74, .78];
   const GRADE = ['0', '1', '2', '3', '4', '5弱', '5強', '6弱', '6強', '7'];
@@ -565,7 +566,7 @@
   // 终报之后事件卡就该收了——「预警结束 → 震度速報」是先后关系，不是同时。
   // 留 HERO_HOLD 秒是为了让人看清「第 7 报 / 終報」那一行，不然最后一报一闪就没。
   // 注意：收的是卡片，地图上的震度场/海啸继续留着，那才是后面该看的东西。
-  const HERO_HOLD = 6;
+  const HERO_HOLD = 120;   // 终报之后卡片保留 120 秒（原来是 6 秒，最后一报一闪就没）
   function sinceFinal(ev) {
     return ev.isSim
       ? Math.max(0, elapsedOf(ev) - (ev.sim_t || 0))
@@ -710,25 +711,31 @@
   // 底图配色：深色 / 浅色两套。浅色模式下海是浅灰蓝、陆是近白，
   // 经纬网、海岸线、国界都换成深一点的灰蓝，免得整张图糊成一片白。
   const MPAL = {
+    // 和 ui.css 的「炭黑 / 米白 / 琥珀」同一套：海是暖炭，陆是暖灰，
+    // 经纬网用旧纸的暖白，不再走蓝黑科技风。
     dark: {
-      sea: ['#081320', '#060d16', '#04090f'],
-      grid: 'rgba(120,180,225,.075)', gridTxt: 'rgba(120,150,190,.28)',
-      land: '#152230', land2: '#18293a',
-      coast: 'rgba(96,142,188,.55)', coast2: 'rgba(104,152,200,.6)',
-      border: 'rgba(158,198,236,.62)', scs: 'rgba(140,178,214,.55)',
-      pref: 'rgba(158,203,240,', gq: 'rgba(122,168,210,.30)',
-      chip: 'rgba(6,10,16,.82)', knock: 'rgba(4,8,13,.45)',
-      tagBg: 'rgba(8,13,20,.86)', tagFg: '#ffd7cf',
+      sea: ['#0e0c0a', '#0b0a08', '#090807'],
+      grid: 'rgba(220,200,160,.075)', gridTxt: 'rgba(210,195,165,.28)',
+      land: '#25211b', land2: '#2b261f',
+      coast: 'rgba(170,155,130,.55)', coast2: 'rgba(180,165,140,.60)',
+      border: 'rgba(210,195,165,.55)', scs: 'rgba(190,175,150,.45)',
+      pref: 'rgba(210,195,165,', gq: 'rgba(175,162,140,.28)',
+      chip: 'rgba(12,10,8,.88)', knock: 'rgba(8,7,6,.50)',
+      tagBg: 'rgba(16,14,11,.94)', tagFg: '#f0d2c4',
+      stIdle: 'rgba(206,196,178,.18)', stIdle2: 'rgba(206,196,178,.26)',
+      stIdle3: 'rgba(206,196,178,.32)', stHollow: 'rgba(206,196,178,.30)',
     },
     light: {
-      sea: ['#eef4fa', '#e6eef7', '#dfe9f3'],
-      grid: 'rgba(70,110,155,.13)', gridTxt: 'rgba(60,90,125,.55)',
-      land: '#fcfdfe', land2: '#f8fafc',
-      coast: 'rgba(120,150,180,.62)', coast2: 'rgba(110,142,175,.66)',
-      border: 'rgba(60,100,150,.60)', scs: 'rgba(90,120,160,.55)',
-      pref: 'rgba(90,125,165,', gq: 'rgba(90,120,155,.32)',
-      chip: 'rgba(255,255,255,.90)', knock: 'rgba(255,255,255,.55)',
-      tagBg: 'rgba(255,255,255,.94)', tagFg: '#8a2f22',
+      sea: ['#d2cab8', '#cdc5b2', '#c8bfac'],
+      grid: 'rgba(70,58,40,.15)', gridTxt: 'rgba(64,54,38,.60)',
+      land: '#fffdf6', land2: '#faf6eb',
+      coast: 'rgba(100,88,66,.62)', coast2: 'rgba(90,78,58,.66)',
+      border: 'rgba(60,50,35,.58)', scs: 'rgba(85,73,54,.52)',
+      pref: 'rgba(80,68,48,', gq: 'rgba(100,88,65,.32)',
+      chip: 'rgba(253,250,243,.94)', knock: 'rgba(253,250,243,.60)',
+      tagBg: 'rgba(255,252,245,.96)', tagFg: '#6e2a1c',
+      stIdle: 'rgba(92,82,64,.30)', stIdle2: 'rgba(92,82,64,.38)',
+      stIdle3: 'rgba(92,82,64,.46)', stHollow: 'rgba(92,82,64,.42)',
     },
   };
   let PAL = MPAL.dark;
@@ -998,13 +1005,21 @@
     if (r < 46) return;
     const x = px(ev.lon) - r, y = py(ev.lat);
     if (x < 46 || y < 70 || y > view.h - 40) return;
-    ctx.font = '700 9.5px ui-monospace,monospace';
-    const w = ctx.measureText(text).width;
-    ctx.fillStyle = 'rgba(5,9,14,.78)';
-    roundRect(ctx, x - w / 2 - 5, y - 8, w + 10, 15, 4);
-    ctx.fill();
-    ctx.fillStyle = color;
-    ctx.fillText(text, x - w / 2, y + 3);
+    const font = '700 9.5px ui-monospace,monospace';
+    later(() => {
+      ctx.font = font;
+      const w = ctx.measureText(text).width;
+      ctx.save();
+      ctx.fillStyle = 'rgba(5,9,14,.88)';
+      roundRect(ctx, x - w / 2 - 5, y - 8, w + 10, 15, 4);
+      ctx.fill();
+      ctx.strokeStyle = color; ctx.globalAlpha = .28; ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = color;
+      ctx.fillText(text, x - w / 2, y + 3);
+      ctx.restore();
+    });
   }
 
   // ---------------- 视野自适应（起手取景 + P 波撞边大步拉远） ----------------
@@ -1019,6 +1034,21 @@
     if (!vTween) return;
     const p = clamp((performance.now() - vTween.t0) / vTween.dur, 0, 1);
     const e = 1 - Math.pow(1 - p, 3);          // easeOutCubic：起步快、落点稳，不会拖泥带水
+    if (vTween.mode === 'arc') {
+      // 切地震的运镜：缩小、平移、再放大，全程一条曲线跑完。
+      // 缩放走对数空间的贝塞尔（控制点在中途最低视野上）——前半程压低、
+      // 后半程拉回，恰好和「两头慢、中间快」的平移同步：视野最低的那一段
+      // 正是走得最快的一段，看起来就是先拉远、掠过去、再俯冲下来。
+      const q = 1 - p;
+      view.s = Math.exp(q * q * vTween.L0 + 2 * q * p * vTween.Lc + p * p * vTween.L1);
+      const pe = p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2;   // easeInOutCubic
+      view.tx = view.w / 2 - (vTween.wx0 + (vTween.wx1 - vTween.wx0) * pe) * view.s;
+      view.ty = view.h / 2 - (vTween.wy0 + (vTween.wy1 - vTween.wy0) * pe) * view.s;
+      clampView();
+      baseDirty = fieldDirty = true;
+      if (p >= 1) vTween = null;
+      return;
+    }
     const s = vTween.s0 + (vTween.s1 - vTween.s0) * e;
     view.s = s;
     if (vTween.mode === 'fly') {
@@ -1045,6 +1075,40 @@
     const ty1 = view.h / 2 - (merc(WORLD.lat1) - merc(lat)) * sTo;
     vTween = { t0: performance.now(), dur: dur || 620, mode: 'fly',
       s0: view.s, s1: sTo, tx0: view.tx, ty0: view.ty, tx1: tx1, ty1: ty1 };
+  }
+  // 切到一场离得远的地震时的运镜：先缩小（和移动同时开始）、掠过中间、
+  // 到了震源再放大回目标视野。距离近到低的那档缩放也装得下时，不折腾，直接直线飞。
+  function flyToSmart(lat, lon, sTo, dur) {
+    if (!(sTo > 0) || !isFinite(sTo) || lat == null || lon == null) return;
+    // 当前画面中心，换算成 scale=1 的世界坐标（经度取最短绕行方向，左右无缝）
+    const cx0 = (view.w / 2 - view.tx) / view.s;
+    const cy0 = (view.h / 2 - view.ty) / view.s;
+    const cy1 = merc(WORLD.lat1) - merc(lat);
+    let dx = (lon - WORLD.lon0) * D2R - cx0;
+    dx = ((dx % WORLD_W) + WORLD_W * 1.5) % WORLD_W - WORLD_W / 2;   // → (-π, π]
+    const cx1 = cx0 + dx;
+    const dist = Math.hypot(cx1 - cx0, cy1 - cy0);
+    const minEdge = Math.min(view.w, view.h);
+    const sMin = Math.min(view.s, sTo);
+    // 在两端较低的缩放下整段路都装得进屏幕 → 没必要先拉远，走原来的直线飞
+    if (dist <= 0 || dist * sMin <= minEdge * 0.55) {
+      flyTo(lat, lon, sTo, dur);
+      return;
+    }
+    // 中途把视野压到「整段路最远时占屏幕 42%」的程度，再贴着下限兜底
+    let sDip = Math.min(minEdge * 0.42 / dist, sMin * 0.985);
+    sDip = Math.max(sDip, view.fit * 0.85);
+    if (sDip >= sMin * 0.985) {
+      flyTo(lat, lon, sTo, dur);
+      return;
+    }
+    // 对数空间贝塞尔：让缩放在中途正好压到 sDip，终点还是 sTo
+    const L0 = Math.log(view.s), L1 = Math.log(sTo);
+    const Lc = 2 * Math.log(sDip) - 0.5 * (L0 + L1);
+    vTween = { t0: performance.now(),
+      dur: Math.round(clamp(650 + dist * 420, 760, 1500)),
+      mode: 'arc', L0: L0, Lc: Lc, L1: L1,
+      wx0: cx0, wy0: cy0, wx1: cx1, wy1: cy1 };
   }
   function cancelViewTween() { vTween = null; }
   function canAutoView() {
@@ -1679,6 +1743,7 @@
   // 地图动态层（地震/波前/测站/标签）。左右无缝：按世界宽度平移画多份，
   // 事情挪到地图另一侧时也能接着显示。
   function paintOverlay(ev, live, histPlaying, elapsed, firstCopy) {
+    LATE.length = 0;                  // 上一帧若有异常没冲掉，别把旧牌子带进来
     if (ev && state.layers.waves && (live || histPlaying) && elapsed > 0.6) {
       // 多事件波前：同屏最多 waveN 起（1~10，默认 10），主事件最亮
       if (live && !state.historyEvent) {
@@ -1717,6 +1782,9 @@
     drawFocus(ev);
     if (state.simPick.on) drawSimPick();
     if (state.layers.labels) drawLabels();
+    // 最后补「必须压在最上面」的小牌：波前 P/S、震中地名
+    for (let i = 0; i < LATE.length; i++) { try { LATE[i](); } catch (e) { } }
+    LATE.length = 0;
   }
 
   function draw() {
@@ -1727,7 +1795,7 @@
       tipAt = nowSec();
       const pinSt = state.stations.find(s => s.code === state.tipPin);
       const tip = $('#tip');
-      if (pinSt) tip.innerHTML = stationInfoHtml(pinSt);
+      if (pinSt) tip.innerHTML = stationInfoHtml(pinSt, true);
       else { state.tipPin = ''; tip.classList.remove('show', 'pin'); }
     }
     const live0 = !!currentEvent();
@@ -2164,13 +2232,47 @@
     return '';
   }
 
-  function stationInfoHtml(st) {
+  // 悬停只留一行半：站名 + 强度 + 网络/距离。
+  // 以前六行说明（电文时刻、kmoni 图幅、海底网解释……）全贴在鼠标边上，
+  // 一划过台站地图就被盖掉一块；那些只在「点击钉住」时才展开。
+  function stationInfoHtml(st, full) {
     const ev = eventForMap();
     const o = state.obs;
     const jp = st.country === 'JP';
     const obs = nearestObsPoint(st, 8);
     const age = o && o.origin_ts ? Math.max(0, nowSec() - o.origin_ts) : 1e9;
     const fresh = age < 1800;                 // 半小时内的电文才算「这一次」
+
+    if (!full) {
+      const est = ev ? estimate(ev, st.lat, st.lon) : null;
+      let label = '—', risk = 0, kind = jp ? '待机' : '无数据';
+      if (obs && fresh) {
+        risk = SCALE_RISK[obs.p.scale] || 0;
+        label = '震度' + (obs.p.label || '?');
+        kind = age < 300 ? '实测' : '上次实测';
+      } else if (jp && kmoniFresh() && state.kmoni.lv[st.code] !== undefined) {
+        const v = state.kmoni.lv[st.code];
+        const g = kmRiskOf(v);
+        risk = v < 0.5 ? 0 : g;
+        label = '震度' + (v < 0.5 ? 0 : GRADE[g]);
+        kind = '实时';
+      } else if (est && est.risk >= 1) {
+        risk = Math.min(9, est.risk | 0);
+        label = (usesShindo(ev) ? '震度' : '') + est.label;
+        kind = '预计';
+      }
+      const col = (RISK && RISK[risk]) || '#9aa5b1';
+      const meta = [];
+      if (st.net) meta.push(st.net);
+      const area = st.region || st.area;
+      if (area) meta.push(area);
+      if (est && est.R > 0.5) meta.push('距 ' + Math.round(est.R) + ' km');
+      return '<div class="tip-hd"><i style="background:' + col + '"></i><b>' + st.name + '</b>' +
+        '<span class="tv" style="color:' + col + '">' + label + '</span></div>' +
+        '<div class="tip-sub"><em>' + kind + '</em>' +
+        (meta.length ? ' · ' + meta.join(' · ') : '') + '<s>点击钉住</s></div>';
+    }
+
     let h = '<b>' + st.name + '</b> <span class="dimx">' + (st.region || st.area || '') + '</span>';
     h += '<br><span class="dimx">' + (st.net || '代表点') + ' · ' + st.code + ' · ' +
       st.lat.toFixed(2) + '°N ' + st.lon.toFixed(2) + '°E' +
@@ -2446,13 +2548,13 @@
       if (x < -14 || y < -14 || x > view.w + 14 || y > view.h + 14) continue;
       const ga = vals[s.c];
       if (ga === undefined) {                // 这一帧没上报：留个待机暗点，看得出台网在哪
-        ctx.fillStyle = 'rgba(136,168,204,.16)';
+        ctx.fillStyle = PAL.stIdle;
         ctx.beginPath(); ctx.arc(x, y, 1.35, 0, Math.PI * 2); ctx.fill();
         continue;
       }
       const lv = gaLv(ga);
       if (lv < 0.5) {
-        ctx.fillStyle = 'rgba(136,168,204,.26)';
+        ctx.fillStyle = PAL.stIdle2;
         ctx.beginPath(); ctx.arc(x, y, 1.5, 0, Math.PI * 2); ctx.fill();
         continue;
       }
@@ -2750,36 +2852,40 @@
     state.shakeN = hits.length;
     if (!ev) { try { autoFrameShake(hits); } catch (e) { } }
     if (hits.length < SHAKE.minSt) return;   // 单站跳一下不算，至少两个站同时
-    // 东亚视野下日本只有几十像素宽，几十个框会糊成一团绿。按强度取前 N 个，
-    // 且彼此屏幕距离不足 9px 的只留最强那个——放大后照样一个站一个框。
+    // 东亚视野下日本只有几十像素宽，几十个框会糊成一团绿。
+    // 以前先按 9px 去重再画，结果「一片站」被压成两三个点，永远凑不满五个——
+    // 现在去重放到聚簇之后：密的整片合成一个大框，散的才一个站一个小框。
     hits.sort((a, b) => b.v - a.v);
-    const drawn = [];
-    const pick = [];
-    for (let i = 0; i < hits.length && pick.length < SHAKE.max; i++) {
-      const h = hits[i];
-      const hx = px(h.lon), hy = py(h.lat);
-      let dup = false;
-      for (let j = 0; j < drawn.length; j++) {
-        if (Math.abs(drawn[j][0] - hx) < 9 && Math.abs(drawn[j][1] - hy) < 9) { dup = true; break; }
-      }
-      if (dup) continue;
-      drawn.push([hx, hy]);
-      pick.push(h);
-    }
-    // 闪烁：|sin| 让框明暗跳，比单纯透明度渐变更像「报警」
     const blink = 0.35 + 0.65 * Math.abs(Math.sin(nowSec() * SHAKE.hz));
-    ctx.save();
-    ctx.globalAlpha = blink;
-    ctx.strokeStyle = '#4ade80';
-    ctx.lineWidth = 1.9;
-    ctx.lineJoin = 'round';
-    for (let i = 0; i < pick.length; i++) {
-      const h = pick[i];
+    const pts = [];
+    for (const h of hits) {
       const x = px(h.lon), y = py(h.lat);
       if (x < -20 || y < -20 || x > view.w + 20 || y > view.h + 20) continue;
-      const r = 7 + Math.min(5, (h.v - SHAKE.lv) * 1.8);
-      // 圆角方框：四角小圆弧，比直角更像「框住那个站」
-      const w = r * 2, k = 2.4;
+      pts.push({ x, y, v: h.v });
+      if (pts.length >= 260) break;          // 上限只是防极端情况，正常一场地震到不了
+    }
+    const CLUSTER_R = 30;                       // 屏幕 30px 以内算同一簇
+    const groups = [];
+    const used = new Array(pts.length).fill(false);
+    for (let i = 0; i < pts.length; i++) {
+      if (used[i]) continue;
+      used[i] = true;
+      const g = [pts[i]];
+      // 单链扩散：挨着簇里任意一个就并进来（不是只跟头一个比）
+      for (let k = 0; k < g.length; k++) {
+        for (let j = 0; j < pts.length; j++) {
+          if (used[j]) continue;
+          if (Math.hypot(pts[j].x - g[k].x, pts[j].y - g[k].y) <= CLUSTER_R) {
+            used[j] = true; g.push(pts[j]);
+          }
+        }
+      }
+      groups.push(g);
+    }
+    window.__shakeDbg = { hits: hits.length, pick: pts.length, groups: groups.map(g => g.length) };
+    // 单个台站的小框：四角小圆弧，比直角更像「框住那个站」
+    const smallFrame = (x, y, r) => {
+      const k = 2.4;
       ctx.beginPath();
       ctx.moveTo(x - r + k, y - r);
       ctx.lineTo(x + r - k, y - r); ctx.quadraticCurveTo(x + r, y - r, x + r, y - r + k);
@@ -2788,6 +2894,72 @@
       ctx.lineTo(x - r, y - r + k); ctx.quadraticCurveTo(x - r, y - r, x - r + k, y - r);
       ctx.closePath();
       ctx.stroke();
+    };
+    ctx.save();
+    ctx.globalAlpha = blink;
+    ctx.strokeStyle = '#4ade80';
+    ctx.lineWidth = 1.9;
+    ctx.lineJoin = 'round';
+    const smallDrawn = [];                      // 散站的小框：去重 + 封顶，别糊成一片
+    for (const g of groups) {
+      if (g.length >= 5) {
+        let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9, vmax = 0;
+        for (const p of g) {
+          x0 = Math.min(x0, p.x); x1 = Math.max(x1, p.x);
+          y0 = Math.min(y0, p.y); y1 = Math.max(y1, p.y);
+          vmax = Math.max(vmax, p.v);
+        }
+        const pad = 10 + Math.min(6, Math.max(0, vmax - SHAKE.lv) * 1.6);
+        const bx = x0 - pad, by = y0 - pad;
+        const bw = (x1 - x0) + pad * 2, bh = (y1 - y0) + pad * 2;
+        ctx.globalAlpha = blink * .55;
+        ctx.fillStyle = 'rgba(74,222,128,.10)';
+        roundRect(ctx, bx, by, bw, bh, 8);
+        ctx.fill();
+        ctx.globalAlpha = blink;
+        ctx.lineWidth = 2.1;
+        roundRect(ctx, bx, by, bw, bh, 8);
+        ctx.stroke();
+        // 站数小牌：按「这一片里到底有几个站在摇」算，不是按画了几个框
+        let nReal = 0;
+        for (const h of hits) {
+          const hx = px(h.lon), hy = py(h.lat);
+          if (hx >= bx - 3 && hx <= bx + bw + 3 && hy >= by - 3 && hy <= by + bh + 3) nReal++;
+        }
+        const tag = Math.max(g.length, nReal) + ' 站';
+        ctx.font = '700 10px ui-monospace,monospace';
+        const tw = ctx.measureText(tag).width + 12;
+        // 框够大就把站数塞在左上角内侧，贴边不压台站；太窄才挂到框外顶上
+        const inside = bw >= tw + 12 && bh >= 42;
+        const tx = Math.min(view.w - tw - 4, Math.max(4, inside ? bx + 4 : bx));
+        const ty = Math.max(4, inside ? by + 4 : by - 17);
+        // 站数牌不跟着闪：框在跳，数字得一直读得出来，不然一眨眼就没了
+        ctx.save();
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = 'rgba(5,12,9,.90)';
+        roundRect(ctx, tx, ty, tw, 16, 5);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(134,239,172,.40)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        ctx.fillStyle = '#9df5bb';
+        ctx.fillText(tag, tx + 6, ty + 11.5);
+        ctx.restore();
+        ctx.lineWidth = 1.9;
+        OCC.push([tx, ty, tw, 16]);
+      } else {
+        for (const p of g) {
+          if (smallDrawn.length >= SHAKE.max) break;
+          let dup = false;
+          for (const q of smallDrawn) {
+            if (Math.abs(q[0] - p.x) < 9 && Math.abs(q[1] - p.y) < 9) { dup = true; break; }
+          }
+          if (dup) continue;
+          smallDrawn.push([p.x, p.y]);
+          const r = 7 + Math.min(5, (p.v - SHAKE.lv) * 1.8);
+          smallFrame(p.x, p.y, r);
+        }
+      }
     }
     ctx.restore();
   }
@@ -2831,11 +3003,11 @@
       const x = px(st.lon), y = py(st.lat);
       if (x < -20 || y < -20 || x > view.w + 20 || y > view.h + 20) continue;
 
-      let color = 'rgba(150,182,220,.30)', r = 2.2, hollow = false, hot = false, numG = -1;
+      let color = PAL.stIdle, r = 2.2, hollow = false, hot = false, numG = -1;
 
       if (mode === 'idle') {
         // 震度速报已是「地域」级：台站只当底网点缀，不冒充每个点都测到了
-        const col = st.country === 'JP' ? 'rgba(136,168,204,.26)' : 'rgba(132,164,200,.20)';
+        const col = PAL.stIdle;
         if (st.sea) { sea.push([x, y, col, 1.9, 0, -1]); continue; }
         push(x, y, col, 1.9, st.country !== 'JP');
         continue;
@@ -2846,10 +3018,10 @@
         // 平静(-3~0.5)画暗点待机——这正是「平时也能看出测站有没有震动」。
         const v = state.kmoni.lv[st.code];
         if (st.country !== 'JP' || v === undefined) {
-          if (st.country === 'JP') { color = 'rgba(136,168,204,.34)'; r = 2.0; }
-          else { hollow = true; color = 'rgba(132,164,200,.42)'; r = 2.0; }
+          if (st.country === 'JP') { color = PAL.stIdle2; r = 2.0; }
+          else { hollow = true; color = PAL.stHollow; r = 2.0; }
         } else if (v < JP_LIGHT) {
-          color = 'rgba(136,168,204,.40)';   // 真·平静：暗点待机
+          color = PAL.stIdle3;   // 真·平静：暖灰点待机，不再是黑点
           r = 2.0;
         } else if (v < 0.5) {
           // 微动：JP_LIGHT 以上先点亮，黑→蓝→绿连续变亮变大
@@ -2869,7 +3041,7 @@
           // 还没被波扫到 / 已经退干净 —— 画成待机灰点，不要直接 continue。
           // 以前这里一 continue，整场演练地图上只剩震中周围一圈彩色，
           // 日本其余地方一片空白，看着既像「没测站」也像「衰减得飞快」。
-          color = st.country === 'JP' ? 'rgba(136,168,204,.30)' : 'rgba(132,164,200,.24)';
+          color = PAL.stIdle;
           r = 2.0;
           hollow = st.country !== 'JP';
         } else {
@@ -2902,11 +3074,11 @@
           hot = risk >= 5;
           numG = risk;
         } else if (st.country === 'JP') {
-          color = 'rgba(136,168,204,.34)';
+          color = PAL.stIdle2;
           r = 2.0;
         } else {
           hollow = true;
-          color = 'rgba(132,164,200,.42)';
+          color = PAL.stHollow;
           r = 2.0;
         }
       }
@@ -2970,6 +3142,12 @@
     // kmoni 模式下，气象厅电文观测点仍然叠在最上层（带地名标签，更醒目）
     if (real && mode === 'kmoni') drawRealStations(real, ev);
   }
+
+  // 一帧里「必须压在所有人上面」的东西：波前 P/S 小牌、震中名牌。
+  // 它们以前是就地画的，后面 drawStations / drawShakeHints 一铺绿框就把字盖掉，
+  // 看着像两张标签「重合」在一起。现在先登记，等整帧画完再统一补上。
+  const LATE = [];
+  function later(fn) { LATE.push(fn); }
 
   let OCC = [];
   function drawPrefLabels(ev) {
@@ -3047,16 +3225,22 @@
     // 演练：靶标画在「反演出来的震中」上，不是真震中——真震源是要藏起来的。
     const label = (ev.isSim ? '演练 · 推定震源 · ' : ev.isHist ? '历史 · ' : (ev.active === false ? '最近 · ' : '')) +
       String(ev.place || '').replace(/（演练）/g, '').replace(/\(演练\)/g, '') + deep;
-    ctx.font = '600 11px system-ui,"PingFang SC","Hiragino Sans",sans-serif';
-    const w = ctx.measureText(label).width;
-    const bx = x + 13, by = y - 26;
-    ctx.fillStyle = PAL.tagBg;
-    ctx.strokeStyle = 'rgba(255,90,70,.22)';
-    ctx.lineWidth = 1;
-    roundRect(ctx, bx, by, w + 14, 19, 6);
-    ctx.fill(); ctx.stroke();
-    ctx.fillStyle = ev.isSim ? '#ffc46b' : PAL.tagFg;
-    ctx.fillText(label, bx + 7, by + 13);
+    const fg = ev.isSim ? '#ffc46b' : PAL.tagFg;
+    // 名牌压在最后一层：绿框、台站、县块都画完再贴，永远看得清。
+    later(() => {
+      ctx.save();
+      ctx.font = '600 11px system-ui,"PingFang SC","Hiragino Sans",sans-serif';
+      const w = ctx.measureText(label).width;
+      const bx = x + 13, by = y - 26;
+      ctx.fillStyle = PAL.tagBg;
+      ctx.strokeStyle = 'rgba(255,90,70,.26)';
+      ctx.lineWidth = 1;
+      roundRect(ctx, bx, by, w + 14, 19, 7);
+      ctx.fill(); ctx.stroke();
+      ctx.fillStyle = fg;
+      ctx.fillText(label, bx + 7, by + 13);
+      ctx.restore();
+    });
   }
 
   // 多事件适配：其它同时进行的地震用小号震中标出（主事件仍在中心带波前/色块）
@@ -3376,7 +3560,7 @@
     if (near) {
       // 点到台站：把它的观测状态钉在屏幕上（内容随下一拍刷新），再点空白处取消
       state.tipPin = near.code;
-      tip.innerHTML = stationInfoHtml(near);
+      tip.innerHTML = stationInfoHtml(near, true);
       tip.style.left = Math.min(e.clientX, innerWidth - 300) + 'px';
       tip.style.top = Math.min(e.clientY + 14, innerHeight - 40) + 'px';
       tip.classList.add('show', 'pin');
@@ -4048,20 +4232,38 @@
   };
 
   function renderDots() {
-    const box = $('#srcDots');
-    box.innerHTML = state.sources.map(s => {
-      const cls = s.state === 'ok' ? 'ok' : s.state === 'down' ? 'err' : 'wait';
-      const tip = (SHORT[s.id] || s.name_zh) + ' · ' +
-        (s.state === 'ok' ? (s.latency_ms ? s.latency_ms + 'ms' : '正常') :
-          s.state === 'down' ? '连接失败' : s.state === 'stale' ? '缓存' : '连接中') +
-        (s.id === 'globalquake' && s.role ? ' · ' + s.role : '');
-      return '<span class="sd ' + cls + '" data-tip="' + tip + '"></span>';
-    }).join('');
-    const ok = state.sources.filter(s => s.state === 'ok').length;
-    if (state.sources.length) {
+    const list = state.sources || [];
+    const ok = list.filter(s => s.state === 'ok').length;
+    const down = list.some(s => s.state === 'down');
+    const pending = list.some(s => s.state !== 'ok');
+    const led = $('#ssLed');
+    if (led) led.className = 'ss-led ' + (down ? 'err' : pending ? 'wait' : 'ok');
+    const okEl = $('#ssOk'), allEl = $('#ssAll'), stat = $('#srcStat');
+    if (okEl) okEl.textContent = ok;
+    if (allEl) allEl.textContent = list.length;
+    if (stat) {
+      stat.title = '数据源 ' + ok + '/' + list.length +
+        (down ? ' · 有断流' : pending ? ' · 有降级' : ' · 全部正常');
+      stat.classList.toggle('bad', down);
+      stat.classList.toggle('warn', !down && pending);
+    }
+    const pop = $('#srcPop');
+    if (pop) {
+      pop.innerHTML = list.map(s => {
+        const cls = s.state === 'ok' ? 'ok' : s.state === 'down' ? 'err' : 'wait';
+        const stateTxt = s.state === 'ok'
+          ? (s.latency_ms ? s.latency_ms + ' ms' : '正常')
+          : s.state === 'down' ? '断流'
+            : s.state === 'stale' ? '缓存' : '连接中';
+        const extra = (s.id === 'globalquake' && s.role) ? ' · ' + s.role : '';
+        return '<div class="srcrow ' + cls + '"><i></i><b>' +
+          (SHORT[s.id] || s.name_zh || s.id) + '</b><span>' + stateTxt + extra + '</span></div>';
+      }).join('') || '<div class="srcrow"><b>暂无数据源</b></div>';
+    }
+    if (list.length) {
       $('#quietTxt').textContent = (state.sim && state.sim.pending)
         ? '演练 · 台站检测中（还没有台站报到）'
-        : '监听中 · ' + ok + '/' + state.sources.length + ' 源正常';
+        : '监听中 · ' + ok + '/' + list.length + ' 源正常';
     }
   }
 
@@ -4966,8 +5168,40 @@
     }));
   }
 
-  function renderObsCard() {
+  // 速报卡「贴」在事件卡下面。事件卡高度会变（读数换行、推算段出现、公式展开），
+  // 以前只在每秒一次的轮询里重算，最多有 1 秒停在旧位置——那 1 秒就是两张卡叠在一起。
+  // 现在直接盯 #hero 的尺寸变化（ResizeObserver），高度一动立刻跟。
+  function positionObsCard() {
     const box = $('#obsCard');
+    if (!box || box.hidden) return;
+    const h = $('#hero');
+    const top = (h && !h.hidden) ? Math.round(h.getBoundingClientRect().bottom + 10) : 82;
+    box.style.top = top + 'px';
+    // 下限看着左下角的「最近地震」：事件卡特别长的时候，速报卡自己滚，
+    // 别把最近地震列表压掉一半（那也是「两张卡叠在一起」）。
+    let limit = document.documentElement.clientHeight - 16;
+    const rc = document.getElementById('recent');
+    if (rc) {
+      const rr = rc.getBoundingClientRect();
+      if (rr.height > 40 && rr.top > 120) limit = rr.top - 10;
+    }
+    const room = limit - top;
+    if (room > 150 && box.scrollHeight > room) {
+      box.style.maxHeight = room + 'px';
+      box.style.overflowY = 'auto';
+    } else {
+      box.style.maxHeight = '';
+      box.style.overflowY = '';
+    }
+  }
+  try {
+    const ro = new ResizeObserver(positionObsCard);
+    const heroEl = $('#hero');
+    if (heroEl) ro.observe(heroEl);
+    window.addEventListener('resize', positionObsCard);
+  } catch (e) { }
+
+  function renderObsCard() {    const box = $('#obsCard');
     if (!box) return;
     // 位置和事件卡是同一个（左上），所以速报在的时候要让「监听中」那颗绿点让开
     const setObs = v => {
@@ -4977,11 +5211,7 @@
       }
       // 速报卡和事件卡同在左上角：事件卡还在时把速报卡顺延到它下面，
       // 两张都看得见（震度速報 常常和 EEW 的续报同时在线）。
-      if (v) {
-        const h = $('#hero');
-        box.style.top = (h && !h.hidden)
-          ? Math.round(h.getBoundingClientRect().bottom + 10) + 'px' : '82px';
-      }
+      if (v) positionObsCard();
     };
     const o = state.obs;
     if (!o || !o.pref || !Object.keys(o.pref).length) {
@@ -5198,7 +5428,7 @@
   function flyHome(dur) {
     lastFocusUid = '';                 // 同一场地震下一报还能重新居中
     atHome = true;
-    flyTo(HOME_MID.lat, HOME_MID.lon, homeScale(), dur || 900);
+    flyToSmart(HOME_MID.lat, HOME_MID.lon, homeScale(), dur || 900);
   }
 
   function followView() {
@@ -5235,7 +5465,7 @@
     const sTo = ev.auto ? homeScale() * 5
       : near ? Math.max(view.s, homeScale() * 1.6)
         : homeScale() * 1.1;
-    flyTo(ev.lat, ev.lon, sTo, 620);
+    flyToSmart(ev.lat, ev.lon, sTo, 620);
     estKey = '';
   }
 
@@ -5967,6 +6197,200 @@
     logDlg.addEventListener('click', e => { if (e.target === logDlg) logDlg.close(); });
   }
 
+  // ---------------- 安装 / 更新 / 卸载 ----------------
+  // 这三个动作都在本机起进程：下载安装包、跑安装程序、跑卸载程序。
+  // 服务端只负责起进程，界面负责把「装完窗口会自己关」说在前面——
+  // 不提前说，用户会以为程序崩了。
+  const APPU = { info: null, timer: 0, armed: 0, busy: false };
+
+  function updNote(t, warn) {
+    const n = $('#updNote');
+    if (!n) return;
+    n.textContent = t || '—';
+    n.classList.toggle('warn', !!warn);
+  }
+
+  function updBar(v) {
+    const bar = $('#updBar'), fill = $('#updFill');
+    if (!bar) return;
+    if (v == null) { bar.hidden = true; fill.style.width = '0%'; return; }
+    bar.hidden = false;
+    fill.style.width = Math.max(0, Math.min(100, v)) + '%';
+  }
+
+  function updReset(msg, warn) {
+    APPU.busy = false;
+    const go = $('#btnUpdGo');
+    if (go) { go.disabled = false; go.textContent = '下载并安装'; }
+    if (msg) updNote(msg, warn);
+  }
+
+  async function loadAppInfo() {
+    const mode = $('#updMode');
+    if (!mode) return;
+    let d;
+    try {
+      const r = await fetch('/api/app/info', { cache: 'no-store' });
+      d = await r.json();
+    } catch (e) {
+      mode.textContent = '服务未响应';
+      mode.classList.add('off');
+      updNote('读不到安装信息：' + e.message, true);
+      return;
+    }
+    APPU.info = d;
+    $('#updCur').textContent = 'v' + (d.version || '—');
+    const installed = !!d.installed;
+    mode.textContent = installed ? '已安装' : '便携版 · 未安装';
+    mode.classList.toggle('off', !installed);
+    const un = $('#btnUninstall'), hint = $('#uninstHint');
+    let base;
+    if (installed) {
+      base = '安装位置：' + d.dir + (d.installed_at ? '　·　' + d.installed_at : '');
+      un.disabled = false;
+      hint.textContent = '卸载会删除程序文件，可选择保留设置与录像';
+    } else {
+      base = '正在直接运行 exe。装成安装版才有桌面/开始菜单快捷方式、自动更新和「应用和功能」里的卸载项。';
+      un.disabled = true;
+      hint.textContent = '便携版没有安装记录：直接删掉程序文件夹即可';
+    }
+    updNote(d.frozen ? base : base + '　·　源码运行，自动安装不可用', !installed || !d.frozen);
+    updBar(null);
+  }
+
+  async function checkUpdateUI(force) {
+    const b = $('#btnUpdCheck');
+    if (!b) return;
+    b.disabled = true; b.textContent = '检查中…';
+    updNote('正在连接更新服务器…');
+    let d = null;
+    try {
+      const r = await fetch('/api/update/check?force=' + (force ? 1 : 0), { cache: 'no-store' });
+      d = await r.json();
+    } catch (e) {
+      updNote('检查失败：服务未响应', true);
+    }
+    b.disabled = false; b.textContent = '检查更新';
+    if (!d) return;
+    if (!d.ok) { updNote('检查失败：' + (d.error || '连不上更新服务器'), true); return; }
+    if (!d.has) {
+      $('#btnUpdGo').hidden = true;
+      updNote('已是最新版本 v' + d.current);
+      return;
+    }
+    const first = String(d.notes || '').split('\n').filter(Boolean)[0] || '';
+    updNote('发现新版本 v' + d.latest + (first ? '　·　' + first : ''), false);
+    const go = $('#btnUpdGo');
+    go.hidden = false;
+    go.disabled = !(APPU.info && APPU.info.frozen);
+    if (go.disabled) updNote('发现 v' + d.latest + '，但源码运行模式不能自动安装，请用安装包升级。', true);
+  }
+
+  function pollUpdate() {
+    clearTimeout(APPU.timer);
+    APPU.timer = setTimeout(async () => {
+      let s;
+      try {
+        const r = await fetch('/api/update/status', { cache: 'no-store' });
+        s = await r.json();
+      } catch (e) {
+        updReset('读不到下载进度：服务已退出或未响应', true);
+        return;
+      }
+      if (s.state === 'downloading') {
+        const p = s.pct || 0;
+        updBar(p);
+        updNote('正在下载 v' + (s.ver || '') + '　' + p + '%');
+        pollUpdate();
+        return;
+      }
+      if (s.state === 'error') { updReset('下载失败：' + (s.error || '未知错误'), true); return; }
+      if (s.state === 'ready') {
+        updBar(100);
+        updNote('下载完成，正在启动安装程序：这个窗口会自己关掉，装完自动重新打开。');
+        installUpdate();
+        return;
+      }
+      updReset('下载没有开始，稍后再试一次', true);
+    }, 700);
+  }
+
+  function installUpdate() {
+    const go = $('#btnUpdGo');
+    if (go) { go.disabled = true; go.textContent = '安装中…'; }
+    fetch('/api/update/install', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
+    }).then(() => {
+      updNote('安装程序已启动，本窗口将在几秒内关闭…');
+    }).catch(e => {
+      updReset('启动安装程序失败：' + e.message, true);
+    });
+  }
+
+  async function downloadUpdate() {
+    if (APPU.busy) return;
+    APPU.busy = true;
+    const go = $('#btnUpdGo');
+    go.disabled = true; go.textContent = '下载中…';
+    updBar(0);
+    updNote('正在下载安装包…');
+    let d = null;
+    try {
+      const r = await fetch('/api/update/download', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ force: true }),
+      });
+      d = await r.json();
+    } catch (e) {
+      updReset('下载启动失败：' + e.message, true);
+      return;
+    }
+    if (!d || !d.ok) { updReset('下载启动失败：' + ((d && d.error) || '未知错误'), true); return; }
+    pollUpdate();
+  }
+
+  (function initUpdateUI() {
+    if (!$('#updCur')) return;
+    $('#btnUpdCheck').addEventListener('click', () => checkUpdateUI(true));
+    $('#btnUpdGo').addEventListener('click', downloadUpdate);
+    $('#btnUpdDir').addEventListener('click', async () => {
+      try {
+        const r = await fetch('/api/app/openfolder', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
+        });
+        const d = await r.json();
+        if (!d.ok) toast('打不开文件夹：' + (d.error || ''));
+      } catch (e) { toast('打不开文件夹'); }
+    });
+    const b = $('#btnUninstall');
+    b.addEventListener('click', async () => {
+      if (!APPU.armed) {
+        APPU.armed = setTimeout(() => {
+          APPU.armed = 0; b.classList.remove('arm'); b.textContent = '卸载';
+        }, 4000);
+        b.classList.add('arm');
+        b.textContent = '再点一次确认';
+        return;
+      }
+      clearTimeout(APPU.armed); APPU.armed = 0;
+      b.classList.remove('arm'); b.textContent = '卸载'; b.disabled = true;
+      let d = null;
+      try {
+        const r = await fetch('/api/uninstall', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
+        });
+        d = await r.json();
+      } catch (e) { d = { ok: false, error: e.message }; }
+      if (d && d.ok) {
+        updNote('卸载程序已启动：可以勾选「保留设置、账号与录像」，本窗口随后关闭。');
+      } else {
+        b.disabled = false;
+        updNote('卸载失败：' + ((d && d.error) || '未知错误'), true);
+      }
+    });
+    loadAppInfo();
+  })();
+
   if (statsDlg) {
     const openStats = () => {
       if (!statsDlg.open) statsDlg.showModal();
@@ -6123,6 +6547,106 @@
       } finally {
         bp.disabled = false; bp.textContent = old;
       }
+    });
+  }
+
+  // ---- 网盘备份（WebDAV，录像自动上传） ----
+  const cloudEls = {
+    on: $('#optCloud'), url: $('#optCloudUrl'), folder: $('#optCloudFolder'),
+    user: $('#optCloudUser'), pass: $('#optCloudPass'),
+    hint: $('#cloudHint'), test: $('#btnCloudTest'),
+    sync: $('#btnCloudSync'), save: $('#btnCloudSave'),
+  };
+  function cloudPayload() {
+    return {
+      enabled: !!cloudEls.on.checked,
+      url: (cloudEls.url.value || '').trim(),
+      folder: (cloudEls.folder.value || '').trim() || '震线EEW',
+      user: (cloudEls.user.value || '').trim(),
+      pass: cloudEls.pass.value || '',
+    };
+  }
+  async function loadCloud() {
+    if (!cloudEls.on) return;
+    try {
+      const r = await fetch('/api/cloud/status');
+      const j = await r.json();
+      if (!j.ok) return;
+      cloudEls.on.checked = !!j.enabled;
+      cloudEls.url.value = j.url || '';
+      cloudEls.folder.value = j.folder || '震线EEW';
+      cloudEls.user.value = j.user || '';
+      cloudEls.pass.value = '';
+      cloudEls.pass.placeholder = j.has_pass ? '留空 = 沿用已保存的密码' : '应用密码';
+      cloudEls.hint.textContent = (j.enabled
+        ? '已开启 · 已上传 ' + (j.uploaded || 0) + ' 个录像'
+          + (j.queued ? '，排队中 ' + j.queued : '')
+        : '未开启')
+        + (j.last_err ? '，最近错误：' + j.last_err : '');
+    } catch (e) {
+      cloudEls.hint.textContent = '状态读取失败';
+    }
+  }
+  function pollCloudSync() {
+    const t = setInterval(async () => {
+      try {
+        const r = await fetch('/api/cloud/status');
+        const j = await r.json();
+        if (!j.ok) { clearInterval(t); return; }
+        cloudEls.hint.textContent = '补传中…已上传 ' + (j.uploaded || 0) + ' 个录像';
+        if (!j.syncing) {
+          clearInterval(t);
+          loadCloud();
+          toast('网盘补传完成');
+        }
+      } catch (e) { clearInterval(t); }
+    }, 2000);
+  }
+  if (cloudEls.on) {
+    if (cloudEls.save) cloudEls.save.addEventListener('click', async () => {
+      cloudEls.save.disabled = true;
+      try {
+        const r = await fetch('/api/cloud/save', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(cloudPayload()),
+        });
+        const j = await r.json();
+        if (j.ok) { toast('网盘备份设置已保存'); loadCloud(); }
+        else toast('保存失败：' + (j.error || '未知错误'), 5000);
+      } catch (e) { toast('保存失败：' + e.message, 5000); }
+      finally { cloudEls.save.disabled = false; }
+    });
+    if (cloudEls.test) cloudEls.test.addEventListener('click', async () => {
+      cloudEls.test.disabled = true;
+      const old = cloudEls.test.textContent;
+      cloudEls.test.textContent = '测试中…';
+      try {
+        const r = await fetch('/api/cloud/test', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(cloudPayload()),
+        });
+        const j = await r.json();
+        if (j.ok) {
+          cloudEls.hint.textContent = '连接测试通过，远程目录可写';
+          toast('网盘连接成功');
+        } else {
+          cloudEls.hint.textContent = '测试失败：' + (j.error || '未知错误');
+          toast('连接失败：' + (j.error || '未知错误'), 6000);
+        }
+      } catch (e) { toast('连接失败：' + e.message, 6000); }
+      finally { cloudEls.test.disabled = false; cloudEls.test.textContent = old; }
+    });
+    if (cloudEls.sync) cloudEls.sync.addEventListener('click', async () => {
+      cloudEls.sync.disabled = true;
+      try {
+        const r = await fetch('/api/cloud/sync', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
+        });
+        const j = await r.json();
+        if (j.ok) { cloudEls.sync.textContent = '补传中…'; pollCloudSync(); }
+        else toast('补传失败：' + (j.error || '未知错误'), 5000);
+      } catch (e) { toast('补传失败：' + e.message, 5000); }
+      finally { setTimeout(() => { cloudEls.sync.disabled = false; cloudEls.sync.textContent = '立即补传'; }, 3000); }
     });
   }
 
@@ -6679,6 +7203,8 @@
   });
   $('#btnSettings').addEventListener('click', () => {
     paintFocus(); dlg.showModal(); loadMyTokens(); loadSrcTokens();
+    try { loadAppInfo(); } catch (e) { }
+    try { loadCloud(); } catch (e) { }
   });
 
   $('#btnImport').addEventListener('click', async () => {
@@ -6858,6 +7384,51 @@
     renderAll();
   });
 
+  const srcStat = $('#srcStat'), srcPop = $('#srcPop');
+  // 数据源面板以前是「绝对定位 left:0 / top:46」，正好盖在左上角的事件卡与
+  // 震度速報卡身上——两张面板叠着，谁的字都看不清。现在算一次位置：
+  // 宽屏时贴着左列右边展开（只压地图），窄屏退回状态格下面、把卡片暂时淡出。
+  function placeSrcPop() {
+    if (!srcPop || !srcStat || srcPop.hidden) return;
+    const host = srcPop.offsetParent || srcPop.parentElement;
+    const hb = host.getBoundingClientRect();
+    const cb = srcStat.getBoundingClientRect();
+    const vw = document.documentElement.clientWidth;
+    const vh = document.documentElement.clientHeight;
+    const w = Math.min(312, vw - 32);
+    srcPop.style.width = w + 'px';
+    srcPop.style.maxHeight = Math.max(180, vh - 92) + 'px';
+    // 左列卡片：left 20 + width 322 → 右边界 342，再留 12 的缝
+    const cardRight = 354;
+    const wide = vw >= 780 && hb.left + cardRight + w <= vw - 12;
+    const left = wide ? (cardRight - hb.left) : (cb.left - hb.left + 2);
+    const top = wide ? (cb.top - hb.top) : (cb.bottom - hb.top + 6);
+    srcPop.style.left = Math.max(0, Math.round(left)) + 'px';
+    srcPop.style.top = Math.max(0, Math.round(top)) + 'px';
+    document.body.classList.toggle('pop-on', !wide);
+  }
+  function closeSrcPop() {
+    if (!srcPop) return;
+    srcPop.hidden = true;
+    document.body.classList.remove('pop-on');
+    if (srcStat) srcStat.setAttribute('aria-expanded', 'false');
+  }
+  if (srcStat && srcPop) {
+    srcStat.addEventListener('click', e => {
+      e.stopPropagation();
+      srcPop.hidden = !srcPop.hidden;
+      srcStat.setAttribute('aria-expanded', srcPop.hidden ? 'false' : 'true');
+      if (!srcPop.hidden) placeSrcPop();
+      else document.body.classList.remove('pop-on');
+    });
+    document.addEventListener('click', e => {
+      if (srcPop.hidden) return;
+      if (srcPop.contains(e.target) || srcStat.contains(e.target)) return;
+      closeSrcPop();
+    });
+    window.addEventListener('resize', placeSrcPop);
+    document.addEventListener('keydown', e => { if (e.key === 'Escape' && !srcPop.hidden) closeSrcPop(); });
+  }
   $('#heroClose').addEventListener('click', () => {
     if (state.historyEvent) {
       state.historyEvent = null;
@@ -7054,6 +7625,7 @@
     baseDirty = fieldDirty = true;
   };
   window.__viewProbe = () => view.s;      // 调试钩子：读当前缩放
+  window.__fly = flyToSmart;              // 调试钩子：跑一次切震运镜（远=弧线，近=直线）
   // 调试钩子：走时 / 反演同一套公式，方便对数（__tt(300,10) → P/S 走时）
   window.__tt = (delta, depth, model) => travelInfo(delta, depth, model);
   window.__ttModel = ttModelFor;

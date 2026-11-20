@@ -1292,8 +1292,13 @@ def now_ts():
     return time.time()
 
 
-def is_active(e, now=None, max_age=300):
-    """预警是否仍在有效窗口内（避免把几天前的旧速报当成警报）"""
+def is_active(e, now=None, max_age=900):
+    """预警是否仍在有效窗口内（避免把几天前的旧速报当成警报）
+
+    终报之后不能立刻把事件从 eew_list 里拿掉：前端还要把「第 N 报 / 終報」
+    留 120 秒给人看清。所以 final 单独按 report_ts 算 120 秒；
+    未终报的给 15 分钟窗口，避免长序列（或源端短暂抖动）在终报前就被判死。
+    """
     if not e:
         return False
     now = now or time.time()
@@ -1303,6 +1308,9 @@ def is_active(e, now=None, max_age=300):
     if not o:
         return False
     age = now - o
+    if e.get("final"):
+        r = e.get("report_ts") or o
+        return -60 <= age and (now - r) <= 120
     return -60 <= age <= max_age
 
 

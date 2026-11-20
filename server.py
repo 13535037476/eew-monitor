@@ -8,6 +8,7 @@ import copy
 import hashlib
 import json
 import ssl
+import subprocess
 import math
 import re
 import os
@@ -15,6 +16,7 @@ import queue
 import random
 import shutil
 import sys
+import tempfile
 import threading
 import time
 import traceback
@@ -81,7 +83,190 @@ def user_dir(name):
 
 def user_file(name, fn):
     return os.path.join(user_dir(name), fn)
-VERSION = "1.30.0"
+VERSION = "1.35.0"
+APP_NAME = "震线 EEW"
+HOMEPAGE = "https://github.com/13535037476/eew-monitor"
+INSTALL_FILE = os.path.join(APP_DIR, "install.json")
+UNINSTALLER = os.path.join(APP_DIR, "uninstall.exe")
+UPDATE_URL_DEFAULT = "https://raw.githubusercontent.com/13535037476/eew-monitor/main/update.json"
+UPDATE_URL_GH_API = "https://api.github.com/repos/13535037476/eew-monitor/releases/latest"
+
+# ---------------------------------------------------------------- 安装 / 更新
+# 安装包会在安装目录写一份 install.json；便携版（直接双击 exe）没有这个文件。
+# 设置里的「卸载」和「检查更新」都靠它判断自己是被安装的还是一份绿色版。
+_UPDATE_LOCK = threading.Lock()
+_UPDATE_CACHE = {"at": 0.0, "data": None}
+_DL = {"state": "idle", "pct": 0, "path": "", "error": "", "ver": "", "at": 0.0}
+
+
+def _install_info():
+    info = {}
+    try:
+        with open(INSTALL_FILE, encoding="utf-8") as f:
+            info = json.load(f) or {}
+    except Exception:
+        info = {}
+    has_uninst = os.path.isfile(UNINSTALLER)
+    return {
+        "app": APP_NAME,
+        "version": VERSION,
+        "dir": APP_DIR,
+        "frozen": FROZEN,
+        "installed": bool(has_uninst and info.get("version")),
+        "install_version": str(info.get("version") or ""),
+        "installed_at": str(info.get("installed_at") or ""),
+        "uninstaller": UNINSTALLER if has_uninst else "",
+        "update_url": str(info.get("update_url") or UPDATE_URL_DEFAULT),
+        "homepage": str(info.get("homepage") or HOMEPAGE),
+        "portable": not bool(has_uninst and info.get("version")),
+    }
+
+
+def _vtuple(s):
+    nums = re.findall(r"\d+", str(s or ""))
+    t = tuple(int(x) for x in nums[:3])
+    return t + (0,) * (3 - len(t))
+
+
+def _fetch_json(url, timeout=5):
+    req = urllib.request.Request(url, headers={
+        "User-Agent": "EEWMonitor/" + VERSION,
+        "Accept": "application/json",
+    })
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        raw = r.read(400000)
+    return json.loads(raw.decode("utf-8", "replace"))
+
+
+def _manifest(d):
+    """吃得下两种格式：自己写的 update.json，和 GitHub 的 releases/latest。"""
+    if not isinstance(d, dict):
+        return None
+    if "tag_name" in d:
+        url = ""
+        for a in (d.get("assets") or []):
+            n = (a.get("name") or "").lower()
+            if n.endswith(".exe"):
+                url = a.get("browser_download_url") or ""
+                if "setup" in n:
+                    break
+        body = d.get("body") or ""
+        return {"version": str(d.get("tag_name") or "").lstrip("vV"), "url": url,
+                "notes": body[:4000], "published": str(d.get("published_at") or "")[:19].replace("T", " ")}
+    url = d.get("url") or d.get("download") or d.get("setup") or ""
+    return {"version": str(d.get("version") or "").lstrip("vV"), "url": url,
+            "notes": str(d.get("notes") or "")[:4000], "published": str(d.get("published") or ""),
+            "sha256": str(d.get("sha256") or "")}
+
+
+def check_update(force=False):
+    """查更新。成功/失败都缓存 10 分钟，force=True 时强制重查。"""
+    now = time.time()
+    with _UPDATE_LOCK:
+        if not force and _UPDATE_CACHE["data"] is not None and now - _UPDATE_CACHE["at"] < 600:
+            return _UPDATE_CACHE["data"]
+
+    info = _install_info()
+    urls = [info.get("update_url"), UPDATE_URL_DEFAULT, UPDATE_URL_GH_API]
+    seen, err = set(), ""
+    for u in urls:
+        if not u or u in seen:
+            continue
+        seen.add(u)
+        try:
+            m = _manifest(_fetch_json(u))
+            if not m or not m.get("version"):
+                continue
+            cur, new = _vtuple(VERSION), _vtuple(m["version"])
+            out = {"ok": True, "current": VERSION, "latest": m["version"],
+                   "has": new > cur, "url": m.get("url") or "", "notes": m.get("notes") or "",
+                   "published": m.get("published") or "", "source": u, "at": int(now)}
+            with _UPDATE_LOCK:
+                _UPDATE_CACHE.update({"at": now, "data": out})
+            return out
+        except Exception as e:
+            err = "%s" % e
+    out = {"ok": False, "current": VERSION, "has": False, "error": err or "连不上更新服务器",
+           "at": int(now)}
+    with _UPDATE_LOCK:
+        _UPDATE_CACHE.update({"at": now, "data": out})
+    return out
+
+
+def _download_thread(url, dst, ver, sha=""):
+    try:
+        _DL.update({"state": "downloading", "pct": 0, "path": "", "error": "", "ver": ver})
+        req = urllib.request.Request(url, headers={"User-Agent": "EEWMonitor/" + VERSION})
+        h = hashlib.sha256()
+        got = total = 0
+        with urllib.request.urlopen(req, timeout=60) as r, open(dst, "wb") as f:
+            try:
+                total = int(r.headers.get("Content-Length") or 0)
+            except Exception:
+                total = 0
+            while True:
+                b = r.read(256 * 1024)
+                if not b:
+                    break
+                f.write(b)
+                h.update(b)
+                got += len(b)
+                if total:
+                    _DL["pct"] = min(99, int(got * 100 / total))
+        if got < 1024 * 512:
+            raise RuntimeError("下载到的文件太小（%d 字节），可能不是安装包" % got)
+        if sha and h.hexdigest().lower() != sha.lower():
+            raise RuntimeError("校验不一致，文件可能被改过")
+        _DL.update({"state": "ready", "pct": 100, "path": dst, "error": "", "ver": ver})
+    except Exception as e:
+        _DL.update({"state": "error", "pct": 0, "error": str(e), "ver": ver})
+
+
+def start_update_download(force=False):
+    """下载安装包到临时目录；已经下过就直接复用。"""
+    if _DL["state"] == "downloading":
+        return dict(ok=True, state="downloading")
+    up = check_update(force)
+    if not up.get("ok"):
+        return {"ok": False, "error": up.get("error") or "检查更新失败"}
+    if not up.get("has"):
+        return {"ok": False, "error": "已经是最新版本 %s" % VERSION}
+    url = up.get("url") or ""
+    if not url.startswith("https://"):
+        return {"ok": False, "error": "更新地址不是 https，拒绝下载"}
+    dst = os.path.join(tempfile.gettempdir(), "震线EEW-Setup-%s.exe" % up["latest"])
+    if os.path.isfile(dst) and os.path.getsize(dst) > 1024 * 512:
+        _DL.update({"state": "ready", "pct": 100, "path": dst, "error": "", "ver": up["latest"]})
+        return {"ok": True, "state": "ready"}
+    threading.Thread(target=_download_thread, args=(url, dst, up["latest"]), daemon=True).start()
+    return {"ok": True, "state": "downloading"}
+
+
+def run_update_installer():
+    """把下载好的安装包拉起来（静默覆盖安装），然后退出本进程。"""
+    p = _DL.get("path") or ""
+    if _DL.get("state") != "ready" or not os.path.isfile(p):
+        return {"ok": False, "error": "还没下载完"}
+    try:
+        subprocess.Popen([p, "/S", "--relaunch"], cwd=os.path.dirname(p), close_fds=True)
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+    threading.Timer(1.2, lambda: os._exit(0)).start()
+    return {"ok": True, "started": True}
+
+
+def run_uninstaller():
+    info = _install_info()
+    if not info["installed"]:
+        return {"ok": False, "error": "这是便携版，没有安装记录：直接删掉程序文件夹就行",
+                "portable": True}
+    try:
+        subprocess.Popen([info["uninstaller"]], cwd=APP_DIR, close_fds=True)
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+    threading.Timer(1.5, lambda: os._exit(0)).start()
+    return {"ok": True, "started": True}
+
 
 # ---------------- 站点所有者 ----------------
 # 这套东西默认是本机一家人用，账号管理（建号/改密/踢设备/替人配密钥）
@@ -2028,6 +2213,7 @@ class Handler(SimpleHTTPRequestHandler):
                 f.write(raw)
         except Exception as exc:
             return self._json({"ok": False, "error": str(exc)[:160]}, 500)
+        _cloud_enqueue(full)  # 开了网盘备份就排队上传
         return self._json({"ok": True, "path": full, "size": len(raw)})
 
     def end_headers(self):
@@ -2223,6 +2409,41 @@ class Handler(SimpleHTTPRequestHandler):
                         continue
                 self._json(data)
                 return
+            if path == "/api/app/info":
+                self._json(dict(ok=True, **_install_info()))
+                return
+            if path == "/api/cloud/status":
+                u = self._user()
+                if not u:
+                    return self._json({"ok": False, "error": "未登录"}, 401)
+                cfg = _cloud_cfg()
+                man = _cloud_manifest()
+                n_ok = sum(1 for v in man.values() if isinstance(v, dict) and v.get("ok"))
+                self._json({
+                    "ok": True,
+                    "enabled": bool(cfg.get("enabled")),
+                    "url": cfg.get("url", ""),
+                    "folder": cfg.get("folder", ""),
+                    "user": cfg.get("user", ""),
+                    "has_pass": bool(cfg.get("pass")),
+                    "uploaded": n_ok,
+                    "queued": _CLOUD_Q.qsize(),
+                    "syncing": _CLOUD_SYNCING,
+                    "last_ok": _CLOUD_STATE["ok"],
+                    "last_fail": _CLOUD_STATE["fail"],
+                    "last_err": _CLOUD_STATE["err"],
+                })
+                return
+            if path == "/api/update/check":
+                qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+                force = (qs.get("force") or ["0"])[0] in ("1", "true", "yes")
+                self._json(check_update(force))
+                return
+            if path == "/api/update/status":
+                self._json({"ok": True, "state": _DL["state"], "pct": _DL["pct"],
+                            "error": _DL["error"], "ver": _DL["ver"],
+                            "ready": _DL["state"] == "ready"})
+                return
             if path == "/api/health":
                 self._json({"ok": True, "version": VERSION,
                             "desktop": DESKTOP, "server_audio": DESKTOP and HAVE_WINSOUND,
@@ -2242,6 +2463,31 @@ class Handler(SimpleHTTPRequestHandler):
         if path == "/api/rec/save":
             return self._rec_save()
         body = self._body()
+        if path in ("/api/cloud/save", "/api/cloud/test", "/api/cloud/sync"):
+            u = self._user()
+            if not u:
+                return self._json({"ok": False, "error": "未登录"}, 401)
+            cfg = _cloud_cfg()
+            new = {
+                "enabled": bool(body.get("enabled", cfg.get("enabled"))),
+                "url": str(body.get("url") or cfg.get("url") or "").strip(),
+                "folder": str(body.get("folder") or cfg.get("folder") or "震线EEW").strip(),
+                "user": str(body.get("user") if body.get("user") is not None else cfg.get("user", "")).strip(),
+                # 密码留空 = 沿用已存的那份（避免前端来回传明文）
+                "pass": str(body.get("pass") or cfg.get("pass", "")),
+            }
+            if path == "/api/cloud/test":
+                ok, err = _cloud_test(new)
+                return self._json({"ok": ok, "error": err})
+            if path == "/api/cloud/save":
+                try:
+                    _cloud_cfg_save(new)
+                except OSError as exc:
+                    return self._json({"ok": False, "error": "写入失败：%s" % exc}, 500)
+                return self._json({"ok": True})
+            # /api/cloud/sync：后台补传，前端轮询 /api/cloud/status 看进度
+            threading.Thread(target=_cloud_catchup, daemon=True).start()
+            return self._json({"ok": True, "message": "补传已在后台开始"})
         # ---- 账号 ----
         if path in ("/api/login", "/api/register"):
             ip = self._client_ip()
@@ -2283,6 +2529,24 @@ class Handler(SimpleHTTPRequestHandler):
             if not u:
                 return self._json({"ok": False, "error": "未登录", "login": True}, 401)
             enter(bucket_of(u))
+        # ---- 安装 / 更新 ----
+        # 只有登录用户能触发下载、安装和卸载（这几个动作都会在本机起进程）。
+        if path == "/api/update/download":
+            self._json(start_update_download(force=bool(body.get("force"))))
+            return
+        if path == "/api/update/install":
+            self._json(run_update_installer())
+            return
+        if path == "/api/uninstall":
+            self._json(run_uninstaller())
+            return
+        if path == "/api/app/openfolder":
+            try:
+                os.startfile(APP_DIR)
+                self._json({"ok": True})
+            except Exception as e:
+                self._json({"ok": False, "error": str(e)[:160]}, 500)
+            return
         if path == "/api/stations/custom":
             u0 = self._user() or {}
             if body.get("user") and body.get("user") != u0.get("name"):
@@ -3071,6 +3335,207 @@ def jian_loop(tok):
                 JIAN_FEEDS.pop(tok, None)
 
 
+# ---------------- 网盘备份（WebDAV，录像 webm 自动上传） ----------------
+# 推荐坚果云：地址 https://dav.jianguoyun.com.cn/dav/ + 注册邮箱 + 应用密码
+# （坚果云网页版 → 账户信息 → 安全选项 → 添加应用密码，别用登录密码）。
+# 配置存 data\cloud.json；上传清单存 data\cloud_upload.json，失败的下次启动补传。
+
+_CLOUD_LOCK = threading.Lock()
+_CLOUD_Q = queue.Queue()
+_CLOUD_MAN = None  # 文件名 -> {"ok":bool,"ts":int,"size":int,"err":str}
+_CLOUD_SYNCING = False
+_CLOUD_STATE = {"ok": 0, "fail": 0, "last": "", "err": "", "busy": False}
+
+
+def _cloud_cfg():
+    try:
+        with open(os.path.join(DATA_DIR, "cloud.json"), encoding="utf-8") as f:
+            d = json.load(f)
+        return d if isinstance(d, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def _cloud_cfg_save(cfg):
+    p = os.path.join(DATA_DIR, "cloud.json")
+    tmp = p + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(cfg, f, ensure_ascii=False)
+    os.replace(tmp, p)
+
+
+def _cloud_manifest():
+    global _CLOUD_MAN
+    if _CLOUD_MAN is None:
+        try:
+            with open(os.path.join(DATA_DIR, "cloud_upload.json"), encoding="utf-8") as f:
+                _CLOUD_MAN = json.load(f)
+        except (OSError, ValueError):
+            _CLOUD_MAN = {}
+        if not isinstance(_CLOUD_MAN, dict):
+            _CLOUD_MAN = {}
+    return _CLOUD_MAN
+
+
+def _cloud_man_save():
+    try:
+        p = os.path.join(DATA_DIR, "cloud_upload.json")
+        tmp = p + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(_cloud_manifest(), f, ensure_ascii=False)
+        os.replace(tmp, p)
+    except OSError:
+        pass
+
+
+def _dav_request(method, url, cfg, body=None, timeout=120):
+    """一次 WebDAV 请求，返回 (http_code, 错误串)；2xx 视为成功。"""
+    import base64
+    req = urllib.request.Request(url, data=body, method=method)
+    tok = base64.b64encode(("%s:%s" % (cfg.get("user", ""), cfg.get("pass", "")))
+                           .encode("utf-8")).decode("ascii")
+    req.add_header("Authorization", "Basic " + tok)
+    req.add_header("User-Agent", "ZhenXianEEW/%s" % VERSION)
+    if body is not None:
+        req.add_header("Content-Type", "application/octet-stream")
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            r.read(64)
+            return r.getcode(), ""
+    except Exception as e:
+        return getattr(e, "code", 0), str(e)[:160]
+
+
+def _dav_url_for(cfg, name):
+    base = (cfg.get("url") or "").rstrip("/") + "/"
+    folder = (cfg.get("folder") or "").replace("\\", "/").strip("/")
+    segs = [urllib.parse.quote(p, safe="") for p in folder.split("/") if p]
+    if name:
+        segs.append(urllib.parse.quote(name, safe=""))
+    return base + "/".join(segs)
+
+
+def _dav_mkdirs(cfg, folder):
+    """逐段 MKCOL 建远程目录；已存在（405/301）不算错。"""
+    base = (cfg.get("url") or "").rstrip("/") + "/"
+    cur = base
+    for seg in [p for p in (folder or "").replace("\\", "/").split("/") if p]:
+        cur += urllib.parse.quote(seg, safe="") + "/"
+        code, err = _dav_request("MKCOL", cur, cfg, body=b"")
+        if code not in (200, 201, 301, 405, 409):
+            return False, "建目录失败 HTTP %s %s" % (code, err)
+    return True, ""
+
+
+def _cloud_upload_one(path, cfg):
+    name = os.path.basename(path)
+    if not cfg.get("enabled"):
+        return False, "未启用网盘备份"
+    try:
+        with open(path, "rb") as f:
+            data = f.read()
+    except OSError as e:
+        return False, "读不到文件：%s" % e
+    ok, err = _dav_mkdirs(cfg, cfg.get("folder") or "震线EEW")
+    if not ok:
+        return False, err
+    code, err = _dav_request("PUT", _dav_url_for(cfg, name), cfg, body=data)
+    if code in (200, 201, 204):
+        return True, ""
+    return False, "上传失败 HTTP %s %s" % (code, err)
+
+
+def _cloud_record(name, ok, size, err=""):
+    man = _cloud_manifest()
+    man[name] = {"ok": bool(ok), "ts": int(time.time()),
+                 "size": int(size or 0), "err": str(err)[:120]}
+    if ok:
+        _CLOUD_STATE["ok"] += 1
+    else:
+        _CLOUD_STATE["fail"] += 1
+        _CLOUD_STATE["err"] = str(err)[:160]
+    _CLOUD_STATE["last"] = name
+    _cloud_man_save()
+
+
+def _cloud_worker():
+    while True:
+        path = _CLOUD_Q.get()
+        if not path:
+            continue
+        try:
+            ok, err = _cloud_upload_one(path, _cloud_cfg())
+            sz = os.path.getsize(path) if os.path.exists(path) else 0
+            _cloud_record(os.path.basename(path), ok, sz, err)
+        except Exception as e:
+            _cloud_record(os.path.basename(path or "?"), False, 0, str(e))
+
+
+def _cloud_enqueue(path):
+    if _cloud_cfg().get("enabled"):
+        _CLOUD_Q.put(path)
+
+
+def _cloud_rec_dirs():
+    dirs = [os.path.join(DATA_DIR, "recordings")]
+    rd = (_load_settings().get("recDir") or "").strip()
+    if rd and os.path.isdir(rd) and rd not in dirs:
+        dirs.append(rd)
+    return dirs
+
+
+def _cloud_catchup():
+    """把录像目录里还没传成功过的 webm 补传一遍，返回成功条数。"""
+    global _CLOUD_SYNCING
+    with _CLOUD_LOCK:
+        if _CLOUD_SYNCING:
+            return -1
+        _CLOUD_SYNCING = True
+    try:
+        cfg = _cloud_cfg()
+        if not cfg.get("enabled"):
+            return 0
+        man = _cloud_manifest()
+        n = 0
+        for d in _cloud_rec_dirs():
+            try:
+                names = sorted(os.listdir(d))
+            except OSError:
+                continue
+            for fn in names:
+                if not fn.lower().endswith(".webm"):
+                    continue
+                rec = man.get(fn)
+                if rec and rec.get("ok"):
+                    continue
+                p = os.path.join(d, fn)
+                ok, err = _cloud_upload_one(p, _cloud_cfg())
+                _cloud_record(fn, ok, os.path.getsize(p), err)
+                if ok:
+                    n += 1
+                time.sleep(0.5)  # 温和点，别把网盘打爆
+        return n
+    finally:
+        with _CLOUD_LOCK:
+            _CLOUD_SYNCING = False
+
+
+def _cloud_test(cfg):
+    """连通性测试：建目录 → 写测试文件 → 删掉。"""
+    if not cfg.get("url", "").lower().startswith(("http://", "https://")):
+        return False, "地址要以 http(s):// 开头"
+    ok, err = _dav_mkdirs(cfg, cfg.get("folder") or "震线EEW")
+    if not ok:
+        return False, err
+    url = _dav_url_for(cfg, "震线连接测试.txt")
+    code, err = _dav_request("PUT", url, cfg,
+                             body="震线 EEW 连接测试，可删除。".encode("utf-8"))
+    if code not in (200, 201, 204):
+        return False, "写入失败 HTTP %s %s（账号或应用密码不对？）" % (code, err)
+    _dav_request("DELETE", url, cfg)
+    return True, ""
+
+
 def boot(host="127.0.0.1", port=8765, tls_cert=None, tls_key=None):
     """起数据源线程 + HTTP(S) 服务，返回 server 对象（不阻塞）"""
     auth.init(os.path.join(DATA_DIR, "users.db"))
@@ -3099,6 +3564,11 @@ def boot(host="127.0.0.1", port=8765, tls_cert=None, tls_key=None):
     threading.Thread(target=heartbeat_loop, daemon=True).start()
     threading.Thread(target=primary_loop, daemon=True).start()
     threading.Thread(target=kmoni_loop, daemon=True).start()
+    # 网盘备份：上传工作线程 + 启动后延迟补传没传成功的录像
+    threading.Thread(target=_cloud_worker, daemon=True).start()
+    _t = threading.Timer(20.0, _cloud_catchup)
+    _t.daemon = True
+    _t.start()
     srv = Server((host, port), Handler)
     srv.daemon_threads = True
     if tls_cert and tls_key:
