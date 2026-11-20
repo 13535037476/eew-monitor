@@ -83,7 +83,7 @@ def user_dir(name):
 
 def user_file(name, fn):
     return os.path.join(user_dir(name), fn)
-VERSION = "1.35.0"
+VERSION = "1.35.1"
 APP_NAME = "震线 EEW"
 HOMEPAGE = "https://github.com/13535037476/eew-monitor"
 INSTALL_FILE = os.path.join(APP_DIR, "install.json")
@@ -128,12 +128,80 @@ def _vtuple(s):
     return t + (0,) * (3 - len(t))
 
 
-def _fetch_json(url, timeout=5):
-    req = urllib.request.Request(url, headers={
-        "User-Agent": "EEWMonitor/" + VERSION,
-        "Accept": "application/json",
-    })
-    with urllib.request.urlopen(req, timeout=timeout) as r:
+# ---------------- 网络回退：直连不通就走本地代理 ----------------
+# 国内直连 GitHub 常常不通，用户机器上多半挂着 v2rayN/Clash 之类的本地代理。
+# 依次试：上次记住的路 → urllib 默认（环境变量/已启用的系统代理）→ 注册表里写的
+# 代理（哪怕系统代理开关是关的）→ 常见本地代理端口 → 明确不走代理。
+# 找到能用的就记住，失败就换下一条。
+_NET = {"proxy": "unset"}
+
+
+def _registry_proxy():
+    """读注册表 ProxyServer；系统代理开关没开也读，很多加速器改完不复原开关。"""
+    try:
+        import winreg
+        k = winreg.OpenKey(
+            winreg.HKEY_CURRENT_USER,
+            r"Software\Microsoft\Windows\CurrentVersion\Internet Settings")
+        srv, _ = winreg.QueryValueEx(k, "ProxyServer")
+        try:
+            k.Close()
+        except Exception:
+            pass
+        if ";" in srv or "=" in srv:
+            parts = dict(p.split("=", 1) for p in srv.split(";") if "=" in p)
+            srv = parts.get("https") or parts.get("http") or ""
+        if srv and not srv.startswith("http"):
+            srv = "http://" + srv
+        return srv or ""
+    except Exception:
+        return ""
+
+
+def _proxy_candidates():
+    out = [_registry_proxy()]
+    for port in ("10800", "7890", "10809", "10808", "7897"):
+        out.append("http://127.0.0.1:" + port)
+    return [p for p in out if p]
+
+
+def _net_open(url, timeout=8, headers=None):
+    """带代理回退的 urlopen，返回响应对象；找到能用的路就记在 _NET 里。"""
+    hdrs = {"User-Agent": "EEWMonitor/" + VERSION}
+    if headers:
+        hdrs.update(headers)
+    req = urllib.request.Request(url, headers=hdrs)
+    order = []
+    if _NET["proxy"] != "unset":
+        order.append(_NET["proxy"])            # 上次走通的优先
+    order.append(None)                          # urllib 默认：环境变量/已启用系统代理
+    order.extend(_proxy_candidates())           # 注册表 + 常见本地端口
+    order.append("__direct__")                  # 明确不走代理兜底
+    seen, last_err = set(), ""
+    for p in order:
+        if p in seen:
+            continue
+        seen.add(p)
+        try:
+            if p is None:
+                op = urllib.request.build_opener()
+            elif p == "__direct__":
+                op = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+            else:
+                op = urllib.request.build_opener(urllib.request.ProxyHandler(
+                    {"http": p, "https": p}))
+            r = op.open(req, timeout=timeout)
+            _NET["proxy"] = p
+            return r
+        except Exception as e:
+            last_err = "%s: %s" % (p or "default", e)
+            if p == _NET["proxy"]:
+                _NET["proxy"] = "unset"         # 记住的路挂了，重新探测
+    raise RuntimeError("连不上更新服务器（各条路都试过了）：%s" % last_err)
+
+
+def _fetch_json(url, timeout=8):
+    with _net_open(url, timeout=timeout, headers={"Accept": "application/json"}) as r:
         raw = r.read(400000)
     return json.loads(raw.decode("utf-8", "replace"))
 
@@ -196,10 +264,9 @@ def check_update(force=False):
 def _download_thread(url, dst, ver, sha=""):
     try:
         _DL.update({"state": "downloading", "pct": 0, "path": "", "error": "", "ver": ver})
-        req = urllib.request.Request(url, headers={"User-Agent": "EEWMonitor/" + VERSION})
         h = hashlib.sha256()
         got = total = 0
-        with urllib.request.urlopen(req, timeout=60) as r, open(dst, "wb") as f:
+        with _net_open(url, timeout=60) as r, open(dst, "wb") as f:
             try:
                 total = int(r.headers.get("Content-Length") or 0)
             except Exception:
