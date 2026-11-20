@@ -4976,11 +4976,16 @@
     let pick = null, pickKey = '';
     for (const e of list) {
       if (!e || e.isSim || e.cancel) continue;
+      // 演练副本（服务端占 eew 槽位的那份）不带 isSim 标记，只认 source/uid：
+      // 不挡的话演练会被当成真地震录下来；training 同理
+      if (String(e.source) === 'sim' || String(e.uid || '').indexOf('SIM-') === 0) continue;
+      if (e.training) continue;
       const th = srcThOf(e);
       if ((e.mag || 0) < (th.mag || 0)) continue;
       if (evIntenNum(e) < (th.int || 0)) continue;   // 强度用事件自身的最大震度
       if (!recSrcOn(e)) continue;
-      if (now - (e.report_ts || e.origin_ts || 0) > 30) continue;      // 老报不补录
+      const ts0 = e.report_ts || e.origin_ts || 0;
+      if (!(now - ts0 <= 30)) continue;   // 老报不补录；时间戳异常（NaN/字符串）也当老报
       // 整场只录一次（按 uid 去重），录多久由用户点「停止」决定
       const key = String(e.uid);
       if (REC.seen.has(key)) continue;
@@ -6495,8 +6500,15 @@
     recEls.on.addEventListener('change', e => {
       state.settings.recOn = e.target.checked;
       recSaveSoon();
-      toast(e.target.checked ? '自动录屏已开启（M' + (state.settings.recMag ?? 4) + ' 起录）'
-        : '自动录屏已关闭');
+      if (e.target.checked) {
+        toast('自动录屏已开启（M' + (state.settings.recMag ?? 4) + ' 起录）');
+      } else {
+        // 关掉就立刻收手：以前开关只挡「下一次开录」，正在录的那段会继续录
+        // 到上限，看起来就像「关不掉」。已录的部分照常保存。
+        const wasRec = !!REC.mr;
+        if (REC.mr) stopRec();
+        toast('自动录屏已关闭' + (wasRec ? '，正在录的那段已停止并保存' : ''));
+      }
     });
     const num = (el, key, lo, hi, dflt) => {
       if (!el) return;

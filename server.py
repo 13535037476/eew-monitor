@@ -1842,6 +1842,17 @@ def build_state():
         if sim and now - (sim.get("report_ts") or sim.get("origin_ts") or 0) > 300:
             STATE["sim"] = None
             sim = None
+        # 演练在 eew 槽位里的副本：只在「同名演练本体还活着」时保留，否则撤掉。
+        # 以前过期只清 sim 本体，槽位里那份拷贝带着 active 标记永远挂着——
+        # 等于一场「休眠地震」：每个新开的页面都能看到它，录屏这类按
+        # eew_list 触发的逻辑也会被它带偏。
+        for c in ("JP", "CN", "TW"):
+            slot = STATE["eew"].get(c)
+            if not (slot and slot.get("source") == "sim"):
+                continue
+            if not (sim and sim.get("uid") == slot.get("uid")):
+                STATE["eew"][c] = None
+                eew[c] = None   # build_state 前面拿过浅拷贝，本帧返回的也一并清掉
         ob = STATE["obs"]
         if ob and ob.get("sim") and now - (ob.get("report_ts") or 0) > 600:
             STATE["obs"] = None
