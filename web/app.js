@@ -171,6 +171,15 @@
       chime: 'builtin', pack: '',
       // 自动录屏：JMA 达到震级就录一段地图画面（带震级/地点叠加），存成本地 webm
       recOn: false, recMag: 4.0, recDur: 60, recKbps: 2500, recDir: '',
+      recSeg: true, recSegDur: 12,          // 分段：每一报录一段，段长默认 12s
+      // 每个数据源各自的「震级 / 强度」门槛：告警与录屏都按它判
+      // jp/tw/gq 的强度用震度（3 = 震度3），cn 用烈度（4 = 烈度Ⅳ）
+      srcTh: {
+        jp: { mag: 3.5, int: 3 },
+        cn: { mag: 4.0, int: 4 },
+        tw: { mag: 4.0, int: 3 },
+        gq: { mag: 4.5, int: 3 },
+      },
       recSrc: { jp: true, cn: false, tw: false, gq: false },
     }, LS.get('settings', {})),
     seen: new Set(LS.get('seen', [])),
@@ -495,7 +504,7 @@
     if (ev.country === 'CN' || ev.country === 'JP' || ev.country === 'TW') return (ev.mag || 0) >= 3.0;
     // 全球台网：门槛改由「全球检测弹窗震级」决定（默认 4.5）。
     // 原来写死 5.0，GQ 推来的 M4~4.9 既不弹卡也不响铃，看起来就是「GQ 从来没预警」。
-    return (ev.mag || 0) >= Number(state.settings.gqAlert ?? 4.5);
+    return (ev.mag || 0) >= (srcThOf(ev).mag || 0);
   }
 
   function currentEvent() {
@@ -4452,7 +4461,40 @@
   // 为什么录画布而不是整窗：浏览器拿不到整窗截图权限（getDisplayMedia 每次都要选窗口），
   // 而 #map 是纯 canvas，captureStream 直接可用、无需任何授权。震级/地点/时间
   // 用 canvas 画成叠加条，所以画面里一定看得到关键信息。
-  const REC = { mr: null, cv: null, c2: null, timer: 0, stopAt: 0, ev: null, key: '' };
+  const REC = { mr: null, cv: null, c2: null, timer: 0, stopAt: 0, ev: null,
+    key: '', seen: new Set(), queue: null, seg: false };
+
+  // 数据源归类 → 取该源的门槛
+  function srcKeyOf(ev) {
+    const id = String((ev && ev.source) || '');
+    if (id.indexOf('jma') === 0) return 'jp';
+    if (id === 'cwa') return 'tw';
+    if (id === 'gq') return 'gq';
+    return 'cn';                       // cenc / sc / fj / cq / icl
+  }
+  function srcThOf(ev) {
+    const all = state.settings.srcTh || {};
+    const t = all[srcKeyOf(ev)];
+    if (t && isFinite(t.mag) && isFinite(t.int)) return t;
+    const d = { jp: { mag: 3.5, int: 3 }, cn: { mag: 4, int: 4 },
+                tw: { mag: 4, int: 3 }, gq: { mag: 4.5, int: 3 } };
+    return d[srcKeyOf(ev)];
+  }
+  const INT_LABEL = { '1': 1, '2': 2, '3': 3, '4': 4, '5弱': 5, '5強': 5.5,
+    '6弱': 6, '6強': 6.5, '7': 7, 'Ⅰ': 1, 'Ⅱ': 2, 'Ⅲ': 3, 'Ⅳ': 4,
+    'Ⅴ': 5, 'Ⅵ': 6, 'Ⅶ': 7, 'Ⅷ': 8, 'Ⅸ': 9, 'Ⅹ': 10, 'Ⅺ': 11, 'Ⅻ': 12 };
+  // 事件自身的最大震度/烈度（数值）：录屏门槛用它，远处的大震才录得到
+  function evIntenNum(ev) {
+    if (!ev) return 0;
+    if (typeof ev.max_intensity_num === 'number' && isFinite(ev.max_intensity_num))
+      return ev.max_intensity_num;
+    const lab = String(ev.max_intensity || '').trim();
+    if (INT_LABEL[lab] != null) return INT_LABEL[lab];
+    const g = GRADE.indexOf(lab);
+    if (g >= 0) return g;
+    const v = parseFloat(lab);
+    return isFinite(v) ? v : 0;
+  }
 
   function recSrcOn(ev) {
     const src = state.settings.recSrc || {};
@@ -4469,7 +4511,8 @@
     const ts = d.getFullYear() + p2(d.getMonth() + 1) + p2(d.getDate()) + '_' +
       p2(d.getHours()) + p2(d.getMinutes()) + p2(d.getSeconds());
     return 'EEW_' + ts + '_' + String(ev.source || 'eew').toUpperCase() +
-      '_M' + (ev.mag || 0).toFixed(1) + '.webm';
+      '_M' + (ev.mag || 0).toFixed(1) +
+      (REC.seg && ev.serial ? '_R' + ev.serial + '\u5831' : '') + '.webm';
   }
 
   function recHud(c2, ev, w, h) {
@@ -4543,7 +4586,7 @@
     try { mr.stop(); } catch (e) { }
   }
 
-  function startRec(ev) {
+  function startRec(ev, durSec) {
     const map = $('#map');
     if (!map || !window.MediaRecorder || !map.captureStream) {
       toast('这个环境不支持录制（需要 WebView2 / Chromium 内核）'); return;
@@ -4552,7 +4595,8 @@
     cv.width = map.width; cv.height = map.height;
     const c2 = cv.getContext('2d');
     const fps = 15;
-    const dur = Math.max(5, Math.min(600, parseInt(state.settings.recDur, 10) || 60));
+    const want = durSec || state.settings.recDur;
+    const dur = Math.max(3, Math.min(600, parseFloat(want) || 60));
     const kbps = Math.max(400, Math.min(20000, parseInt(state.settings.recKbps, 10) || 2500));
     let stream;
     try { stream = cv.captureStream(fps); } catch (e) { toast('拿不到画布流：' + e.message); return; }
@@ -4572,6 +4616,10 @@
       saveRec(blob, REC.ev || ev);
       try { stream.getTracks().forEach(t => t.stop()); } catch (e) { }
       REC.ev = null;
+      // 分段模式下，录制期间来的新报排队，这段存完接着录
+      const q = REC.queue;
+      REC.queue = null;
+      if (q) setTimeout(() => { if (!REC.mr) startRec(q.ev, q.dur); }, 400);
     };
     REC.mr = mr; REC.cv = cv; REC.c2 = c2; REC.ev = ev;
     REC.stopAt = nowSec() + dur;
@@ -4594,27 +4642,41 @@
 
   // 每 250ms 由主循环调一次：够格就开录，一场地震只录一次
   function tryAutoRec() {
-    if (REC.mr) return;
     if (!state.settings.recOn) return;
     if (state.historyEvent) return;
-    const minMag = Number(state.settings.recMag) || 4;
     const now = nowSec();
-    // 不只看「当前显示的那一起」：主卡被别的事件占着时，JMA 的 M4+ 也要照录。
-    // 在一整批进行中事件里挑震级最大的那一起来录。
+    const seg = state.settings.recSeg !== false;
+    const segDur = Math.max(3, Math.min(120, parseFloat(state.settings.recSegDur) || 12));
+    // 不只看「当前显示的那一起」：主卡被别的事件占着时，其它源的新报也要照录。
     const list = (state.eewList || []).slice();
     if (state.autoEv) list.push(state.autoEv);
-    let pick = null;
+    let pick = null, pickKey = '';
     for (const e of list) {
       if (!e || e.isSim || e.cancel) continue;
-      if ((e.mag || 0) < minMag) continue;
+      const th = srcThOf(e);
+      if ((e.mag || 0) < (th.mag || 0)) continue;
+      if (evIntenNum(e) < (th.int || 0)) continue;   // 强度用事件自身的最大震度
       if (!recSrcOn(e)) continue;
-      if (REC.key && REC.key === e.uid) continue;
-      if (now - (e.report_ts || e.origin_ts || 0) > 30) continue;   // 老事件不补录
-      if (!pick || (e.mag || 0) > (pick.mag || 0)) pick = e;
+      if (now - (e.report_ts || e.origin_ts || 0) > 30) continue;      // 老报不补录
+      // 分段：以「事件 + 第几报」为单位，每来一报录一段；
+      // 不分段：整场只录一次（按 uid 去重）
+      const key = seg ? (e.uid + '#' + (e.serial || 0)) : String(e.uid);
+      if (REC.seen.has(key)) continue;
+      if (!pick || (e.mag || 0) > (pick.mag || 0)) { pick = e; pickKey = key; }
     }
     if (!pick) return;
-    REC.key = pick.uid;
-    startRec(pick);
+    REC.seen.add(pickKey);
+    if (REC.seen.size > 400) {                     // 别让集合无限长
+      const first = REC.seen.values().next().value;
+      REC.seen.delete(first);
+    }
+    const dur = seg ? segDur : (state.settings.recDur || 60);
+    if (REC.mr) {                                  // 正在录：记下最新一报，录完接着
+      REC.queue = { ev: pick, dur: dur };
+      return;
+    }
+    REC.seg = seg;
+    startRec(pick, dur);
   }
 
   function tickReactions() {
@@ -5160,10 +5222,15 @@
       const aKey = String(ev.origin_ts || ev.uid);
       const already = state.lastAlarmKey === aKey && est.risk <= (state.lastAlarmRisk || 0);
       const th = usesShindo(ev) ? Number(state.settings.thJp) : Number(state.settings.thCn);
+      const srcTh = srcThOf(ev);
+      // 震级门槛：每个源各自一条（以前只有 GQ 有，日本/中国只看本地震度）
+      const magOk = (ev.mag || 0) >= (srcTh.mag || 0);
+      // 强度门槛：事件自身的最大震度 vs 关注点预估，取大的那个
+      const intenNow = Math.max(evIntenNum(ev), est.val || 0);
+      const intOk = intenNow >= (srcTh.int || 0);
       // 全球检测（GQ）没有「本地震度」这回事：智利 M7 在关注点永远是 0 度，
-      // 按日本阈值走就等于一辈子不响。它按震级门槛单独判定。
-      const gqAlert = ev.kind === 'gq' &&
-        (ev.mag || 0) >= Number(state.settings.gqAlert ?? 4.5);
+      // 所以它按「震中烈度估算 + 震级」判，不按关注点。
+      const gqAlert = ev.kind === 'gq' && magOk && intOk;
       // 日本/台湾的「緊急地震速報」本身就是警报：卡片照弹，桌面通知照发，
       // 只是本地预估不够时不出警报音（免得天天被远处的 M4 吵）。
       const warnOnly = !!(ev.warn || ev.country === 'TW') && !ev.cancel &&
@@ -5172,7 +5239,7 @@
       const why = ev.kind === 'gq'
         ? '全球台网检测 · ' + where + '预估' + est.label
         : where + '预估' + est.label + ' · 距 ' + Math.round(est.R) + 'km';
-      if (!ev.isSim && !gqAlert && est.val < th) {
+      if (!ev.isSim && !gqAlert && (!magOk || !intOk)) {
         if (warnOnly) notifyEvent(ev, '预估' + est.label + '（本地未达阈值）');
         continue;
       }
@@ -5873,6 +5940,7 @@
     on: $('#optRec'), mag: $('#optRecMag'), dur: $('#optRecDur'), kbps: $('#optRecKbps'),
     dir: $('#optRecDir'), jp: $('#optRecJP'), cn: $('#optRecCN'),
     tw: $('#optRecTW'), gq: $('#optRecGQ'),
+    seg: $('#optRecSeg'), segDur: $('#optRecSegDur'),
   };
   function syncRecUI() {
     const st = state.settings, src = st.recSrc || {};
@@ -5885,6 +5953,8 @@
     if (recEls.cn) recEls.cn.checked = !!src.cn;
     if (recEls.tw) recEls.tw.checked = !!src.tw;
     if (recEls.gq) recEls.gq.checked = !!src.gq;
+    if (recEls.seg) recEls.seg.checked = st.recSeg !== false;
+    if (recEls.segDur) recEls.segDur.value = String(st.recSegDur ?? 12);
   }
   function recSaveSoon() { LS.set('settings', state.settings); }
   if (recEls.on) {
@@ -5907,6 +5977,12 @@
       });
     };
     num(recEls.mag, 'recMag', 1, 9, 4);
+    num(recEls.segDur, 'recSegDur', 3, 120, 12);
+    if (recEls.seg) recEls.seg.addEventListener('change', e => {
+      state.settings.recSeg = e.target.checked;
+      recSaveSoon();
+      toast(e.target.checked ? '分段录屏：每一报录一段' : '分段录屏已关闭（整场只录一段）');
+    });
     num(recEls.dur, 'recDur', 5, 600, 60);
     num(recEls.kbps, 'recKbps', 400, 20000, 2500);
     if (recEls.dir) recEls.dir.addEventListener('change', e => {
@@ -5983,10 +6059,46 @@
     if (it) playFiles([soundPath(it.file)], -1, 'preview', 2);
   });
 
-  $('#optThJp').value = String(state.settings.thJp);
-  $('#optThCn').value = String(state.settings.thCn);
-  $('#optThJp').addEventListener('change', e => { state.settings.thJp = +e.target.value; LS.set('settings', state.settings); });
-  $('#optThCn').addEventListener('change', e => { state.settings.thCn = +e.target.value; LS.set('settings', state.settings); });
+  // 每源「震级 / 强度」表
+  const THF = [
+    ['thJpMag', 'thJpInt', 'jp', 0.1], ['thCnMag', 'thCnInt', 'cn', 0.1],
+    ['thTwMag', 'thTwInt', 'tw', 0.1], ['thGqMag', 'thGqInt', 'gq', 0.1],
+  ];
+  function syncThTable() {
+    const all = state.settings.srcTh || {};
+    for (const [mi, ii, key] of THF) {
+      const t = all[key] || {};
+      const m = document.getElementById(mi), i2 = document.getElementById(ii);
+      if (m) m.value = String(t.mag ?? '');
+      if (i2) i2.value = String(t.int ?? '');
+    }
+    // 老逻辑（上卡判定/告警文案）还在读 thJp/thCn，跟着镜像一份
+    state.settings.thJp = (all.jp && all.jp.int) || 3;
+    state.settings.thCn = (all.cn && all.cn.int) || 4;
+  }
+  function bindThTable() {
+    for (const [mi, ii, key] of THF) {
+      const m = document.getElementById(mi), i2 = document.getElementById(ii);
+      const on = () => {
+        const all = Object.assign({
+          jp: { mag: 3.5, int: 3 }, cn: { mag: 4, int: 4 },
+          tw: { mag: 4, int: 3 }, gq: { mag: 4.5, int: 3 },
+        }, state.settings.srcTh || {});
+        const cur = Object.assign({}, all[key]);
+        const mv = parseFloat(m && m.value), iv = parseFloat(i2 && i2.value);
+        if (isFinite(mv)) cur.mag = Math.max(0.5, Math.min(9, mv));
+        if (isFinite(iv)) cur.int = Math.max(0.5, Math.min(12, iv));
+        all[key] = cur;
+        state.settings.srcTh = all;
+        syncThTable();
+        LS.set('settings', state.settings);
+      };
+      if (m) m.addEventListener('change', on);
+      if (i2) i2.addEventListener('change', on);
+    }
+  }
+  bindThTable();
+  syncThTable();
   const gm = $('#optGqMag');
   if (gm) {
     gm.value = String(state.settings.gqMag ?? 3);
@@ -6029,6 +6141,7 @@
     const tj = $('#optThJp'), tc = $('#optThCn');
     if (tj) tj.value = String(state.settings.thJp);
     if (tc) tc.value = String(state.settings.thCn);
+    try { syncThTable(); } catch (e) { }
     const gmEl = $('#optGqMag');
     if (gmEl) gmEl.value = String(state.settings.gqMag ?? 3);
     const gaEl = $('#optGqAlert');

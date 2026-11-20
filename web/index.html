@@ -6,7 +6,7 @@
 <title>震线 EEW · 中日地震预警</title>
 <script>/* 首帧前定主题，避免启动时先闪一下深色 */
 try{if(localStorage.getItem('eew.theme')==='light')document.documentElement.classList.add('light')}catch(e){}</script>
-<link rel="stylesheet" href="style.css?v=239">
+<link rel="stylesheet" href="style.css?v=240">
 </head>
 <body>
 
@@ -287,21 +287,24 @@ try{if(localStorage.getItem('eew.theme')==='light')document.documentElement.clas
         <h3>告警</h3>
         <div class="row between"><label>声音告警</label><input type="checkbox" id="optSound" class="switch"></div>
         <div class="row between"><label>系统朗读（TTS，中日文）</label><input type="checkbox" id="optSpeech" class="switch"></div>
-        <div class="row between">
-          <label>日本震度阈值</label>
-          <input type="number" id="optThJp" class="select" min="1" max="7" step="0.5" value="4.5" style="width:86px">
+        <div class="thtbl">
+          <div class="thhd"><span>数据源</span><span>震级 ≥</span><span>强度 ≥</span></div>
+          <div class="throw"><span>日本 JMA</span>
+            <input type="number" id="thJpMag" class="select mono" min="1" max="9" step="0.1" style="width:74px">
+            <input type="number" id="thJpInt" class="select mono" min="1" max="7" step="0.5" style="width:74px"></div>
+          <div class="throw"><span>中国 CENC</span>
+            <input type="number" id="thCnMag" class="select mono" min="1" max="9" step="0.1" style="width:74px">
+            <input type="number" id="thCnInt" class="select mono" min="1" max="12" step="0.5" style="width:74px"></div>
+          <div class="throw"><span>台湾 CWA</span>
+            <input type="number" id="thTwMag" class="select mono" min="1" max="9" step="0.1" style="width:74px">
+            <input type="number" id="thTwInt" class="select mono" min="1" max="7" step="0.5" style="width:74px"></div>
+          <div class="throw"><span>全球 GQ</span>
+            <input type="number" id="thGqMag" class="select mono" min="1" max="9" step="0.1" style="width:74px">
+            <input type="number" id="thGqInt" class="select mono" min="1" max="9" step="0.5" style="width:74px"></div>
         </div>
         <div class="row between">
-          <label>中国烈度阈值</label>
-          <input type="number" id="optThCn" class="select" min="2" max="9" step="0.5" value="6" style="width:86px">
-        </div>
-        <div class="row between">
-          <label>全球检测最小震级</label>
+          <label>全球检测最小震级（只影响列表）</label>
           <input type="number" id="optGqMag" class="select" min="1" max="8" step="0.5" value="3" style="width:86px">
-        </div>
-        <div class="row between">
-          <label>全球检测弹窗震级</label>
-          <input type="number" id="optGqAlert" class="select" min="2" max="8" step="0.5" value="4.5" style="width:86px">
         </div>
         <div class="row between"><label>桌面通知（窗口在后台也弹）</label><input type="checkbox" id="optNotify" class="switch"></div>
         <div class="row between"><label>夜间免打扰</label><input type="checkbox" id="optQuiet" class="switch"></div>
@@ -318,10 +321,10 @@ try{if(localStorage.getItem('eew.theme')==='light')document.documentElement.clas
           <input type="number" id="optQuietMag" class="select mono" min="2" max="7.5" step="0.1" value="5.5" style="width:76px">
           <span class="hint">不响铃、不弹桌面通知（卡片照常显示）</span>
         </div>
-        <p class="hint">关注点预估震度/烈度 ≥ 阈值才响警报音，可自由输入。
-          全球检测（GQ）没有本地震度概念，按「弹窗震级」单独判定：达到就弹事件卡 + 响铃 + 桌面通知，
-          不受关注点远近影响；列表最小震级只影响「最近地震」里显示多少。
-          桌面通知需要浏览器授权，窗口最小化时也能看到。</p>
+        <p class="hint">每个数据源各设两条线：<b>震级</b>和<b>强度</b>，两条都过才报（弹卡 / 响铃 / 录屏）。
+          强度填震度档：日本/台湾/全球 3 = 震度3、5.5 = 5強；中国填烈度，4 = Ⅳ度。
+          判定时取「事件最大震度」和「关注点预估」里较大的那个——远处的大震也报，本地摇得凶也报。
+          全球 GQ 的强度按震中烈度估算判，不看关注点远近；列表最小震级只决定「最近地震」里显示多少。</p>
       </div>
 
       <div class="sec">
@@ -478,6 +481,14 @@ try{if(localStorage.getItem('eew.theme')==='light')document.documentElement.clas
           <label style="flex:none;width:74px">码率(kbps)</label>
           <input id="optRecKbps" class="input mono" style="width:84px" value="2500">
         </div>
+        <div class="row between"><label>分段录屏（每一报录一段）</label>
+          <input type="checkbox" id="optRecSeg" class="switch"></div>
+        <div class="row">
+          <label style="flex:none;width:76px">每段时长</label>
+          <input id="optRecSegDur" class="input mono" style="width:76px" value="12">
+          <span class="hint" style="margin:0">同一场地震每来一报（第 1 報 / 第 2 報…）各录一段，
+            文件名带 <code>_R2報</code>；关掉则整场只录一段（用上面的时长）。</span>
+        </div>
         <div class="row">
           <label style="flex:none;width:76px">保存目录</label>
           <input id="optRecDir" class="input" placeholder="留空 = data/recordings">
@@ -624,6 +635,6 @@ try{if(localStorage.getItem('eew.theme')==='light')document.documentElement.clas
 <script src="geo.js?v=207"></script>
 <script src="geo_jp.js?v=176"></script>
 <script src="geo_world.js?v=207"></script>
-<script src="app.js?v=296"></script>
+<script src="app.js?v=297"></script>
 </body>
 </html>

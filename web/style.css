@@ -1080,3 +1080,13 @@ html.light .hero-meta .pschip b{color:#1d4f8f}
 @keyframes recBlink{0%,100%{opacity:1}50%{opacity:.25}}
 .recck{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;color:var(--txt2);white-space:nowrap}
 .recck input{accent-color:var(--accent)}
+
+/* 每个数据源的震级 / 强度门槛表 */
+.thtbl{display:flex;flex-direction:column;gap:4px;margin:4px 0 10px;padding:9px 12px;
+  border-radius:11px;background:rgba(255,255,255,.035);border:1px solid var(--line)}
+.thhd,.throw{display:grid;grid-template-columns:1fr 74px 74px;align-items:center;gap:8px}
+.thhd span{font-size:10px;color:var(--dim);letter-spacing:.08em}
+.thhd span:not(:first-child){text-align:center}
+.throw span{font-size:12px;color:var(--txt2)}
+.throw input{width:74px}
+html.light .thtbl{background:rgba(12,26,41,.03)}
