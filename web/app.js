@@ -182,6 +182,7 @@
     serverAudio: false,
     obs: null,
     tsunami: null, lpgm: null, obsVoiceUid: 0, obsVoiceRisk: -1, obsKey: '', obsAt: 0,
+    tsuVoiceKey: '', tsuVoiceRank: 0, obsSokuhoKey: '', obsResultKey: '',
     palertStations: [],
     autoEv: null,      // 本地推算的弱震（JMA 不发时补位）
     onAt: new Map(),   // code → 该站第一次超过门槛的时刻（推发震时刻用）
@@ -1158,6 +1159,44 @@
       (areas.length > 3 ? ' 等 ' + areas.length + ' 区' : '');
     $('#tsuAlertTime').textContent = '气象厅 ' + fmtHM(t.issued_ts, 9 * 3600);
     el.hidden = false;
+  }
+
+  // 海啸警报：按最高等级播语音包里的那三段。
+  // 注意报只有人声；警报/大警报先播「警报前奏」再念等级，顺序同气象厅播报。
+  const TSU_RANK = { Watch: 1, Warning: 2, MajorWarning: 3 };
+  const TSU_KEY = { Watch: 'tsunWatch', Warning: 'tsunWarn', MajorWarning: 'tsunMajor' };
+  function announceTsunami(t) {
+    if (!t) return;
+    if (t.cancelled) {
+      stopChannel('tsu');
+      state.tsuVoiceKey = 'cancel|' + (t.issued_ts || 0);
+      state.tsuVoiceRank = 0;
+      return;
+    }
+    const areas = t.areas || [];
+    if (!areas.length || !t.issued_ts) return;
+    // 启动时别把昨天的警报重播一遍：只报 10 分钟内新发表的
+    if (nowSec() - t.issued_ts > 600) return;
+    if (!state.settings.sound) return;
+    let grade = '', rank = 0;
+    for (const a of areas) {
+      const r = TSU_RANK[a.grade] || 0;
+      if (r > rank) { rank = r; grade = a.grade; }
+    }
+    if (!rank) return;
+    // 同一份电文只播一次；续报升级（注意报→警报→大警报）再播
+    const key = (t.id || '') + '|' + t.issued_ts;
+    if (key === state.tsuVoiceKey && rank <= state.tsuVoiceRank) return;
+    state.tsuVoiceKey = key;
+    state.tsuVoiceRank = rank;
+    const files = [];
+    if (grade !== 'Watch') {
+      const s0 = pickVoice('tsunSiren');
+      if (s0) files.push(soundPath(s0.file));
+    }
+    const v = pickVoice(TSU_KEY[grade]);
+    if (v) files.push(soundPath(v.file));
+    if (files.length) playFiles(files, 0, 'tsunami', 30);
   }
 
   // ---------------- 海啸 ----------------
@@ -3370,7 +3409,10 @@
   // ---------------- 语音包（EQuake 标注版） ----------------
   // 只使用用户标注过语义的文件；未标注的数字文件不加载、不播放。
   const VOICE = { items: [], map: {} };
-  const VOICE_GROUP = { event: '事件', exp: '预想震度', station: '测站震度' };
+  const VOICE_GROUP = {
+    event: '事件', exp: '预想震度', station: '测站震度',
+    tsunami: '海啸警报', sokuho: '震度速報',
+  };
 
   async function loadVoicePack() {
     try {
@@ -3394,7 +3436,9 @@
       if (it.voice) slot.voice = it; else slot.plain = it;
     }
     const cnt = $('#packCount');
-    if (cnt) cnt.textContent = VOICE.order.length || '0';
+    // 这里数「音频段数」而不是语义 key：一个 key 可能有人声/提示音两段，
+    // 用户关心的是自己标注的文件有没有全部进来。
+    if (cnt) cnt.textContent = VOICE.items.length || '0';
     renderVoiceList();
     buildChimeOptions();
   }
@@ -3430,7 +3474,7 @@
       box.innerHTML = '<div class="hint">未找到 sounds/voice/index.json</div>';
       return;
     }
-    box.innerHTML = ['event', 'exp', 'station'].map(g => {
+    box.innerHTML = ['event', 'exp', 'station', 'tsunami', 'sokuho'].map(g => {
       const keys = (VOICE.order || []).filter(k => VOICE.map[k] && VOICE.map[k].group === g);
       if (!keys.length) return '';
       return '<div class="vg"><div class="vg-hd">' + VOICE_GROUP[g] + '</div><div class="vg-body">' +
@@ -3526,7 +3570,7 @@
   let sndEpoch = 0;
   function stopAllSound() {
     sndEpoch++;
-    ['alarm', 'evt', 'st', 'st2', 'prev'].forEach(stopChannel);
+    ['alarm', 'evt', 'st', 'st2', 'tsu', 'prev'].forEach(stopChannel);
   }
 
   // 同一段语音短时间内重复请求一律丢掉：两个窗口同时开着、或续报连着来，
@@ -3569,6 +3613,7 @@
     if (tag === 'preview') { stopAllSound(); chPush('prev', paths, true); return; }
     if (tag === 'st') { stVoicePush(paths); return; }
     if (tag === 'alarm') { chPush('alarm', paths, true); return; }
+    if (tag === 'tsunami') { chPush('tsu', paths, true); return; }
     // 人声比警报音晚 220ms 开口，开头不被三连音盖住；但不等警报播完
     const ep = sndEpoch;
     setTimeout(() => { if (ep === sndEpoch) chPush('evt', paths, false); }, 220);
@@ -3779,6 +3824,7 @@
   // 这时候台站是实实在在观测到了震度，一样该出声
   function announceObs(o) {
     if (!o || !state.settings.voice || state.settings.stVoice === false) return;
+    if (!state.settings.sound) return;
     const risk = SCALE_RISK[o.max_scale] || 0;
     if (risk < 1) return;
     // 只报最近十分钟内的速报，别一开程序就把昨天的震度念一遍
@@ -3789,26 +3835,52 @@
     if (state.obsVoiceUid !== vKey) {
       state.obsVoiceUid = vKey;
       state.obsVoiceRisk = -1;
+      state.obsSokuhoKey = '';
+      state.obsResultKey = '';
     }
-    if (risk <= state.obsVoiceRisk) return;
+    // 这一报要不要先播整句：
+    //   震度速報（jma_sokuho）每场一次，6弱以上换成专用那句
+    //   震度結果（jma_obs 详细观测）每场一次，哪怕最大震度没再升高
+    let lead = '';
+    const src = String(o.source || '');
+    if (src === 'jma_sokuho') {
+      if (state.obsSokuhoKey !== vKey) {
+        state.obsSokuhoKey = vKey;
+        lead = risk >= 7 ? 'sokuho6' : 'sokuho';    // 7 = 6弱（55），8 = 6強
+      }
+    } else if (src === 'jma_obs') {
+      if (state.obsResultKey !== vKey) {
+        state.obsResultKey = vKey;
+        lead = 'sokuhoResult';
+      }
+    }
+    const newer = risk > state.obsVoiceRisk;
+    if (!lead && !newer) return;
     const tO = nowSec();
-    // 震度速報是「事后通报」，不该拿台站那种警报音去吓人：
-    // 优先播语音包里的**人声**「震度N」，没有才退回提示音。
-    if (tO - (state.lastObsSound || 0) < 1.2) return;
-    state.obsVoiceRisk = risk;
+    // 没带整句时仍然限速；整句是这一场的关键播报，不受 1.2 秒限制
+    if (!lead && tO - (state.lastObsSound || 0) < 1.2) return;
+    if (newer) state.obsVoiceRisk = risk;
     state.lastObsSound = tO;
-    playObsSound(risk);
+    // 整句里已经念过震度档时不再叠一句「震度N」；升级时才补
+    playObsSound(risk, lead, !lead || newer);
   }
 
-  // 震度速報专用出口：人声优先，且 5強/6強 也有人声版（st5p-v / st6p-v）
-  function playObsSound(risk) {
+  // 震度速報专用出口：整句 + 震度档依次播；5強/6強 也有人声版（st5p-v / st6p-v）
+  function playObsSound(risk, leadKey, withIntensity) {
     const r = Math.max(0, Math.min(9, risk | 0));
-    const slot = VOICE.map[ST_KEYS[r]];
-    const it = slot && (slot.voice || slot.plain);
-    if (!it) { stTone(r); return; }
-    const files = [soundPath(it.file)];
+    const files = [];
+    if (leadKey) {
+      const l = pickVoice(leadKey);
+      if (l) files.push(soundPath(l.file));
+    }
+    if (withIntensity !== false) {
+      const slot = VOICE.map[ST_KEYS[r]];
+      const it = slot && (slot.voice || slot.plain);
+      if (it) files.push(soundPath(it.file));
+    }
+    if (!files.length) { stTone(r); return; }
     if (state.serverAudio) {
-      postSound({ files: files.map(serverPath), prio: 2, tag: 'obs', ttl: 5 }, true);
+      postSound({ files: files.map(serverPath), prio: 2, tag: 'obs', ttl: 14 }, true);
       return;
     }
     chPush('obs', files, true);
@@ -5084,6 +5156,7 @@
     state.obs = data.obs || null;
     state.tsunami = data.tsunami || null;
     state.lpgm = data.lpgm || null;
+    announceTsunami(state.tsunami);
     announceObs(state.obs);
     try { maybeSokuho(); } catch (e) { }
     // 每 10 秒重算一次的「延迟最低源」+ 台湾 P-Alert 测站实时 PGA

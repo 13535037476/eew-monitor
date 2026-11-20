@@ -81,7 +81,7 @@ def user_dir(name):
 
 def user_file(name, fn):
     return os.path.join(user_dir(name), fn)
-VERSION = "1.29.0"
+VERSION = "1.30.0"
 
 # ---------------- 站点所有者 ----------------
 # 这套东西默认是本机一家人用，账号管理（建号/改密/踢设备/替人配密钥）
@@ -374,6 +374,11 @@ def _snd_enqueue(files, prio=0, tag="", ttl=8.0):
 
     if tag == "alarm":
         return _snd_play("alarm", files)
+
+    # 海啸警报单独一条：前奏 + 等级人声要连着播，
+    # 不能塞进 event 通道等 EEW 人声，也不能被它顶掉。
+    if tag in ("tsu", "tsunami"):
+        return _snd_play("tsu", files)
 
     # 人声播报：稍等半拍，别被警报音的三连音盖住开头
     return _snd_play("event", files, delay=0.25)

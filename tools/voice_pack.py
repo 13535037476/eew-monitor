@@ -24,6 +24,10 @@ LABELS = {
     "st0": "震度 0 · 检测到测站反应", "st1": "震度 1", "st2": "震度 2", "st3": "震度 3",
     "st4": "震度 4", "st5m": "震度 5弱", "st5p": "震度 5強", "st6m": "震度 6弱",
     "st6p": "震度 6強", "st7": "震度 7",
+    # v1.30：海啸与震度速報也进了语音包
+    "tsunSiren": "津波警报 · 警报前奏",
+    "tsunWatch": "津波注意报", "tsunWarn": "津波警报", "tsunMajor": "大津波警报",
+    "sokuho": "震度速報", "sokuho6": "震度速報（6弱以上）", "sokuhoResult": "震度結果",
 }
 GROUPS = {"jma_eew": "event"}
 

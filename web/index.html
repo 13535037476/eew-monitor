@@ -360,6 +360,8 @@ try{if(localStorage.getItem('eew.theme')==='light')document.documentElement.clas
       <div class="sec">
         <h3>语音包</h3>
         <p class="hint">只加载你标注过语义的 <b id="packCount">—</b> 段；未标注的数字文件已全部丢弃。
+          含 <b>海啸注意报 / 警报 / 大警报</b>（警报先响前奏再念等级）、
+          <b>震度速報 / 震度結果</b>（6弱以上用专用那句）。
           「测站提示音」和「播报」是两条独立的声道：<b>测站只发提示音，不念人声</b>；
           播报（事件/预想震度/最终报）才用语音包里的人声，由下面的「人声发音」开关决定。</p>
         <div class="row between"><label>事件语音播报</label><input type="checkbox" id="optVoice" class="switch"></div>
@@ -645,6 +647,6 @@ try{if(localStorage.getItem('eew.theme')==='light')document.documentElement.clas
 <script src="geo.js?v=207"></script>
 <script src="geo_jp.js?v=176"></script>
 <script src="geo_world.js?v=207"></script>
-<script src="app.js?v=299"></script>
+<script src="app.js?v=302"></script>
 </body>
 </html>

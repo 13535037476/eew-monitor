@@ -223,6 +223,63 @@
    "file": "st4-v.wav",
    "dur": 1.59,
    "voice": true
+  },
+  {
+   "key": "tsunSiren",
+   "label": "津波警报 · 警报前奏",
+   "group": "tsunami",
+   "file": "tsun-siren.wav",
+   "dur": 2.88,
+   "voice": false
+  },
+  {
+   "key": "tsunWatch",
+   "label": "津波注意报",
+   "group": "tsunami",
+   "file": "tsun-watch-v.wav",
+   "dur": 2.11,
+   "voice": true
+  },
+  {
+   "key": "tsunWarn",
+   "label": "津波警报",
+   "group": "tsunami",
+   "file": "tsun-warn-v.wav",
+   "dur": 1.94,
+   "voice": true
+  },
+  {
+   "key": "tsunMajor",
+   "label": "大津波警报",
+   "group": "tsunami",
+   "file": "tsun-major-v.wav",
+   "dur": 2.21,
+   "voice": true
+  },
+  {
+   "key": "sokuho",
+   "label": "震度速報",
+   "group": "sokuho",
+   "file": "sokuho.wav",
+   "dur": 3.94,
+   "voice": false
+  },
+  {
+   "key": "sokuho6",
+   "label": "震度速報（6弱以上）",
+   "group": "sokuho",
+   "file": "sokuho6.wav",
+   "dur": 5.8,
+   "voice": false
+  },
+  {
+   "key": "sokuhoResult",
+   "label": "震度結果",
+   "group": "sokuho",
+   "file": "sokuho-result.wav",
+   "dur": 6.38,
+   "voice": false
   }
- ]
+ ],
+ "source": "EQuake 标注版（用户手工命名，2026-11-20 补齐海啸/震度速報 7 段）"
 }
