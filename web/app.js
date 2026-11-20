@@ -504,7 +504,7 @@
     if (ev.country === 'CN' || ev.country === 'JP' || ev.country === 'TW') return (ev.mag || 0) >= 3.0;
     // 全球台网：门槛改由「全球检测弹窗震级」决定（默认 4.5）。
     // 原来写死 5.0，GQ 推来的 M4~4.9 既不弹卡也不响铃，看起来就是「GQ 从来没预警」。
-    return (ev.mag || 0) >= (srcThOf(ev).mag || 0);
+    return (ev.mag || 0) >= Number(state.settings.gqAlert ?? 4.5);
   }
 
   function currentEvent() {
@@ -5222,15 +5222,11 @@
       const aKey = String(ev.origin_ts || ev.uid);
       const already = state.lastAlarmKey === aKey && est.risk <= (state.lastAlarmRisk || 0);
       const th = usesShindo(ev) ? Number(state.settings.thJp) : Number(state.settings.thCn);
-      const srcTh = srcThOf(ev);
-      // 震级门槛：每个源各自一条（以前只有 GQ 有，日本/中国只看本地震度）
-      const magOk = (ev.mag || 0) >= (srcTh.mag || 0);
-      // 强度门槛：事件自身的最大震度 vs 关注点预估，取大的那个
-      const intenNow = Math.max(evIntenNum(ev), est.val || 0);
-      const intOk = intenNow >= (srcTh.int || 0);
+
       // 全球检测（GQ）没有「本地震度」这回事：智利 M7 在关注点永远是 0 度，
       // 所以它按「震中烈度估算 + 震级」判，不按关注点。
-      const gqAlert = ev.kind === 'gq' && magOk && intOk;
+      const gqAlert = ev.kind === 'gq' &&
+        (ev.mag || 0) >= Number(state.settings.gqAlert ?? 4.5);
       // 日本/台湾的「緊急地震速報」本身就是警报：卡片照弹，桌面通知照发，
       // 只是本地预估不够时不出警报音（免得天天被远处的 M4 吵）。
       const warnOnly = !!(ev.warn || ev.country === 'TW') && !ev.cancel &&
@@ -5239,7 +5235,7 @@
       const why = ev.kind === 'gq'
         ? '全球台网检测 · ' + where + '预估' + est.label
         : where + '预估' + est.label + ' · 距 ' + Math.round(est.R) + 'km';
-      if (!ev.isSim && !gqAlert && (!magOk || !intOk)) {
+      if (!ev.isSim && !gqAlert && est.val < th) {
         if (warnOnly) notifyEvent(ev, '预估' + est.label + '（本地未达阈值）');
         continue;
       }
@@ -6072,9 +6068,6 @@
       if (m) m.value = String(t.mag ?? '');
       if (i2) i2.value = String(t.int ?? '');
     }
-    // 老逻辑（上卡判定/告警文案）还在读 thJp/thCn，跟着镜像一份
-    state.settings.thJp = (all.jp && all.jp.int) || 3;
-    state.settings.thCn = (all.cn && all.cn.int) || 4;
   }
   function bindThTable() {
     for (const [mi, ii, key] of THF) {
@@ -6099,6 +6092,19 @@
   }
   bindThTable();
   syncThTable();
+  const tj0 = $('#optThJp'), tc0 = $('#optThCn');
+  if (tj0) {
+    tj0.value = String(state.settings.thJp);
+    tj0.addEventListener('change', e => {
+      state.settings.thJp = +e.target.value; LS.set('settings', state.settings);
+    });
+  }
+  if (tc0) {
+    tc0.value = String(state.settings.thCn);
+    tc0.addEventListener('change', e => {
+      state.settings.thCn = +e.target.value; LS.set('settings', state.settings);
+    });
+  }
   const gm = $('#optGqMag');
   if (gm) {
     gm.value = String(state.settings.gqMag ?? 3);
