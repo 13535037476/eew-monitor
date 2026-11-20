@@ -112,6 +112,24 @@ SOURCES = [
         "url": "https://api.wolfx.jp/cenc_eqlist.json",
         "provider": "Wolfx",
     },
+    # ---- 海外两路：INGV 的 Early-Est（快速定位，实验性）与 USGS 西海岸实时目录 ----
+    # Early-Est 是 INGV 的全球快速定位系统，QuakeML 格式，几秒一版；
+    # ShakeAlert 的官方 EEW 消息不对外公开（要 USGS 技术伙伴协议），
+    # 这里接的是 USGS 公开实时目录里「美西 ShakeAlert 覆盖区」的部分，标注清楚。
+    {
+        "id": "earlyest", "country": "OT", "kind": "catalog", "poll": 12, "fetch": "earlyest",
+        "name": "Early-Est (INGV)",
+        "name_zh": "Early-Est 全球快速定位（INGV，实验性）",
+        "url": "http://early-est.rm.ingv.it/monitor.xml",
+        "provider": "INGV",
+    },
+    {
+        "id": "shakealert", "country": "US", "kind": "catalog", "poll": 30, "fetch": "shakealert",
+        "name": "ShakeAlert / USGS",
+        "name_zh": "ShakeAlert 覆盖区（USGS 公开实时目录）",
+        "url": "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_hour.geojson",
+        "provider": "USGS",
+    },
     {
         "id": "jma_obs", "country": "JP", "kind": "obs", "poll": 45,
         "name": "気象庁 震度観測点",
@@ -323,6 +341,170 @@ class Session:
 
 
 _SESSIONS = {}
+
+
+EARLYEST_URL = "http://early-est.rm.ingv.it/monitor.xml"
+USGS_HOUR_URL = "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_hour.geojson"
+
+
+def _http_text(url, timeout=20):
+    import urllib.request
+    req = urllib.request.Request(url, headers={"User-Agent": "eew-monitor/1.0"})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return r.read().decode("utf-8", "replace")
+
+
+def _lname(tag):
+    return tag.rsplit("}", 1)[-1] if "}" in tag else tag
+
+
+def earlyest_fetch():
+    """INGV Early-Est：QuakeML 实时流 → 事件列表（一次只给正在处理的那几条）"""
+    import xml.etree.ElementTree as ET
+    txt = _http_text(EARLYEST_URL, timeout=25)
+    root = ET.fromstring(txt)
+    out = []
+    for ev in root.iter():
+        if _lname(ev.tag) != "event":
+            continue
+        origins = [c for c in ev if _lname(c.tag) == "origin"]
+        mags = [c for c in ev if _lname(c.tag) == "magnitude"]
+        if not origins:
+            continue
+        # 同一事件会带很多版解，最后一版是最新的；优先用 preferredOriginID 指定的那版
+        pref = ""
+        for c in ev:
+            if _lname(c.tag) == "preferredOriginID":
+                pref = (c.text or "").strip()
+        og = None
+        for c in origins:
+            if pref and c.get("publicID") == pref:
+                og = c
+                break
+        if og is None:
+            og = origins[-1]
+
+        def gv(node, name):
+            for c in node:
+                if _lname(c.tag) == name:
+                    for g in c:
+                        if _lname(g.tag) == "value":
+                            return g.text
+                    return None
+            return None
+
+        try:
+            lat = float(gv(og, "latitude"))
+            lon = float(gv(og, "longitude"))
+        except (TypeError, ValueError):
+            continue
+        depth_m = gv(og, "depth")
+        try:
+            depth = float(depth_m) / 1000.0 if depth_m is not None else 10.0
+        except (TypeError, ValueError):
+            depth = 10.0
+        region = ""
+        for c in og:
+            if _lname(c.tag) == "region":
+                region = (c.text or "").strip()
+        tstr = gv(og, "time")
+        origin_ts = None
+        if tstr:
+            try:
+                import datetime
+                origin_ts = datetime.datetime.fromisoformat(tstr).replace(
+                    tzinfo=datetime.timezone.utc).timestamp()
+            except Exception:
+                origin_ts = None
+        if origin_ts is None:
+            continue
+        rep_ts = origin_ts
+        for c in ev:
+            if _lname(c.tag) == "creationInfo":
+                for g in c:
+                    if _lname(g.tag) == "creationTime":
+                        try:
+                            import datetime
+                            rep_ts = datetime.datetime.fromisoformat(
+                                (g.text or "").strip()).replace(
+                                tzinfo=datetime.timezone.utc).timestamp()
+                        except Exception:
+                            pass
+        mag = None
+        pmag = ""
+        for c in ev:
+            if _lname(c.tag) == "preferredMagnitudeID":
+                pmag = (c.text or "").strip()
+        pickm = None
+        for m in mags:
+            if pmag and m.get("publicID") == pmag:
+                pickm = m
+                break
+        if pickm is None and mags:
+            pickm = mags[-1]
+        if pickm is not None:
+            try:
+                mag = float(gv(pickm, "mag"))
+            except (TypeError, ValueError):
+                mag = None
+        # 报次：quality 里的 ee:report_count / ee:seq_num
+        rep_n = 0
+        for c in og:
+            if _lname(c.tag) == "quality":
+                for g in c:
+                    if _lname(g.tag) == "report_count":
+                        try:
+                            rep_n = int(float(g.text))
+                        except (TypeError, ValueError):
+                            pass
+                        break
+        uid = "EE-" + (ev.get("publicID", "").rsplit("/", 1)[-1] or str(int(origin_ts)))
+        out.append({
+            "uid": uid, "country": "OT", "source": "earlyest",
+            "event_id": uid, "origin_ts": origin_ts, "report_ts": rep_ts,
+            "place": region or "全球（Early-Est）",
+            "lat": lat, "lon": lon, "depth": round(depth, 1),
+            "mag": round(mag, 1) if mag is not None else 0.0,
+            "max_intensity": "?", "max_intensity_num": 0,
+            "serial": rep_n, "kind": "catalog",
+        })
+    return out
+
+
+def shakealert_fetch():
+    """USGS 公开实时目录 → 只取美西（ShakeAlert 覆盖区）的事件"""
+    d = session_json(USGS_HOUR_URL, timeout=25)
+    feats = (d or {}).get("features") or []
+    out = []
+    for f in feats:
+        try:
+            p = f.get("properties") or {}
+            g = (f.get("geometry") or {}).get("coordinates") or []
+            lon, lat = float(g[0]), float(g[1])
+            depth = float(g[2]) if len(g) > 2 else 10.0
+        except (TypeError, ValueError, IndexError):
+            continue
+        if not (30 <= lat <= 50 and -126 <= lon <= -114):
+            continue
+        mag = p.get("mag")
+        if mag is None or float(mag) < 3.0:      # M2 级的加州小震太多，列表会被刷屏
+            continue
+        t = p.get("time")
+        if not t:
+            continue
+        ts = float(t) / 1000.0
+        uid = "SA-" + str(f.get("id") or int(ts))
+        out.append({
+            "uid": uid, "country": "US", "source": "shakealert",
+            "event_id": uid, "origin_ts": ts,
+            "report_ts": float(p.get("updated") or t) / 1000.0,
+            "place": p.get("place") or "美西",
+            "lat": lat, "lon": lon, "depth": round(abs(depth), 1),
+            "mag": round(float(mag), 1),
+            "max_intensity": "?", "max_intensity_num": 0,
+            "serial": 1, "kind": "catalog",
+        })
+    return out
 
 
 def session_json(url, timeout=12):
@@ -1097,6 +1279,8 @@ def apply_of(source_id, payload):
 
 
 def catalog_of(source_id, payload):
+    if source_id in ("earlyest", "shakealert"):
+        return payload or []
     if source_id == "jma_cat":
         return norm_jma_catalog(payload)
     if source_id == "cenc_cat":

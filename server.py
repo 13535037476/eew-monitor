@@ -81,7 +81,7 @@ def user_dir(name):
 
 def user_file(name, fn):
     return os.path.join(user_dir(name), fn)
-VERSION = "1.27.0"
+VERSION = "1.28.0"
 
 # ---------------- 站点所有者 ----------------
 # 这套东西默认是本机一家人用，账号管理（建号/改密/踢设备/替人配密钥）
@@ -475,7 +475,7 @@ def _blank_state():
         "version": VERSION,
         "sources": [],
         "eew": {"JP": None, "CN": None, "TW": None},
-        "catalogs": {"JP": [], "CN": []},
+        "catalogs": {"JP": [], "CN": [], "OT": [], "US": []},
         "events": [],
         "alerts": [],
         "obs": None,
@@ -1316,6 +1316,10 @@ def poll_once(src):
     """拉一次数据源，成功返回 payload，失败抛异常"""
     if src.get("fetch") == "sokuho":
         return sources.sokuho_fetch()
+    if src.get("fetch") == "earlyest":
+        return sources.earlyest_fetch()
+    if src.get("fetch") == "shakealert":
+        return sources.shakealert_fetch()
     if src.get("fetch") == "lpgm":
         # 气象厅长周期：HTML 列表 + Shift_JIS CSV，不能走 JSON 通道
         return sources.lpgm_fetch()
@@ -1522,6 +1526,7 @@ def _apply_payload_one(src, payload):
             items = []
         else:
             items = sources.catalog_of(sid, payload)
+            STATE["catalogs"].setdefault(src["country"], [])
             STATE["catalogs"][src["country"]] = items
     if src["kind"] == "catalog":
         try:
@@ -1539,7 +1544,9 @@ def build_state():
     minmag = _gq_min_mag()   # 全球检测最小震级（设置面板可调，M1~M8）
     with LOCK:
         gqev = gq_client.recent_events(min_mag=minmag, limit=40) if gq_client else []
-        merged = list(STATE["catalogs"]["CN"]) + list(STATE["catalogs"]["JP"]) + list(gqev)
+        merged = (list(STATE["catalogs"]["CN"]) + list(STATE["catalogs"]["JP"]) +
+                  list(STATE["catalogs"].get("OT") or []) +
+                  list(STATE["catalogs"].get("US") or []) + list(gqev))
         merged.sort(key=lambda e: e.get("origin_ts") or 0, reverse=True)
         eew = dict(STATE["eew"])
         for c in ("JP", "CN", "TW"):

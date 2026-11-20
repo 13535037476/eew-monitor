@@ -114,6 +114,22 @@ v1.16 起改成**所有者模式**：账号管理只属于一个账号（默认 
   不用麻烦所有者。SeedLink 填 `host:port`；Jian 密钥想写进这里会被拒绝
   （那是账号级的东西，只能填「我的 Jian 密钥」）。
 
+## 海外两路：Early-Est 与 ShakeAlert 覆盖区（v1.28）
+
+| 源 | 接口 | 解析 | 节奏 |
+|---|---|---|---|
+| Early-Est（INGV） | `early-est.rm.ingv.it/monitor.xml` | QuakeML：preferredOrigin / preferredMagnitude，深度单位 m → km，报次取 `ee:report_count` | 12 s |
+| ShakeAlert 覆盖区 | USGS `all_hour.geojson` | 取 30~50°N、126~114°W，M≥2.0 | 30 s |
+
+两点说明：
+
+- Early-Est 是 INGV 的**实验性**全球快速定位，官方也标注「未经专家验证」，界面上按实验性信息对待
+- **ShakeAlert 的官方 EEW 消息不对外公开**（需 USGS 技术伙伴协议）。这里接的是 USGS 公开实时目录里
+  「ShakeAlert 覆盖区」的部分，所以数据源面板里写的是「ShakeAlert 覆盖区（USGS 公开实时目录）」，
+  不冒充官方推送
+
+两路都进「最近地震」列表，与 JMA/CENC 目录、GlobalQuake 并列排序。
+
 ## 每个数据源自己的录屏门槛（v1.26 / 位置更正 v1.26.1）
 
 **自动录屏**里每个源各设「震级 / 强度」两条线，两条都过才录：

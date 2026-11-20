@@ -3,6 +3,17 @@
  "count": 20,
  "entries": [
   {
+   "ver": "1.28.0",
+   "date": "2026-11-20",
+   "title": "接入 Early-Est 与 ShakeAlert 覆盖区",
+   "kind": "release",
+   "items": [
+    "新增 Early-Est（INGV 全球快速定位）：解析其 QuakeML 实时流，12 秒一拉，带报次与深度",
+    "新增 ShakeAlert 覆盖区（USGS 公开实时目录）：取美西 30~50°N / 126~114°W 的 M2+ 事件，30 秒一拉",
+    "两路都进「最近地震」列表；官方 ShakeAlert EEW 消息不对外公开，这里用的是 USGS 公开实时目录，数据源面板写明"
+   ]
+  },
+  {
    "ver": "1.27.0",
    "date": "2026-11-20",
    "title": "录屏改成手动停止",
@@ -203,16 +214,6 @@
    "items": [
     "管理员可建号 / 改密码 / 踢下线 / 删号，可替任意账号配 Jian 密钥（只看掩码）",
     "同一把 rt_ 密钥按密钥去重，避免同账号开两条连接触发 account_banned"
-   ],
-   "kind": "release"
-  },
-  {
-   "ver": "1.12.0",
-   "date": "2026-11-14",
-   "title": "数据源密钥按账号隔离",
-   "items": [
-    "Jian 私源改为账号级 WebSocket，一个账号一条流，互不影响",
-    "公开源（JMA/CENC/CWA/GlobalQuake）仍由服务器统一抓取，不按账号重复请求"
    ],
    "kind": "release"
   }
