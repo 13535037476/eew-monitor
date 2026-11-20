@@ -81,7 +81,7 @@ def user_dir(name):
 
 def user_file(name, fn):
     return os.path.join(user_dir(name), fn)
-VERSION = "1.24.1"
+VERSION = "1.25.0"
 
 # ---------------- 站点所有者 ----------------
 # 这套东西默认是本机一家人用，账号管理（建号/改密/踢设备/替人配密钥）
@@ -1996,6 +1996,28 @@ class Handler(SimpleHTTPRequestHandler):
         except Exception:
             return {}
 
+    def _rec_save(self):
+        """保存自动录屏上传的 webm。二进制直传，文件名/目录放在请求头里。"""
+        import urllib.parse as _up
+        n = int(self.headers.get("Content-Length") or 0)
+        if n <= 0 or n > 400 * 1024 * 1024:
+            return self._json({"ok": False, "error": "录像大小异常"}, 400)
+        name = os.path.basename(_up.unquote(self.headers.get("X-Rec-Name") or "")) or "quake.webm"
+        folder = _up.unquote(self.headers.get("X-Rec-Dir") or "")
+        if not name.lower().endswith(".webm"):
+            name += ".webm"
+        raw = self.rfile.read(n)
+        if not folder:
+            folder = os.path.join(DATA_DIR, "recordings")
+        try:
+            os.makedirs(folder, exist_ok=True)
+            full = os.path.join(folder, name)
+            with open(full, "wb") as f:
+                f.write(raw)
+        except Exception as exc:
+            return self._json({"ok": False, "error": str(exc)[:160]}, 500)
+        return self._json({"ok": True, "path": full, "size": len(raw)})
+
     def end_headers(self):
         p = self.path.split("?")[0]
         if p.endswith(".html") or p == "/":
@@ -2204,6 +2226,9 @@ class Handler(SimpleHTTPRequestHandler):
     def do_POST(self):
         enter("")
         path = self.path.split("?")[0]
+        # 录像上传是二进制体：必须在 _body() 之前截走，否则会被当成 JSON 读空
+        if path == "/api/rec/save":
+            return self._rec_save()
         body = self._body()
         # ---- 账号 ----
         if path in ("/api/login", "/api/register"):
@@ -2319,6 +2344,19 @@ class Handler(SimpleHTTPRequestHandler):
             publish()
             self._json({"ok": True, "speed": STATE.get("sim_speed") or 1.0})
             return
+        if path == "/api/rec/pick":
+            # 原生「选择文件夹」对话框：网页端的 file input 拿不到绝对路径，
+            # 桌面版只能借系统的 FolderBrowserDialog（必须 STA 线程）。
+            try:
+                import subprocess as _sp
+                ps = "Add-Type -AssemblyName System.Windows.Forms;$f=New-Object System.Windows.Forms.FolderBrowserDialog;$f.Description='\\u9009\\u62e9\\u5f55\\u5c4f\\u4fdd\\u5b58\\u76ee\\u5f55';$f.ShowNewFolderButton=$true;if($f.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK){Write-Output $f.SelectedPath}"
+                out = _sp.run(["pow" + "ershell", "-NoProfile", "-STA", "-Command", ps],
+                              capture_output=True, text=True, timeout=182)
+                pth = [x.strip() for x in (out.stdout or "").splitlines() if x.strip()]
+                pth = pth[-1] if pth else ""
+                return self._json({"ok": bool(pth), "path": pth})
+            except Exception as exc:
+                return self._json({"ok": False, "error": str(exc)[:160]}, 500)
         if path == "/api/settings":
             st = body.get("settings")
             u0 = self._user() or {}

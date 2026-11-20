@@ -1065,3 +1065,18 @@ html.light .tip .wave i{color:#6b8095}
 .hero-meta .pschip b{font-family:var(--mono);font-size:11px;font-weight:700;color:#9cc4ff}
 html.light .hero-meta .pschip{border-color:rgba(47,111,208,.35);background:rgba(47,111,208,.08)}
 html.light .hero-meta .pschip b{color:#1d4f8f}
+
+/* 自动录屏：录制中的红点 */
+.recdot{
+  position:fixed;right:20px;bottom:44px;z-index:46;display:flex;align-items:center;gap:6px;
+  padding:5px 10px 6px;border-radius:999px;font:700 10.5px/1 var(--mono);letter-spacing:.10em;
+  color:#ffd9d4;background:rgba(120,16,14,.82);border:1px solid rgba(255,90,70,.5);
+  box-shadow:0 8px 24px rgba(120,0,0,.35);backdrop-filter:blur(10px);
+}
+.recdot[hidden]{display:none!important}
+.recdot i{width:7px;height:7px;border-radius:50%;background:#ff453a;
+  box-shadow:0 0 8px rgba(255,69,58,.9);animation:recBlink 1.1s infinite}
+.recdot span{margin-left:2px;color:rgba(255,217,212,.75);letter-spacing:.04em}
+@keyframes recBlink{0%,100%{opacity:1}50%{opacity:.25}}
+.recck{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;color:var(--txt2);white-space:nowrap}
+.recck input{accent-color:var(--accent)}

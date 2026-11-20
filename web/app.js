@@ -169,6 +169,9 @@
       voice: true, human: true, stVoice: true, stAfterFinal: true, stHuman: false,
       decay: 1.6, decayV: 2,
       chime: 'builtin', pack: '',
+      // 自动录屏：JMA 达到震级就录一段地图画面（带震级/地点叠加），存成本地 webm
+      recOn: false, recMag: 4.0, recDur: 60, recKbps: 2500, recDir: '',
+      recSrc: { jp: true, cn: false, tw: false, gq: false },
     }, LS.get('settings', {})),
     seen: new Set(LS.get('seen', [])),
     lastAlarmKey: '', lastAlarmAt: 0,
@@ -4444,6 +4447,176 @@
     if (ev && (!prev || prev.uid !== ev.uid) && !state.historyEvent) focusOnEvent(ev, true);
   }
 
+  // ---------------- 自动录屏 ----------------
+  // 达到设定震级时，把「地图画布 + 叠加条」录成 webm 存到本地。
+  // 为什么录画布而不是整窗：浏览器拿不到整窗截图权限（getDisplayMedia 每次都要选窗口），
+  // 而 #map 是纯 canvas，captureStream 直接可用、无需任何授权。震级/地点/时间
+  // 用 canvas 画成叠加条，所以画面里一定看得到关键信息。
+  const REC = { mr: null, cv: null, c2: null, timer: 0, stopAt: 0, ev: null, key: '' };
+
+  function recSrcOn(ev) {
+    const src = state.settings.recSrc || {};
+    const id = String(ev.source || '');
+    if (id.indexOf('jma') === 0) return !!src.jp;
+    if (id === 'gq') return !!src.gq;
+    if (id === 'cwa') return !!src.tw;
+    return !!src.cn;                       // cenc / sc / fj / cq / icl
+  }
+
+  function recName(ev) {
+    const d = new Date();
+    const p2 = n => String(n).padStart(2, '0');
+    const ts = d.getFullYear() + p2(d.getMonth() + 1) + p2(d.getDate()) + '_' +
+      p2(d.getHours()) + p2(d.getMinutes()) + p2(d.getSeconds());
+    return 'EEW_' + ts + '_' + String(ev.source || 'eew').toUpperCase() +
+      '_M' + (ev.mag || 0).toFixed(1) + '.webm';
+  }
+
+  function recHud(c2, ev, w, h) {
+    const k = w / 1500;
+    const barH = Math.max(38, 46 * k);
+    c2.save();
+    c2.fillStyle = 'rgba(6,10,16,.64)';
+    c2.fillRect(0, h - barH, w, barH);
+    c2.fillStyle = 'rgba(255,255,255,.14)';
+    c2.fillRect(0, h - barH, w, Math.max(1, k));
+    c2.textBaseline = 'middle';
+    const mid = h - barH / 2;
+    let x = 18 * k;
+    const id = String(ev.source || '');
+    const badge = id.indexOf('jma') === 0 ? '気象庁 緊急地震速報'
+      : id === 'cwa' ? 'CWA 地震速報'
+      : id === 'gq' ? 'GlobalQuake'
+      : id === 'cenc' ? '中国地震台网' : '地震速報';
+    c2.font = '700 ' + (15 * k).toFixed(1) + 'px system-ui,"Microsoft YaHei",sans-serif';
+    c2.fillStyle = '#ffd166';
+    c2.fillText(badge, x, mid);
+    x += c2.measureText(badge).width + 16 * k;
+    c2.font = '800 ' + (20 * k).toFixed(1) + 'px ui-monospace,Consolas,monospace';
+    c2.fillStyle = '#fff';
+    const mag = 'M' + (ev.mag || 0).toFixed(1);
+    c2.fillText(mag, x, mid);
+    x += c2.measureText(mag).width + 14 * k;
+    c2.font = '600 ' + (15 * k).toFixed(1) + 'px system-ui,"Microsoft YaHei",sans-serif';
+    c2.fillStyle = '#eaf2fb';
+    const place = (ev.place || '').replace(/（演练）/g, '') + ' · 深 ' +
+      Math.round(ev.depth || 0) + ' km' +
+      (ev.max_intensity && ev.max_intensity !== '?' ? ' · 最大震度 ' + ev.max_intensity : '') +
+      (ev.serial ? ' · 第 ' + ev.serial + ' 報' : '');
+    c2.fillText(place, x, mid);
+    const d = new Date();
+    const p2 = n => String(n).padStart(2, '0');
+    const clock = d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate()) + ' ' +
+      p2(d.getHours()) + ':' + p2(d.getMinutes()) + ':' + p2(d.getSeconds());
+    c2.font = '600 ' + (13 * k).toFixed(1) + 'px ui-monospace,Consolas,monospace';
+    c2.fillStyle = 'rgba(255,255,255,.72)';
+    c2.textAlign = 'right';
+    c2.fillText(clock + ' · 震线 EEW 自动录屏', w - 18 * k, mid);
+    c2.restore();
+  }
+
+  async function saveRec(blob, ev) {
+    try {
+      const r = await fetch('/api/rec/save', {
+        method: 'POST', body: blob,
+        headers: {
+          'Content-Type': 'video/webm',
+          'X-Rec-Name': encodeURIComponent(recName(ev || {})),
+          'X-Rec-Dir': encodeURIComponent(state.settings.recDir || ''),
+        },
+      });
+      const j = await r.json();
+      if (j.ok) toast('录屏已保存：' + j.path, 6000);
+      else toast('录屏保存失败：' + (j.error || '未知错误'), 6000);
+    } catch (e) {
+      toast('录屏上传失败：' + e.message, 6000);
+    }
+  }
+
+  function stopRec() {
+    if (REC.timer) { clearInterval(REC.timer); REC.timer = 0; }
+    const dot = $('#recDot');
+    if (dot) dot.hidden = true;
+    const mr = REC.mr;
+    REC.mr = null;
+    if (!mr) return;
+    try { mr.stop(); } catch (e) { }
+  }
+
+  function startRec(ev) {
+    const map = $('#map');
+    if (!map || !window.MediaRecorder || !map.captureStream) {
+      toast('这个环境不支持录制（需要 WebView2 / Chromium 内核）'); return;
+    }
+    const cv = document.createElement('canvas');
+    cv.width = map.width; cv.height = map.height;
+    const c2 = cv.getContext('2d');
+    const fps = 15;
+    const dur = Math.max(5, Math.min(600, parseInt(state.settings.recDur, 10) || 60));
+    const kbps = Math.max(400, Math.min(20000, parseInt(state.settings.recKbps, 10) || 2500));
+    let stream;
+    try { stream = cv.captureStream(fps); } catch (e) { toast('拿不到画布流：' + e.message); return; }
+    let mime = 'video/webm;codecs=vp9';
+    if (!MediaRecorder.isTypeSupported(mime)) mime = 'video/webm;codecs=vp8';
+    if (!MediaRecorder.isTypeSupported(mime)) mime = 'video/webm';
+    let mr;
+    try {
+      mr = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: kbps * 1000 });
+    } catch (e) {
+      try { mr = new MediaRecorder(stream); } catch (e2) { toast('初始化录制器失败'); return; }
+    }
+    const chunks = [];
+    mr.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+    mr.onstop = () => {
+      const blob = new Blob(chunks, { type: 'video/webm' });
+      saveRec(blob, REC.ev || ev);
+      try { stream.getTracks().forEach(t => t.stop()); } catch (e) { }
+      REC.ev = null;
+    };
+    REC.mr = mr; REC.cv = cv; REC.c2 = c2; REC.ev = ev;
+    REC.stopAt = nowSec() + dur;
+    const frame = () => {
+      if (!REC.mr) return;
+      try { c2.drawImage(map, 0, 0); } catch (e) { }
+      try { recHud(c2, REC.ev || ev, cv.width, cv.height); } catch (e) { }
+      const left = Math.max(0, Math.ceil(REC.stopAt - nowSec()));
+      const l = $('#recLeft');
+      if (l) l.textContent = left + 's';
+      if (nowSec() >= REC.stopAt) stopRec();
+    };
+    try { mr.start(1000); } catch (e) { toast('开始录制失败：' + e.message); return; }
+    REC.timer = setInterval(frame, 1000 / fps);
+    frame();
+    const dot = $('#recDot');
+    if (dot) dot.hidden = false;
+    toast('开始自动录屏（' + dur + 's · ' + kbps + 'kbps）', 4000);
+  }
+
+  // 每 250ms 由主循环调一次：够格就开录，一场地震只录一次
+  function tryAutoRec() {
+    if (REC.mr) return;
+    if (!state.settings.recOn) return;
+    if (state.historyEvent) return;
+    const minMag = Number(state.settings.recMag) || 4;
+    const now = nowSec();
+    // 不只看「当前显示的那一起」：主卡被别的事件占着时，JMA 的 M4+ 也要照录。
+    // 在一整批进行中事件里挑震级最大的那一起来录。
+    const list = (state.eewList || []).slice();
+    if (state.autoEv) list.push(state.autoEv);
+    let pick = null;
+    for (const e of list) {
+      if (!e || e.isSim || e.cancel) continue;
+      if ((e.mag || 0) < minMag) continue;
+      if (!recSrcOn(e)) continue;
+      if (REC.key && REC.key === e.uid) continue;
+      if (now - (e.report_ts || e.origin_ts || 0) > 30) continue;   // 老事件不补录
+      if (!pick || (e.mag || 0) > (pick.mag || 0)) pick = e;
+    }
+    if (!pick) return;
+    REC.key = pick.uid;
+    startRec(pick);
+  }
+
   function tickReactions() {
     const ev = currentEvent();
     if (!ev) { state.reactCount = 0; state.reactKey = ''; return; }
@@ -5695,6 +5868,85 @@
       }
     });
   }
+  // ---- 自动录屏设置 ----
+  const recEls = {
+    on: $('#optRec'), mag: $('#optRecMag'), dur: $('#optRecDur'), kbps: $('#optRecKbps'),
+    dir: $('#optRecDir'), jp: $('#optRecJP'), cn: $('#optRecCN'),
+    tw: $('#optRecTW'), gq: $('#optRecGQ'),
+  };
+  function syncRecUI() {
+    const st = state.settings, src = st.recSrc || {};
+    if (recEls.on) recEls.on.checked = !!st.recOn;
+    if (recEls.mag) recEls.mag.value = String(st.recMag ?? 4);
+    if (recEls.dur) recEls.dur.value = String(st.recDur ?? 60);
+    if (recEls.kbps) recEls.kbps.value = String(st.recKbps ?? 2500);
+    if (recEls.dir) recEls.dir.value = st.recDir || '';
+    if (recEls.jp) recEls.jp.checked = src.jp !== false;
+    if (recEls.cn) recEls.cn.checked = !!src.cn;
+    if (recEls.tw) recEls.tw.checked = !!src.tw;
+    if (recEls.gq) recEls.gq.checked = !!src.gq;
+  }
+  function recSaveSoon() { LS.set('settings', state.settings); }
+  if (recEls.on) {
+    syncRecUI();
+    recEls.on.addEventListener('change', e => {
+      state.settings.recOn = e.target.checked;
+      recSaveSoon();
+      toast(e.target.checked ? '自动录屏已开启（M' + (state.settings.recMag ?? 4) + ' 起录）'
+        : '自动录屏已关闭');
+    });
+    const num = (el, key, lo, hi, dflt) => {
+      if (!el) return;
+      el.addEventListener('change', e => {
+        let v = parseFloat(e.target.value);
+        if (!isFinite(v)) v = dflt;
+        v = Math.max(lo, Math.min(hi, v));
+        e.target.value = String(v);
+        state.settings[key] = v;
+        recSaveSoon();
+      });
+    };
+    num(recEls.mag, 'recMag', 1, 9, 4);
+    num(recEls.dur, 'recDur', 5, 600, 60);
+    num(recEls.kbps, 'recKbps', 400, 20000, 2500);
+    if (recEls.dir) recEls.dir.addEventListener('change', e => {
+      state.settings.recDir = e.target.value.trim();
+      recSaveSoon();
+    });
+    const srcBind = (el, key) => {
+      if (!el) return;
+      el.addEventListener('change', e => {
+        const src = Object.assign({ jp: true, cn: false, tw: false, gq: false },
+          state.settings.recSrc || {});
+        src[key] = e.target.checked;
+        state.settings.recSrc = src;
+        recSaveSoon();
+      });
+    };
+    srcBind(recEls.jp, 'jp'); srcBind(recEls.cn, 'cn');
+    srcBind(recEls.tw, 'tw'); srcBind(recEls.gq, 'gq');
+    const bp = $('#btnRecPick');
+    if (bp) bp.addEventListener('click', async () => {
+      bp.disabled = true;
+      const old = bp.textContent;
+      bp.textContent = '选择中…';
+      try {
+        const r = await fetch('/api/rec/pick', { method: 'POST' });
+        const j = await r.json();
+        if (j.ok && j.path) {
+          state.settings.recDir = j.path;
+          recEls.dir.value = j.path;
+          recSaveSoon();
+          toast('录屏目录：' + j.path, 5000);
+        } else if (j.error) toast('选目录失败：' + j.error, 5000);
+      } catch (e) {
+        toast('选目录失败：' + e.message, 5000);
+      } finally {
+        bp.disabled = false; bp.textContent = old;
+      }
+    });
+  }
+
   const wn = $('#optWaveN');
   if (wn) {
     wn.value = String(state.settings.waveN ?? 10);
@@ -5783,6 +6035,7 @@
     if (gaEl) gaEl.value = String(state.settings.gqAlert ?? 4.5);
     const wnEl = $('#optWaveN');
     if (wnEl) wnEl.value = String(state.settings.waveN ?? 10);
+    try { syncRecUI(); } catch (e) { }
   }
   let _srvSetMerge = false;
   fetch('/api/settings', { cache: 'no-store' }).then(r => r.json()).then(d => {
@@ -6603,5 +6856,6 @@
     tickAuto();
     updateLiveMax();
     if (displayEvent()) renderHero();
+    tryAutoRec();
   }, 250);
 })();

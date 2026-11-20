@@ -6,7 +6,7 @@
 <title>震线 EEW · 中日地震预警</title>
 <script>/* 首帧前定主题，避免启动时先闪一下深色 */
 try{if(localStorage.getItem('eew.theme')==='light')document.documentElement.classList.add('light')}catch(e){}</script>
-<link rel="stylesheet" href="style.css?v=238">
+<link rel="stylesheet" href="style.css?v=239">
 </head>
 <body>
 
@@ -45,6 +45,8 @@ try{if(localStorage.getItem('eew.theme')==='light')document.documentElement.clas
     </div>
   </div>
 </header>
+
+<div class="recdot" id="recDot" hidden><i></i>REC<span id="recLeft"></span></div>
 
 <div class="tsualert" id="tsuAlert" hidden>
   <b id="tsuAlertTitle">津波警報</b>
@@ -463,6 +465,34 @@ try{if(localStorage.getItem('eew.theme')==='light')document.documentElement.clas
       </div>
 
       <div class="sec">
+        <h3>自动录屏</h3>
+        <p class="hint">达到设定震级时自动录一段地图画面（带震级 / 地点 / 时间的叠加条），
+          存成 <b>.webm</b> 放到你选的目录。只录地图，不含左侧浮层卡片；录制中右上角有红点。</p>
+        <div class="row between"><label>开启自动录屏</label>
+          <input type="checkbox" id="optRec" class="switch"></div>
+        <div class="row">
+          <label style="flex:none;width:76px">触发震级</label>
+          <input id="optRecMag" class="input mono" style="width:72px" value="4.0">
+          <label style="flex:none;width:66px">时长(秒)</label>
+          <input id="optRecDur" class="input mono" style="width:72px" value="60">
+          <label style="flex:none;width:74px">码率(kbps)</label>
+          <input id="optRecKbps" class="input mono" style="width:84px" value="2500">
+        </div>
+        <div class="row">
+          <label style="flex:none;width:76px">保存目录</label>
+          <input id="optRecDir" class="input" placeholder="留空 = data/recordings">
+          <button type="button" class="btn" id="btnRecPick">选择…</button>
+        </div>
+        <div class="row" style="gap:12px">
+          <label style="flex:none;width:76px">录制来源</label>
+          <label class="recck"><input type="checkbox" id="optRecJP"> 日本 JMA</label>
+          <label class="recck"><input type="checkbox" id="optRecCN"> 中国</label>
+          <label class="recck"><input type="checkbox" id="optRecTW"> 台湾</label>
+          <label class="recck"><input type="checkbox" id="optRecGQ"> 全球 GQ</label>
+        </div>
+      </div>
+
+      <div class="sec">
         <h3>关于</h3>
         <p class="hint">
           数据：日本气象厅 緊急地震速報 / 震源・震度情報；中国地震台网 CENC；中国地震预警（ICL）；
@@ -594,6 +624,6 @@ try{if(localStorage.getItem('eew.theme')==='light')document.documentElement.clas
 <script src="geo.js?v=207"></script>
 <script src="geo_jp.js?v=176"></script>
 <script src="geo_world.js?v=207"></script>
-<script src="app.js?v=295"></script>
+<script src="app.js?v=296"></script>
 </body>
 </html>
