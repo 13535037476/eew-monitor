@@ -20,7 +20,7 @@ for pkg in ("webview", "pythonnet", "clr_loader"):
     except Exception:
         pass
 
-hiddenimports += ["bili", "qrcode", "qrcode.image.svg",
+hiddenimports += ["bili", "cover", "qrcode", "qrcode.image.svg",
                   "webview.platforms.edgechromium", "clr", "pythonnet",
                   "PIL.Image", "PIL.JpegImagePlugin", "PIL.ImageFile"]
 

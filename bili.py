@@ -89,12 +89,18 @@ def _cookies(c=None):
 
 
 def _req(url, data=None, method=None, headers=None, timeout=60, c=None):
-    h = {
-        "User-Agent": UA,
-        "Referer": "https://member.bilibili.com/",
-        "Origin": "https://member.bilibili.com",
-        "Cookie": _cookies(c),
-    }
+    # 登录（passport）和投稿（member）要各自正确的 Referer/Origin，
+    # 全部塞 member 的头会被 passport 当成跨站请求挡掉。
+    if "passport.bilibili.com" in url:
+        ref, org = "https://www.bilibili.com/", "https://www.bilibili.com"
+    elif "api.bilibili.com" in url:
+        ref, org = "https://www.bilibili.com/", "https://www.bilibili.com"
+    else:
+        ref, org = "https://member.bilibili.com/", "https://member.bilibili.com"
+    h = {"User-Agent": UA, "Referer": ref, "Origin": org, "Accept": "application/json, text/plain, */*"}
+    cc = c or cfg()
+    if cc.get("sessdata"):
+        h["Cookie"] = _cookies(cc)
     if headers:
         h.update(headers)
     body = data
@@ -185,6 +191,26 @@ def _upload_file(path, name, c):
     return up["filename"]
 
 
+def upload_cover(path, c):
+    """封面走 /x/vu/web/cover/up，返回 B站给的图片 URL（失败返回空串）。"""
+    import base64
+    try:
+        with open(path, "rb") as f:
+            b64 = base64.b64encode(f.read()).decode()
+        body = urllib.parse.urlencode({"cover": "data:image/jpeg;base64," + b64}).encode()
+        url = "https://member.bilibili.com/x/vu/web/cover/up?ts=%d&csrf=%s" % (
+            int(time.time() * 1000), c.get("bili_jct", ""))
+        code, raw = _req(url, data=body, timeout=60, c=c,
+                         headers={"Content-Type": "application/x-www-form-urlencoded"})
+        d = json.loads(raw.decode("utf-8", "replace"))
+        if d.get("code") == 0:
+            return (d.get("data") or {}).get("url") or ""
+        _STATE["err"] = "封面上传失败：%s" % (d.get("message") or d.get("code"))
+    except Exception as e:
+        _STATE["err"] = ("封面上传异常：%s" % str(e)[:120])
+    return ""
+
+
 def _add_submission(filename, meta, c):
     tid = int(c.get("tid") or 188)
     title = (c.get("title_tpl") or "【地震预警】{place} M{mag} 最大震度{inten}").format(
@@ -204,7 +230,7 @@ def _add_submission(filename, meta, c):
         "title": title[:80],
         "desc": desc[:1900],
         "tag": (c.get("tags") or "地震,地震预警,EEW").replace("，", ","),
-        "cover": c.get("cover") or "",
+        "cover": meta.get("cover_url") or c.get("cover") or "",
         "videos": [{"filename": filename, "title": title[:80], "desc": ""}],
         "no_reprint": 1,
         "open_elec": 1,
@@ -239,6 +265,17 @@ def upload_one(path, meta, c=None):
     c = c or cfg()
     name = os.path.basename(path)
     try:
+        # 先出封面（A 版「速报卡」），传上去拿到 URL；失败就退回平台自动取帧
+        try:
+            import cover as cover_mod
+            cp = os.path.join(_data_dir(), "covers", os.path.splitext(name)[0] + ".jpg")
+            cover_mod.make_cover(meta, cp)
+            url = upload_cover(cp, c)
+            if url:
+                meta = dict(meta)
+                meta["cover_url"] = url
+        except Exception as e:
+            _STATE["err"] = ("封面生成失败：%s" % str(e)[:120])
         fn = _upload_file(path, name, c)
         data = _add_submission(fn, meta, c)
         bvid = (data or {}).get("bvid") or ""
@@ -383,7 +420,8 @@ def qr_poll(key):
             return {"ok": r.get("ok", False), "state": st2,
                     "uname": r.get("uname"), "mid": r.get("mid"),
                     "error": r.get("error")}
-        return {"ok": True, "state": "waiting"}
+        return {"ok": True, "state": "waiting",
+                "code": d.get("code"), "message": d.get("message") or ""}
     except Exception as e:
         return {"ok": False, "state": "fail", "error": str(e)[:160]}
 

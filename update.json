@@ -1,7 +1,7 @@
 {
-  "version": "1.38.5",
-  "url": "https://github.com/13535037476/eew-monitor/releases/latest/download/ZhenXianEEW-Setup-1.38.5.exe",
-  "size": 57332846,
-  "notes": "· 以前台站一有数值（P 波刚掠过）就亮绿框，看着像已经震了：现在必须同时满足「有震源测算（真实事件或本地推算）」+「S 波已到、真的在摇」\n· P 波阶段一律不画框，只保留台站微动点\n· 一个绿框最多圈 25 个正在摇晃的测站，簇里超出的按强度取前 25，不再把整片台网框进一个巨框",
+  "version": "1.38.6",
+  "url": "https://github.com/13535037476/eew-monitor/releases/latest/download/ZhenXianEEW-Setup-1.38.6.exe",
+  "size": 57342018,
+  "notes": "· B站投稿现在会按事件参数自动画封面（A 版速报卡：地点/M/震度/深度/第几报/数据源），先传封面再交稿件\n· 修「扫码登录炸了」：登录接口用错了 Referer/Origin（一律按投稿站发，被 B站 当跨站），现在按域名分开；空 cookie 也不再发\n· P 波如果本身造成强摇（两站以上 ≥1.5）照样画绿框，不再一律等 S 波；普通 P 波微动仍然不画\n· 关于页增加：技术支持 Mon3tr",
   "published": "2026-11-21"
 }

@@ -2741,10 +2741,6 @@
   let hitKey = '', hitAt = 0, hitCache = [];
   function shakeHits(ev) {
     const hits = [];
-    // 只在「有测算」的时候才谈得上摇晃：真实事件或本地推算，二者有一即可。
-    // 以前只看台站数值，P 波刚掠过两个站就亮框，看起来像已经震起来了。
-    const node = ev || state.autoEv;
-    if (!node) return hits;
     if (kmoniFresh()) {
       const lv = state.kmoni.lv || {};
       for (let i = 0; i < state.stations.length; i++) {
@@ -2767,6 +2763,13 @@
         hits.push({ lat: s.y, lon: s.x, v: v });
       }
     }
+    const node = ev || state.autoEv;
+    // 框的开关：
+    //   · 有测算 → 可以画（下面再按 S 波是否到达筛）；
+    //   · 没测算但实测已经很猛（两站 ≥1.5，P 波也可能把人晃醒）→ 也要画；
+    //   · 其余（没测算、也不猛）→ 一个框都不画，避免 P 波一过就绿一片。
+    const strongMeasured = hits.filter(h => h.v >= 1.5).length >= 2;
+    if (!node && !strongMeasured) return [];
     if (hits.length) return hits;
     // 没有实测数据（kmoni 没帧、P-Alert 没值）时，推算/演练也照给绿框：
     // 每 0.5 秒算一次，别每帧把 2000 多个站重算一遍。
