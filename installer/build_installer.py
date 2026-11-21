@@ -114,10 +114,16 @@ def main():
     dst = os.path.join(OUT, name + ".exe")
     shutil.copy2(setup, dst)
 
+    import hashlib
+    h = hashlib.sha256()
+    with open(dst, "rb") as f:
+        for b in iter(lambda: f.read(1 << 20), b""):
+            h.update(b)
     upd = {
         "version": ver,
         "url": "https://github.com/13535037476/eew-monitor/releases/latest/download/" + name + ".exe",
         "size": os.path.getsize(dst),
+        "sha256": h.hexdigest(),
         "notes": meta["notes"],
         "published": time.strftime("%Y-%m-%d"),
     }

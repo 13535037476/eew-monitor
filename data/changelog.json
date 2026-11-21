@@ -3,6 +3,17 @@
   "count": 20,
   "entries": [
     {
+      "ver": "1.38.8",
+      "date": "2026-11-21",
+      "kind": "release",
+      "title": "修「安装包装了报 PKG archive 错误」：下载必须校验完整",
+      "items": [
+        "别人的电脑装不上、弹「Could not load PyInstaller's embedded PKG archive」= 安装包没下完整（或被杀软截断）。现在下载必须对上体积，带了 sha256 还会校验摘要",
+        "以前只要文件大于 512KB 就当「下好了」，半个包会被直接拿去安装；现在对不上会删掉重下",
+        "update.json 增加 sha256，Release 里额外提供 .sha256 和便携版 zip（解压就能跑，不走安装器）"
+      ]
+    },
+    {
       "ver": "1.38.7",
       "date": "2026-11-21",
       "kind": "release",

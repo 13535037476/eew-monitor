@@ -1,7 +1,8 @@
 {
-  "version": "1.38.7",
-  "url": "https://github.com/13535037476/eew-monitor/releases/latest/download/ZhenXianEEW-Setup-1.38.7.exe",
-  "size": 57342515,
-  "notes": "· 二维码几秒就过期：原来服务端只记一个 key，连点两次「刷新二维码」会互相顶掉，旧码立刻被判过期。现在允许多个未过期二维码并存，前端也会丢弃旧计时器的回包\n· 封面补上深度：之前只传了震级/震度，封面上深度显示「—」\n· 设置最上面加一行低对比度的「感谢 · 技术支持 Mon3tr」，不占地方",
+  "version": "1.38.8",
+  "url": "https://github.com/13535037476/eew-monitor/releases/latest/download/ZhenXianEEW-Setup-1.38.8.exe",
+  "size": 57341489,
+  "sha256": "e75c61c6f59e691689232d6a8121bb0add47c05fbebc8197f9b3e57bcd4913c6",
+  "notes": "· 别人的电脑装不上、弹「Could not load PyInstaller's embedded PKG archive」= 安装包没下完整（或被杀软截断）。现在下载必须对上体积，带了 sha256 还会校验摘要\n· 以前只要文件大于 512KB 就当「下好了」，半个包会被直接拿去安装；现在对不上会删掉重下\n· update.json 增加 sha256，Release 里额外提供 .sha256 和便携版 zip（解压就能跑，不走安装器）",
   "published": "2026-11-21"
 }

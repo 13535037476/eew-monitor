@@ -84,7 +84,7 @@ def user_dir(name):
 
 def user_file(name, fn):
     return os.path.join(user_dir(name), fn)
-VERSION = "1.38.7"
+VERSION = "1.38.8"
 APP_NAME = "震线 EEW"
 HOMEPAGE = "https://github.com/13535037476/eew-monitor"
 INSTALL_FILE = os.path.join(APP_DIR, "install.json")
@@ -212,20 +212,25 @@ def _manifest(d):
     if not isinstance(d, dict):
         return None
     if "tag_name" in d:
-        url = ""
+        url, size, sha = "", 0, ""
         for a in (d.get("assets") or []):
             n = (a.get("name") or "").lower()
             if n.endswith(".exe"):
                 url = a.get("browser_download_url") or ""
+                size = int(a.get("size") or 0)
+                dg = str(a.get("digest") or "")
+                if dg.startswith("sha256:"):
+                    sha = dg.split(":", 1)[1]
                 if "setup" in n:
                     break
         body = d.get("body") or ""
         return {"version": str(d.get("tag_name") or "").lstrip("vV"), "url": url,
+                "size": size, "sha256": sha,
                 "notes": body[:4000], "published": str(d.get("published_at") or "")[:19].replace("T", " ")}
     url = d.get("url") or d.get("download") or d.get("setup") or ""
     return {"version": str(d.get("version") or "").lstrip("vV"), "url": url,
             "notes": str(d.get("notes") or "")[:4000], "published": str(d.get("published") or ""),
-            "sha256": str(d.get("sha256") or "")}
+            "size": int(d.get("size") or 0), "sha256": str(d.get("sha256") or "")}
 
 
 def check_update(force=False):
@@ -249,6 +254,7 @@ def check_update(force=False):
             cur, new = _vtuple(VERSION), _vtuple(m["version"])
             out = {"ok": True, "current": VERSION, "latest": m["version"],
                    "has": new > cur, "url": m.get("url") or "", "notes": m.get("notes") or "",
+                   "size": int(m.get("size") or 0), "sha256": m.get("sha256") or "",
                    "published": m.get("published") or "", "source": u, "at": int(now)}
             with _UPDATE_LOCK:
                 _UPDATE_CACHE.update({"at": now, "data": out})
@@ -262,7 +268,7 @@ def check_update(force=False):
     return out
 
 
-def _download_thread(url, dst, ver, sha=""):
+def _download_thread(url, dst, ver, sha="", size=0):
     try:
         _DL.update({"state": "downloading", "pct": 0, "path": "", "error": "", "ver": ver})
         h = hashlib.sha256()
@@ -283,6 +289,8 @@ def _download_thread(url, dst, ver, sha=""):
                     _DL["pct"] = min(99, int(got * 100 / total))
         if got < 1024 * 512:
             raise RuntimeError("下载到的文件太小（%d 字节），可能不是安装包" % got)
+        if size and got != size:
+            raise RuntimeError("下载不完整（%d/%d 字节），请重试" % (got, size))
         if sha and h.hexdigest().lower() != sha.lower():
             raise RuntimeError("校验不一致，文件可能被改过")
         _DL.update({"state": "ready", "pct": 100, "path": dst, "error": "", "ver": ver})
@@ -303,10 +311,19 @@ def start_update_download(force=False):
     if not url.startswith("https://"):
         return {"ok": False, "error": "更新地址不是 https，拒绝下载"}
     dst = os.path.join(tempfile.gettempdir(), "震线EEW-Setup-%s.exe" % up["latest"])
+    want = int(up.get("size") or 0)
     if os.path.isfile(dst) and os.path.getsize(dst) > 1024 * 512:
-        _DL.update({"state": "ready", "pct": 100, "path": dst, "error": "", "ver": up["latest"]})
-        return {"ok": True, "state": "ready"}
-    threading.Thread(target=_download_thread, args=(url, dst, up["latest"]), daemon=True).start()
+        # 以前只要 >512KB 就当「下好了」：半个包会被当成完整包，装的时候报
+        # "Could not load PyInstaller's embedded PKG archive"。现在必须对上体积。
+        if not want or os.path.getsize(dst) == want:
+            _DL.update({"state": "ready", "pct": 100, "path": dst, "error": "", "ver": up["latest"]})
+            return {"ok": True, "state": "ready"}
+        try:
+            os.remove(dst)
+        except OSError:
+            pass
+    threading.Thread(target=_download_thread,
+                     args=(url, dst, up["latest"], up.get("sha256") or "", want), daemon=True).start()
     return {"ok": True, "state": "downloading"}
 
 
