@@ -84,7 +84,7 @@ def user_dir(name):
 
 def user_file(name, fn):
     return os.path.join(user_dir(name), fn)
-VERSION = "1.38.0"
+VERSION = "1.38.1"
 APP_NAME = "震线 EEW"
 HOMEPAGE = "https://github.com/13535037476/eew-monitor"
 INSTALL_FILE = os.path.join(APP_DIR, "install.json")
@@ -1588,11 +1588,54 @@ def poll_once(src):
     return sources.session_json(src["url"], timeout=tmo)
 
 
+# ---------------- 每个数据源的开关 ----------------
+# 存「关掉的那些 id」，默认全开。关掉的源线程不退出、只是不抓数据，
+# 重新打开立刻恢复（不用重启）。
+_SRC_OFF = set()
+_SRC_OFF_PATH = os.path.join(DATA_DIR, "source_off.json")
+
+
+def _src_off_load():
+    global _SRC_OFF
+    try:
+        with open(_SRC_OFF_PATH, encoding="utf-8") as f:
+            d = json.load(f)
+        _SRC_OFF = set(str(x) for x in (d.get("off") or []))
+    except (OSError, ValueError):
+        _SRC_OFF = set()
+
+
+def src_enabled(sid):
+    return str(sid) not in _SRC_OFF
+
+
+def set_src_enabled(sid, on):
+    sid = str(sid)
+    if on:
+        _SRC_OFF.discard(sid)
+    else:
+        _SRC_OFF.add(sid)
+    try:
+        tmp = _SRC_OFF_PATH + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump({"off": sorted(_SRC_OFF)}, f, ensure_ascii=False, indent=1)
+        os.replace(tmp, _SRC_OFF_PATH)
+    except OSError:
+        pass
+    return src_enabled(sid)
+
+
 def source_loop(src):
     rt = SRC_RUNTIME[src["id"]]
     last_payload = None
     errors = 0
     while True:
+        if not src_enabled(src["id"]):
+            last_payload = None
+            rt.update({"ok": None, "err": None, "has_data": False, "off": True})
+            time.sleep(max(2, src["poll"]))
+            continue
+        rt.pop("off", None)
         # 令牌可以在运行中被清掉（管理员改了机器级令牌）：静默待命，别一直刷报错。
         # 线程不退出，下次填回来立刻恢复，不用重启。
         if src.get("need_token") and not sources.has_token(src):
@@ -1793,6 +1836,19 @@ def _apply_payload_one(src, payload):
             pass
 
 
+def _sources_with_switch():
+    out = []
+    for it in STATE["sources"]:
+        it = dict(it)
+        on = src_enabled(it.get("id"))
+        it["enabled"] = on
+        if not on:
+            it["state"] = "off"
+            it["age_s"] = None
+        out.append(it)
+    return out
+
+
 def build_state():
     now = time.time()
     # 账号的桶是懒创建的：新账号第一次进来时 sources 还是空数组，要等下一轮
@@ -1861,7 +1917,9 @@ def build_state():
             "ts": now,
             "version": VERSION,
             "uptime": int(now - STATE["started"]),
-            "sources": STATE["sources"],
+            # 开关状态当场算：元信息是缓存的，开关后最多 4 秒才刷新，
+            # 直接从内存里的 off 集合取，前端点完立刻能看到变化
+            "sources": _sources_with_switch(),
             "eew": eew,
             "eew_list": eew_list,
             "events": merged[:40],
@@ -1928,8 +1986,14 @@ def refresh_sources_meta():
         item = {k: src[k] for k in ("id", "country", "kind", "name", "name_zh", "url", "poll")}
         item["provider"] = src.get("provider") or ("P2PQuake" if src["id"] == "jma_obs" else "Wolfx")
         item["need_token"] = bool(src.get("need_token"))
+        item["enabled"] = src_enabled(src["id"])
         item["has_token"] = sources.has_token(src)
         item.update(rt)
+        if not src_enabled(src["id"]):
+            item["state"] = "off"
+            item["age_s"] = None
+            out.append(item)
+            continue
         age = now - (rt["last_ok_ts"] or now)
         if src.get("wip"):
             # 接口还没打通（TREM 的域名在本机解析不到）：显示「接入中」，
@@ -2606,6 +2670,69 @@ class Handler(SimpleHTTPRequestHandler):
             if not u:
                 return self._json({"ok": False, "error": "未登录"}, 401)
             return self._json({"ok": True, "awake": set_awake(bool(body.get("on")))})
+        if path == "/api/source/toggle":
+            u = self._user()
+            if not u:
+                return self._json({"ok": False, "error": "未登录"}, 401)
+            enter(bucket_of(u))
+            sid = str(body.get("id") or "").strip()
+            if not any(x["id"] == sid for x in sources.SOURCES):
+                return self._json({"ok": False, "error": "没有这个数据源"}, 400)
+            on = bool(body.get("on"))
+            set_src_enabled(sid, on)
+            try:
+                refresh_sources_meta()   # 元信息是缓存的，开关后立刻重算再推
+            except Exception:
+                pass
+            publish()
+            return self._json({"ok": True, "id": sid, "enabled": on})
+        if path == "/api/source/token":
+            u = self._user()
+            if not u:
+                return self._json({"ok": False, "error": "未登录"}, 401)
+            enter(bucket_of(u))
+            sid = str(body.get("id") or "").strip()
+            src = next((x for x in sources.SOURCES if x["id"] == sid), None)
+            if not src or not src.get("need_token"):
+                return self._json({"ok": False, "error": "这个源不需要令牌"}, 400)
+            tok = str(body.get("token") or "").strip()
+            name = u.get("name") or ""
+            # jian 是按账号存的个人授权；其它（trem/eqsc/seedlink）是机器级
+            path_tok = user_file(name, "tokens.json") if src["need_token"] == "jian" \
+                else _data_file("tokens.json")
+            cur = _read_tokens(path_tok)
+            if tok:
+                cur[src["need_token"]] = tok
+            else:
+                cur.pop(src["need_token"], None)
+            try:
+                os.makedirs(os.path.dirname(path_tok), exist_ok=True)
+                tmp = path_tok + ".tmp"
+                with open(tmp, "w", encoding="utf-8") as f:
+                    json.dump(cur, f, ensure_ascii=False, indent=2)
+                os.replace(tmp, path_tok)
+            except OSError as exc:
+                return self._json({"ok": False, "error": "写入失败：%s" % exc}, 500)
+            try:
+                sources.set_tokens(cur, name if src["need_token"] == "jian" else "")
+            except Exception:
+                pass
+            if src["need_token"] == "jian":
+                try:
+                    restart_jian(name)
+                except Exception:
+                    pass
+            else:
+                try:
+                    start_pending_sources()
+                except Exception:
+                    pass
+            try:
+                refresh_sources_meta()   # 面板立刻从「待授权」切到正常
+            except Exception:
+                pass
+            publish()
+            return self._json({"ok": True, "has_token": True})
         if path in ("/api/bili/qr/new", "/api/bili/logout"):
             u = self._user()
             if not u:
@@ -3977,6 +4104,10 @@ def boot(host="127.0.0.1", port=8765, tls_cert=None, tls_key=None):
     threading.Thread(target=_cloud_worker, daemon=True).start()
     try:
         bili.init()
+    except Exception:
+        pass
+    try:
+        _src_off_load()
     except Exception:
         pass
     _t = threading.Timer(20.0, _cloud_catchup)

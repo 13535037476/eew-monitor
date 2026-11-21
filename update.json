@@ -1,7 +1,7 @@
 {
-  "version": "1.38.0",
-  "url": "https://github.com/13535037476/eew-monitor/releases/latest/download/ZhenXianEEW-Setup-1.38.0.exe",
-  "size": 57326630,
-  "notes": "· 设置→B站投稿：点「扫码登录」，用手机 B站 App 扫一下就行，登录后显示昵称和 UID\n· 录像保存后自动投稿（默认直接公开，平台审核几分钟），用你自己的账号发\n· 录像默认改录 MP4（H.264）：Windows 直接能放，B站不用转码；内核不支持时自动退回 webm\n· 标题/简介按事件自动生成（地点、震级、最大震度、数据源、时间），分区默认 188 科技、标签可改\n· 最近投稿记录、BV 号、失败原因都在面板里；cookie 过期会提示重新扫码",
+  "version": "1.38.1",
+  "url": "https://github.com/13535037476/eew-monitor/releases/latest/download/ZhenXianEEW-Setup-1.38.1.exe",
+  "size": 57327382,
+  "notes": "· 设置→数据源：每一行右边加了开关，关掉就不再抓数据（重开立刻恢复，不用重启）\n· 需要令牌的源（Jian / TREM / EQSC / SeedLink）显示「填令牌」按钮，粘进去就生效，不用再改 tokens.json\n· 修掉「别人连不上 Jian」的根因：Jian 是账号级授权，以前只在 cloudtest 这个账号下有令牌，换账号就继承不到——现在每个账号可以在界面里填自己的密钥，状态立刻从「待授权」变正常",
   "published": "2026-11-21"
 }

@@ -897,3 +897,15 @@ html.light .upd-bar{background:rgba(90,74,48,.13)}
 #updNote.warn{color:#e6b370}
 html.light #updNote.warn{color:#a3730f}
 #updMode.off{color:#d08a7e}
+
+
+/* 数据源开关：行内小开关 + 关闭态变灰 + 「填令牌」小按钮 */
+.srctbl .srcsw { width: 16px; height: 16px; accent-color: #4aa3ff; cursor: pointer; }
+.srctbl tr.src-off td { opacity: .45; }
+.srctbl .srctok {
+  margin-left: 6px; padding: 1px 7px; font-size: 11px; line-height: 16px;
+  border-radius: 8px; border: 1px solid rgba(255, 196, 107, .55);
+  background: rgba(255, 196, 107, .12); color: #ffc46b; cursor: pointer;
+}
+.srctbl .srctok:hover { background: rgba(255, 196, 107, .22); }
+.sdot.off { background: #6b7785; box-shadow: none; }

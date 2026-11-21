@@ -399,9 +399,10 @@ try{if(localStorage.getItem('eew.theme')==='light')document.documentElement.clas
       <div class="sec">
         <h3>数据源</h3>
         <p class="hint">按延迟升序排列，标「主」的是当前同类里延迟最低的一个（每 10 秒重算）。
-          需要令牌的源显示「待授权」：把令牌填进 <code>data/tokens.json</code> 即刻生效。</p>
+          每个源右边有开关，关掉就不再抓数据（重开立刻恢复）；需要令牌的源显示「待授权」，
+          点「填令牌」粘进去即可，不用改文件。</p>
         <table class="srctbl">
-          <thead><tr><th>数据</th><th>提供方</th><th>频率</th><th>状态</th></tr></thead>
+          <thead><tr><th>数据</th><th>提供方</th><th>频率</th><th>状态</th><th>开</th></tr></thead>
           <tbody id="srcTable"></tbody>
         </table>
         <p class="hint">已接入：日本气象厅 / 中国地震预警 / 中国地震台网 / 台湾 P-Alert 强震网（实时 PGA）/

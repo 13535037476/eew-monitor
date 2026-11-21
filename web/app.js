@@ -5421,6 +5421,7 @@
       esc(autoTip) + '">自动</i></span>';
   }
 
+  // 表头有 5 列（最后一行是开关），第一次渲染时补一下
   function renderSrcTable() {
     const body = $('#srcTable');
     if (!body) return;
@@ -5439,23 +5440,67 @@
       const alt = (s.id === 'globalquake' && s.role && s.role.indexOf('备') >= 0)
         ? '<i class="palt" title="' + esc(gqHostTip(s)) + '">备</i>' : '';
       const gqsw = (s.id === 'globalquake') ? gqSwitchHtml(s) : '';
-      const st = s.state === 'ok' ? ['ok', '正常' + (s.latency_ms ? ' ' + s.latency_ms + 'ms' : '')]
+      const off = s.enabled === false;
+      const st = off ? ['off', '已关闭']
+        : s.state === 'ok' ? ['ok', '正常' + (s.latency_ms ? ' ' + s.latency_ms + 'ms' : '')]
         : s.state === 'wip' ? ['wait', '接入中']
           : s.state === 'noauth' ? ['wait', '待授权']
           : s.state === 'down' ? ['err', '失败']
             : s.state === 'stale' ? ['warn', '缓存 ' + Math.round(s.age_s || 0) + 's']
               : ['warn', '连接中'];
-      return '<tr' + (main ? ' class="is-main"' : '') + '>' +
+      // 开关：每个源都能单独开/关（关掉就不再抓数据，重开立刻恢复）
+      const sw = '<input type="checkbox" class="srcsw" data-sid="' + esc(s.id) + '"' +
+        (off ? '' : ' checked') + ' title="开启/关闭这个数据源">';
+      // 需要令牌但还没填：给个入口，别让人去翻 tokens.json
+      const tk = (s.need_token && !s.has_token)
+        ? '<button type="button" class="srctok" data-sid="' + esc(s.id) + '" data-name="' +
+          esc(SRC_TITLE[s.id] || s.name_zh) + '">填令牌</button>' : '';
+      return '<tr' + (main ? ' class="is-main"' : '') + (off ? ' class="src-off"' : '') + '>' +
         '<td>' + (SRC_TITLE[s.id] || s.name_zh) +
-        (main ? '<i class="pmain">主</i>' : '') + alt + gqsw + '</td>' +
+        (main ? '<i class="pmain">主</i>' : '') + alt + gqsw + tk + '</td>' +
         '<td class="pr">' + (s.provider || 'Wolfx') + '</td>' +
         '<td class="st">' + (s.poll || '—') + 's</td>' +
-        '<td class="st"><i class="sdot ' + st[0] + '"></i>' + st[1] + '</td></tr>';
+        '<td class="st"><i class="sdot ' + st[0] + '"></i>' + st[1] + '</td>' +
+        '<td class="st">' + sw + '</td></tr>';
     });
     rows.push('<tr><td>历史目录 FDSN</td><td class="pr">USGS</td>' +
       '<td class="st">按需</td><td class="st"><i class="sdot ok"></i>可查询</td></tr>');
     body.innerHTML = rows.join('');
   }
+  document.addEventListener('change', async (e) => {
+    const el = e.target;
+    if (!el || !el.classList || !el.classList.contains('srcsw')) return;
+    const sid = el.getAttribute('data-sid');
+    el.disabled = true;
+    try {
+      const j = await (await fetch('/api/source/toggle', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: sid, on: el.checked }),
+      })).json();
+      if (j.ok) toast((el.checked ? '已开启：' : '已关闭：') + sid);
+      else toast('操作失败：' + (j.error || ''), 5000);
+    } catch (err) { toast('操作失败：' + err.message, 5000); }
+    finally { el.disabled = false; }
+  });
+  document.addEventListener('click', async (e) => {
+    const b = e.target;
+    if (!b || !b.classList || !b.classList.contains('srctok')) return;
+    const sid = b.getAttribute('data-sid');
+    const nm = b.getAttribute('data-name') || sid;
+    const tip = sid === 'jian'
+      ? '粘贴 Jian Project 的登录密钥（lk_ 开头），填一次就行；这是你账号自己的授权'
+      : '粘贴这个数据源的令牌（填一次就存在本机）';
+    const tok = window.prompt(nm + ' 的令牌：\n' + tip, '');
+    if (tok == null) return;
+    try {
+      const j = await (await fetch('/api/source/token', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: sid, token: tok.trim() }),
+      })).json();
+      if (j.ok) { toast('令牌已保存，正在重连'); }
+      else toast('保存失败：' + (j.error || ''), 6000);
+    } catch (err) { toast('保存失败：' + err.message, 6000); }
+  });
 
   function renderAll() {
     renderDots();
