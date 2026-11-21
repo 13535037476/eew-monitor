@@ -16,6 +16,15 @@ import urllib.request
 
 # 必须在 import server 之前：告诉服务端「桌面模式」，声音走 winsound
 os.environ["EEW_DESKTOP"] = "1"
+# 息屏录制的前提：WebView2 默认会把「被遮挡/最小化」的窗口降频——定时器掐到
+# 一分钟一次、requestAnimationFrame 直接停，录下来的就是一帧静止画面。
+# 这几个开关关掉后台节流，配合服务端的「系统不休眠」，人出门也能照录。
+os.environ.setdefault(
+    "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS",
+    "--disable-background-timer-throttling "
+    "--disable-backgrounding-occluded-windows "
+    "--disable-renderer-backgrounding "
+    "--disable-features=CalculateNativeWinOcclusion")
 
 import server
 

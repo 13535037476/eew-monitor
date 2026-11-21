@@ -83,7 +83,7 @@ def user_dir(name):
 
 def user_file(name, fn):
     return os.path.join(user_dir(name), fn)
-VERSION = "1.35.1"
+VERSION = "1.36.0"
 APP_NAME = "震线 EEW"
 HOMEPAGE = "https://github.com/13535037476/eew-monitor"
 INSTALL_FILE = os.path.join(APP_DIR, "install.json")
@@ -2512,6 +2512,10 @@ class Handler(SimpleHTTPRequestHandler):
                     "last_err": _CLOUD_STATE["err"],
                 })
                 return
+            if path == "/api/power/awake":
+                # 息屏录制：自动录屏开着时前端会让服务端守着「别休眠」
+                self._json({"ok": True, "awake": bool(_AWAKE["on"])})
+                return
             if path == "/api/update/check":
                 qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
                 force = (qs.get("force") or ["0"])[0] in ("1", "true", "yes")
@@ -2541,6 +2545,11 @@ class Handler(SimpleHTTPRequestHandler):
         if path == "/api/rec/save":
             return self._rec_save()
         body = self._body()
+        if path == "/api/power/awake":
+            u = self._user()
+            if not u:
+                return self._json({"ok": False, "error": "未登录"}, 401)
+            return self._json({"ok": True, "awake": set_awake(bool(body.get("on")))})
         if path in ("/api/cloud/save", "/api/cloud/test", "/api/cloud/sync"):
             u = self._user()
             if not u:
@@ -3614,6 +3623,38 @@ def _cloud_test(cfg):
     return True, ""
 
 
+# ---------------- 息屏守夜：录屏期间别让系统睡死 ----------------
+# 录屏跑在浏览器里，系统一进睡眠就全停。这里只申请「系统保持唤醒」
+# （ES_SYSTEM_REQUIRED），显示器照常可以熄——人出门省电，地震来了照样录。
+# SetThreadExecutionState 是线程级的：必须在同一条活着的线程里定期续期。
+_AWAKE = {"on": False}
+
+
+def _awake_loop():
+    import ctypes
+    ES_CONTINUOUS = 0x80000000
+    ES_SYSTEM_REQUIRED = 0x00000001
+    try:
+        while _AWAKE["on"]:
+            ctypes.windll.kernel32.SetThreadExecutionState(
+                ES_CONTINUOUS | ES_SYSTEM_REQUIRED)
+            time.sleep(30)
+        ctypes.windll.kernel32.SetThreadExecutionState(ES_CONTINUOUS)
+    except Exception:
+        _AWAKE["on"] = False
+
+
+def set_awake(on):
+    """开/关守夜。返回当前状态；重复调用是幂等的。"""
+    on = bool(on)
+    if on and not _AWAKE["on"]:
+        _AWAKE["on"] = True
+        threading.Thread(target=_awake_loop, daemon=True).start()
+    elif not on and _AWAKE["on"]:
+        _AWAKE["on"] = False      # 续期线程下一轮自己清掉 ES_CONTINUOUS
+    return _AWAKE["on"]
+
+
 def boot(host="127.0.0.1", port=8765, tls_cert=None, tls_key=None):
     """起数据源线程 + HTTP(S) 服务，返回 server 对象（不阻塞）"""
     auth.init(os.path.join(DATA_DIR, "users.db"))
@@ -3695,7 +3736,12 @@ def open_app_window(url, exe=None, dry=False):
     import subprocess as _sp
     # --window-size 只是首窗大小，用户拖过之后浏览器会记住
     _sp.Popen([exe, "--app=" + url, "--window-size=1520,940",
-               "--no-first-run", "--no-default-browser-check"],
+               "--no-first-run", "--no-default-browser-check",
+               # 息屏/遮挡时不降频，录屏才能继续出帧
+               "--disable-background-timer-throttling",
+               "--disable-backgrounding-occluded-windows",
+               "--disable-renderer-backgrounding",
+               "--disable-features=CalculateNativeWinOcclusion"],
               stdout=_sp.DEVNULL, stderr=_sp.DEVNULL)
     return exe
 

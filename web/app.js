@@ -6494,12 +6494,24 @@
     if (recEls.tw) recEls.tw.checked = !!src.tw;
     if (recEls.gq) recEls.gq.checked = !!src.gq;
   }
+  // 息屏录制：自动录屏开着 → 让服务端守着「系统别休眠」（显示器照常熄）。
+  // 人出门锁屏/熄屏后，地震来了照样能录；关掉自动录屏就解除，不白耗电。
+  function syncAwake() {
+    try {
+      fetch('/api/power/awake', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ on: !!state.settings.recOn }),
+      }).catch(() => { });
+    } catch (e) { }
+  }
   function recSaveSoon() { LS.set('settings', state.settings); }
   if (recEls.on) {
     syncRecUI();
+    syncAwake();
     recEls.on.addEventListener('change', e => {
       state.settings.recOn = e.target.checked;
       recSaveSoon();
+      syncAwake();
       if (e.target.checked) {
         toast('自动录屏已开启（M' + (state.settings.recMag ?? 4) + ' 起录）');
       } else {
@@ -6808,6 +6820,7 @@
     bumpDecay(state.settings);          // 服务端存的老 decay:1 也要抬到新基准
     LS.set('settings', state.settings);
     syncSettingsUI();
+    try { syncAwake(); } catch (e) { }   // 服务端设置可能把 recOn 改回开
     if (state.settings.chime) $('#optChime').value = state.settings.chime;
   }).catch(() => { });
   let _lastSavedSet = JSON.stringify(state.settings);
@@ -7600,16 +7613,29 @@
     document.body.classList.remove('obs-on');
   });
   let lastCapAt = 0;
-  (function loop() {
+  let lastTickAt = 0;
+  function tick() {
+    const t0 = Date.now();
+    if (t0 - lastTickAt < 33) return;   // rAF 和看门狗可能同时叫，限一下帧频
+    lastTickAt = t0;
     draw();
-    const t = Date.now();
-    if (t - lastCapAt >= 1000) {
-      lastCapAt = t;
+    if (t0 - lastCapAt >= 1000) {
+      lastCapAt = t0;
       try { updateLegendCap(); } catch (e) { }
       try { renderObsCard(); } catch (e) { window.__lastErr = 'obs: ' + (e && e.message); }
     }
+  }
+  (function loop() {
+    tick();
     requestAnimationFrame(loop);
   })();
+  // 息屏/窗口被遮挡时浏览器会暂停 requestAnimationFrame，地图就冻住了——
+  // 自动录屏录下来的会是一张静止画面。这里加个看门狗：1.5 秒没刷新就用
+  // 定时器顶上，人出门熄屏后画面照样在动，录像才有意义。
+  setInterval(() => {
+    if (Date.now() - lastTickAt > 1500) tick();
+  }, 500);
+  window.__tickAt = () => lastTickAt;   // 调试/测试：看画面刷新有没有在走
   window.__eew = state;   // 调试用：可以在控制台里看/改状态
   // 任何未捕获异常都留个记号：主循环一旦被 draw() 里的异常打断，
   // 之后卡片就再也不刷新，而控制台在打包版里看不到——只能靠自己记。
@@ -7641,8 +7667,7 @@
   // 调试钩子：走时 / 反演同一套公式，方便对数（__tt(300,10) → P/S 走时）
   window.__tt = (delta, depth, model) => travelInfo(delta, depth, model);
   window.__ttModel = ttModelFor;
-  window.__autoDiag = () => AUTO.diag || null;
-  // 调试：注入一场「假震度场」直接跑推算，用来验证触发门槛（不写进任何真实数据）
+  window.__autoDiag = () => AUTO.diag || null;  // 调试：注入一场「假震度场」直接跑推算，用来验证触发门槛（不写进任何真实数据）
   window.__autoTest = lv => {
     state.kmoni = { ok: true, at: nowSec(), ts: 'test', lv: lv || {}, n: Object.keys(lv || {}).length };
     AUTO.lastAt = 0; AUTO.diag = null;      // 测试时绕过冷却，保证每次都重新判
