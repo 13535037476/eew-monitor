@@ -4908,7 +4908,7 @@
     REC.starting = true;
     let winMode = false;
     let winW = map.width, winH = map.height;
-    if ((state.settings.recView || 'map') === 'window') {
+    if (state.settings.recView !== 'map') {   // 只有明确选「地图」才降级，空值/旧设置一律整窗
       try {
         const r = await fetch('/api/rec/win/start', {
           method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
@@ -6566,7 +6566,7 @@
     if (recEls.on) recEls.on.checked = !!st.recOn;
     if (recEls.mag) recEls.mag.value = String(st.recMag ?? 4);
     if (recEls.kbps) recEls.kbps.value = String(st.recKbps ?? 2500);
-    if (recEls.view) recEls.view.value = st.recView || 'map';
+    if (recEls.view) recEls.view.value = st.recView === 'map' ? 'map' : 'window';
     if (recEls.dir) recEls.dir.value = st.recDir || '';
     if (recEls.jp) recEls.jp.checked = src.jp !== false;
     if (recEls.cn) recEls.cn.checked = !!src.cn;
