@@ -226,6 +226,7 @@
     shakeN: 0, shakeSince: 0, shakeFrameAt: 0,
     stUid: '', stKey: '', stMax: -1, stLvAt: {}, stRec: [], tipPin: '',
     kmoni: { ok: false, at: 0, ts: '', lv: {}, n: 0 },
+    kmoniTop: new Set(),   // 正在摇晃里最强的 25 个站号（地图只给它们戴徽章）
     history: { days: 30, minmag: 4.5, items: [], loading: false },
     connected: false,
   };
@@ -2997,6 +2998,8 @@
       if (!a) batch.set(key, a = []);
       a.push(x, y);
     };
+    const HOT_CAP = 25;                        // 一次最多「圈」25 个正在摇晃的测站
+    let hotDrawn = 0;                          // 推算/观测模式下已高亮的数量
     const sea = [];                            // 海底站：单独画方点
     const lvCnt = new Array(10).fill(0);      // 各档台站数，供调试观察衰减
     window.__lvCount = lvCnt;
@@ -3034,6 +3037,13 @@
           r = Math.round((2.0 + g * 0.32) * 2) / 2;
           hot = g >= 5;
           numG = g;
+          // 不是最强的那 25 个：保留颜色但去掉数字徽章和光晕，
+          // 地图上「谁在摇」一眼能数清
+          if (state.kmoniTop && state.kmoniTop.size && !state.kmoniTop.has(st.code)) {
+            hot = false;
+            numG = -1;
+            r = Math.max(2.0, r - 1.4);
+          }
         }
       } else if (mode === 'est' && ev) {
         const est = estOf(ev, st);
@@ -3082,6 +3092,13 @@
           color = PAL.stHollow;
           r = 2.0;
         }
+      }
+
+      // 除 kmoni 外（kmoni 已按 top25 精确筛选）再兜一道：
+      // 带数字徽章的测站也最多 25 个，超出的只留颜色点，不然满屏都是数字
+      if (numG >= 1 && mode !== 'kmoni') {
+        if (hotDrawn >= HOT_CAP) { hot = false; numG = -1; }
+        else hotDrawn++;
       }
 
       // 海底站：颜色/强度照上面算，但不画圆点——它们是埋在海床上的，
@@ -5938,9 +5955,18 @@
           for (const [c0, t0] of state.onAt) {
             if (nowSec() - t0 > 300) state.onAt.delete(c0);   // 5 分钟前的起点不再参与
           }
-          if (n > 800)   // 命中过少说明取色坐标或图片异常，丢弃这帧
+          if (n > 800) {  // 命中过少说明取色坐标或图片异常，丢弃这帧
+            // 地图上只留最强的 25 个「正在摇晃」测站：真实一次地震里摇的台站
+            // 也就这么多，全画出来会糊成一片，反而看不出震中在哪。
+            const hot = [];
+            for (const code in lv) {
+              const v = lv[code];
+              if (v >= 0.5) hot.push([v, code]);
+            }
+            hot.sort((a, b) => b[0] - a[0]);
+            state.kmoniTop = new Set(hot.slice(0, 25).map(x => x[1]));
             state.kmoni = { ok: true, at: nowSec(), ts: lastTs, lv, n };
-          else state.kmoni.n = n;   // 保留上一帧，顺手记下这次的命中数便于排查
+          } else state.kmoni.n = n;   // 保留上一帧，顺手记下这次的命中数便于排查
           window.__km = { ts: lastTs, n: n, at: state.kmoni.at, ok: state.kmoni.ok };
         } else throw new Error('http ' + r.status);
       } catch (e) {
