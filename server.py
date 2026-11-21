@@ -83,7 +83,7 @@ def user_dir(name):
 
 def user_file(name, fn):
     return os.path.join(user_dir(name), fn)
-VERSION = "1.36.1"
+VERSION = "1.37.0"
 APP_NAME = "震线 EEW"
 HOMEPAGE = "https://github.com/13535037476/eew-monitor"
 INSTALL_FILE = os.path.join(APP_DIR, "install.json")
@@ -2516,6 +2516,26 @@ class Handler(SimpleHTTPRequestHandler):
                 # 息屏录制：自动录屏开着时前端会让服务端守着「别休眠」
                 self._json({"ok": True, "awake": bool(_AWAKE["on"])})
                 return
+            if path == "/api/rec/frame":
+                u = self._user()
+                if not u:
+                    return self._json({"ok": False, "error": "未登录"}, 401)
+                jpg = _WINREC["jpg"]
+                if not jpg:
+                    self.send_response(204)
+                    self.send_header("Content-Length", "0")
+                    self.end_headers()
+                    return
+                self.send_response(200)
+                self.send_header("Content-Type", "image/jpeg")
+                self.send_header("Content-Length", str(len(jpg)))
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                try:
+                    self.wfile.write(jpg)
+                except Exception:
+                    pass
+                return
             if path == "/api/update/check":
                 qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
                 force = (qs.get("force") or ["0"])[0] in ("1", "true", "yes")
@@ -2550,6 +2570,13 @@ class Handler(SimpleHTTPRequestHandler):
             if not u:
                 return self._json({"ok": False, "error": "未登录"}, 401)
             return self._json({"ok": True, "awake": set_awake(bool(body.get("on")))})
+        if path in ("/api/rec/win/start", "/api/rec/win/stop"):
+            u = self._user()
+            if not u:
+                return self._json({"ok": False, "error": "未登录"}, 401)
+            if path.endswith("/start"):
+                return self._json(winrec_start())
+            return self._json(winrec_stop())
         if path in ("/api/cloud/save", "/api/cloud/test", "/api/cloud/sync"):
             u = self._user()
             if not u:
@@ -3653,6 +3680,195 @@ def set_awake(on):
     elif not on and _AWAKE["on"]:
         _AWAKE["on"] = False      # 续期线程下一轮自己清掉 ES_CONTINUOUS
     return _AWAKE["on"]
+
+
+# ---------------- 整窗录制：直接抓应用窗口的像素 ----------------
+# 浏览器里的 MediaRecorder 只能录画布，录不到 DOM 卡片；这里用 Win32 的
+# PrintWindow(PW_RENDERFULLCONTENT) 抓整个窗口（实测 WebView2 能拿到真画面），
+# 转成 JPEG 由前端拉走、合进同一路 MediaRecorder——录像就和屏幕上一模一样。
+# 显示器熄灭时抓到的是黑帧，所以前端启动前会先问 /api/rec/win/start，
+# 返回 display_off 就退回「只录地图」。
+_WINREC = {"on": False, "thread": None, "jpg": b"", "at": 0.0,
+           "err": "", "w": 0, "h": 0, "hwnd": 0, "frames": 0, "bright": 0.0}
+
+
+def _find_app_window():
+    import ctypes
+    import ctypes.wintypes as wt
+    user32 = ctypes.windll.user32
+    hits = []
+
+    @ctypes.WINFUNCTYPE(wt.BOOL, wt.HWND, wt.LPARAM)
+    def cb(hwnd, _):
+        n = user32.GetWindowTextLengthW(hwnd)
+        if n:
+            buf = ctypes.create_unicode_buffer(n + 1)
+            user32.GetWindowTextW(hwnd, buf, n + 1)
+            t = buf.value
+            # 最小化的窗口也要收：PrintWindow 抓最小化窗口是空白，
+            # 起录时会先把它还原（见 winrec_start），否则人最小化着就永远录不到
+            if ("震线" in t or "EEW" in t) and "GDI+" not in t and user32.IsWindowVisible(hwnd):
+                hits.append((int(hwnd), t))
+        return True
+
+    try:
+        user32.EnumWindows(cb, 0)
+    except Exception:
+        pass
+    return hits[0] if hits else (0, "")
+
+
+def _display_on():
+    """主显示器是不是亮着（灭屏时整窗捕获只会得到黑帧）。"""
+    import ctypes
+    try:
+        k = ctypes.windll.kernel32
+        h = k.CreateFileW("\\\\.\\DISPLAY1", 0, 3, None, 3, 0, None)
+        if h in (None, -1, 0xFFFFFFFFFFFFFFFF):
+            return True
+        on = ctypes.c_int(0)
+        ok = k.GetDevicePowerState(h, ctypes.byref(on))
+        k.CloseHandle(h)
+        return (not ok) or bool(on.value)
+    except Exception:
+        return True
+
+
+def _grab_window_bgra(hwnd, w, h):
+    """PrintWindow 抓一帧，返回 BGRA 原始字节（失败返回 None）。"""
+    import ctypes
+    import ctypes.wintypes as wt
+    user32 = ctypes.windll.user32
+    gdi32 = ctypes.windll.gdi32
+    hdc = user32.GetWindowDC(hwnd)
+    if not hdc:
+        return None
+    mdc = gdi32.CreateCompatibleDC(hdc)
+    bmp = gdi32.CreateCompatibleBitmap(hdc, w, h)
+    old = gdi32.SelectObject(mdc, bmp)
+    ok = user32.PrintWindow(hwnd, mdc, 2)      # PW_RENDERFULLCONTENT
+
+    class BIH(ctypes.Structure):
+        _fields_ = [("biSize", wt.DWORD), ("biWidth", wt.LONG), ("biHeight", wt.LONG),
+                    ("biPlanes", wt.WORD), ("biBitCount", wt.WORD),
+                    ("biCompression", wt.DWORD), ("biSizeImage", wt.DWORD),
+                    ("biXPelsPerMeter", wt.LONG), ("biYPelsPerMeter", wt.LONG),
+                    ("biClrUsed", wt.DWORD), ("biClrImportant", wt.DWORD)]
+
+    bi = BIH()
+    bi.biSize = ctypes.sizeof(BIH)
+    bi.biWidth = w
+    bi.biHeight = -h
+    bi.biPlanes = 1
+    bi.biBitCount = 32
+    buf = ctypes.create_string_buffer(w * h * 4)
+    got = gdi32.GetDIBits(mdc, bmp, 0, h, buf, ctypes.byref(bi), 0)
+    gdi32.SelectObject(mdc, old)
+    gdi32.DeleteObject(bmp)
+    gdi32.DeleteDC(mdc)
+    user32.ReleaseDC(hwnd, hdc)
+    if not ok or not got:
+        return None
+    return buf.raw
+
+
+def _winrec_loop():
+    import io
+    import ctypes
+    import ctypes.wintypes as wt
+    try:
+        from PIL import Image
+    except ImportError:
+        _WINREC["err"] = "缺少 Pillow（整窗录制需要 PIL 编码 JPEG）"
+        _WINREC["on"] = False
+        return
+    user32 = ctypes.windll.user32
+    interval = 1.0 / 12
+    last_rect = (0, 0)
+    while _WINREC["on"]:
+        t0 = time.time()
+        try:
+            if not _WINREC["hwnd"] or not user32.IsWindow(_WINREC["hwnd"]):
+                hwnd, _t = _find_app_window()
+                _WINREC["hwnd"] = hwnd
+            hwnd = _WINREC["hwnd"]
+            if not hwnd:
+                _WINREC["err"] = "找不到应用窗口"
+                time.sleep(0.5)
+                continue
+            if user32.IsIconic(hwnd):
+                user32.ShowWindow(hwnd, 9)      # SW_RESTORE：最小化了就还原，不然抓到的是空框
+                time.sleep(0.2)
+            rect = wt.RECT()
+            user32.GetWindowRect(hwnd, ctypes.byref(rect))
+            w, h = rect.right - rect.left, rect.bottom - rect.top
+            if w < 50 or h < 50:
+                time.sleep(0.3)
+                continue
+            if (w, h) != last_rect:             # 尺寸变了重建画布由前端处理，这里只记
+                last_rect = (w, h)
+                _WINREC["w"], _WINREC["h"] = w, h
+            raw = _grab_window_bgra(hwnd, w, h)
+            if raw:
+                # 亮度抽样：刚还原/刚唤醒时 WebView2 会先给几帧黑图，
+                # 起录要等画面真的出来（见 winrec_start）
+                step = 4 * 64
+                lum = 0.0
+                n = 0
+                for i in range(0, len(raw) - 3, step):
+                    lum += raw[i] + raw[i + 1] + raw[i + 2]
+                    n += 1
+                _WINREC["bright"] = (lum / max(1, n)) / 3.0
+                im = Image.frombuffer("RGB", (w, h), raw, "raw", "BGRX", 0, 1)
+                bio = io.BytesIO()
+                im.save(bio, "JPEG", quality=72, optimize=False)
+                _WINREC["jpg"] = bio.getvalue()
+                _WINREC["at"] = time.time()
+                _WINREC["frames"] += 1
+                _WINREC["err"] = ""
+        except Exception as e:
+            _WINREC["err"] = str(e)[:160]
+        dt = time.time() - t0
+        if dt < interval:
+            time.sleep(interval - dt)
+
+
+def winrec_start():
+    if _WINREC["on"]:
+        return {"ok": True, "w": _WINREC["w"], "h": _WINREC["h"]}
+    if not _display_on():
+        return {"ok": False, "display_off": True,
+                "error": "显示器已熄灭，整窗录制抓不到画面"}
+    hwnd, title = _find_app_window()
+    if not hwnd:
+        return {"ok": False, "error": "找不到应用窗口（标题里没有「震线」）"}
+    try:
+        import ctypes
+        if ctypes.windll.user32.IsIconic(hwnd):
+            ctypes.windll.user32.ShowWindow(hwnd, 9)   # SW_RESTORE：最小化时先还原
+            time.sleep(0.35)
+    except Exception:
+        pass
+    _WINREC.update({"on": True, "hwnd": hwnd, "jpg": b"", "at": 0.0,
+                    "err": "", "frames": 0, "w": 0, "h": 0, "bright": 0.0})
+    _WINREC["thread"] = threading.Thread(target=_winrec_loop, daemon=True)
+    _WINREC["thread"].start()
+    # 等画面真的出来：刚还原的 WebView2 会先吐几帧黑图，拿黑图当「成功」
+    # 会让整段录像从黑屏开始，所以按亮度筛，最多等 6 秒
+    deadline = time.time() + 6
+    while time.time() < deadline:
+        if _WINREC["jpg"] and _WINREC["bright"] > 8:
+            break
+        time.sleep(0.12)
+    if not _WINREC["jpg"] or _WINREC["bright"] <= 8:
+        _WINREC["on"] = False
+        return {"ok": False, "error": _WINREC["err"] or "窗口画面是黑的（可能刚还原，稍后再试）"}
+    return {"ok": True, "w": _WINREC["w"], "h": _WINREC["h"]}
+
+
+def winrec_stop():
+    _WINREC["on"] = False
+    return {"ok": True, "frames": _WINREC["frames"]}
 
 
 def boot(host="127.0.0.1", port=8765, tls_cert=None, tls_key=None):

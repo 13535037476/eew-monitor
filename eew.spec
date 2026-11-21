@@ -20,7 +20,8 @@ for pkg in ("webview", "pythonnet", "clr_loader"):
     except Exception:
         pass
 
-hiddenimports += ["webview.platforms.edgechromium", "clr", "pythonnet"]
+hiddenimports += ["webview.platforms.edgechromium", "clr", "pythonnet",
+                  "PIL.Image", "PIL.JpegImagePlugin", "PIL.ImageFile"]
 
 block_cipher = None
 
@@ -33,7 +34,7 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=["tkinter", "matplotlib", "numpy", "PIL", "pytest"],
+    excludes=["tkinter", "matplotlib", "numpy", "pytest"],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,

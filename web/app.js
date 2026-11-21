@@ -202,6 +202,7 @@
       chime: 'builtin', pack: '',
       // 自动录屏：JMA 达到震级就录一段地图画面（带震级/地点叠加），存成本地 webm
       recOn: false, recMag: 4.0, recDur: 60, recKbps: 2500, recDir: '',
+      recView: 'window',   // 'window' 录整个窗口；'map' 只录地图（省资源）
       recSeg: true, recSegDur: 12,          // 分段：每一报录一段，段长默认 12s
       // 每个数据源各自的「震级 / 强度」门槛：告警与录屏都按它判
       // jp/tw/gq 的强度用震度（3 = 震度3），cn 用烈度（4 = 烈度Ⅳ）
@@ -4771,7 +4772,7 @@
   // 而 #map 是纯 canvas，captureStream 直接可用、无需任何授权。震级/地点/时间
   // 用 canvas 画成叠加条，所以画面里一定看得到关键信息。
   const REC = { mr: null, cv: null, c2: null, timer: 0, startAt: 0, ev: null,
-    key: '', seen: new Set(), queue: null, seg: false };
+    key: '', seen: new Set(), queue: null, seg: false, win: false, starting: false };
   const REC_CAP = 900;          // 安全上限 15 分钟：忘了停也不至于录爆磁盘
 
   // 数据源归类 → 取该源的门槛
@@ -4896,13 +4897,37 @@
     try { mr.stop(); } catch (e) { }
   }
 
-  function startRec(ev, durSec) {
+  async function startRec(ev, durSec) {
     const map = $('#map');
     if (!map || !window.MediaRecorder || !map.captureStream) {
       toast('这个环境不支持录制（需要 WebView2 / Chromium 内核）'); return;
     }
+    // 整窗模式：先让服务端把窗口抓起来（灭屏会拒绝），拿到真实窗口尺寸；
+    // 拿不到就退回地图模式，绝不让录制起不来。
+    if (REC.starting) return;              // 异步起录期间别被下一次触发重入
+    REC.starting = true;
+    let winMode = false;
+    let winW = map.width, winH = map.height;
+    if ((state.settings.recView || 'map') === 'window') {
+      try {
+        const r = await fetch('/api/rec/win/start', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
+        });
+        const j = await r.json();
+        if (j.ok && j.w > 100 && j.h > 100) {
+          winMode = true; winW = j.w; winH = j.h;
+        } else if (j.display_off) {
+          toast('显示器已熄灭，这一场改用地图录制', 5000);
+        } else if (j.error) {
+          toast('整窗录制不可用，改用地图录制：' + j.error, 6000);
+        }
+      } catch (e) {
+        toast('整窗录制启动失败，改用地图录制', 5000);
+      }
+    }
+    REC.starting = false;
     const cv = document.createElement('canvas');
-    cv.width = map.width; cv.height = map.height;
+    cv.width = winW; cv.height = winH;
     const c2 = cv.getContext('2d');
     const fps = 15;
     const kbps = Math.max(400, Math.min(20000, parseInt(state.settings.recKbps, 10) || 2500));
@@ -4923,6 +4948,10 @@
       const blob = new Blob(chunks, { type: 'video/webm' });
       saveRec(blob, REC.ev || ev);
       try { stream.getTracks().forEach(t => t.stop()); } catch (e) { }
+      if (REC.win) {
+        REC.win = false;
+        fetch('/api/rec/win/stop', { method: 'POST' }).catch(() => { });
+      }
       REC.ev = null;
       // 分段模式下，录制期间来的新报排队，这段存完接着录
       const q = REC.queue;
@@ -4930,6 +4959,7 @@
       if (q) setTimeout(() => { if (!REC.mr) startRec(q.ev, q.dur); }, 400);
     };
     REC.mr = mr; REC.cv = cv; REC.c2 = c2; REC.ev = ev;
+    REC.win = winMode;
     REC.startAt = nowSec();
     const mmss = t => {
       const s2 = Math.max(0, Math.floor(t));
@@ -4938,8 +4968,10 @@
     };
     const frame = () => {
       if (!REC.mr) return;
-      try { c2.drawImage(map, 0, 0); } catch (e) { }
-      try { recHud(c2, REC.ev || ev, cv.width, cv.height); } catch (e) { }
+      if (!winMode) {                       // 地图模式：每帧抄地图画布 + 信息条
+        try { c2.drawImage(map, 0, 0); } catch (e) { }
+        try { recHud(c2, REC.ev || ev, cv.width, cv.height); } catch (e) { }
+      }
       const el = nowSec() - REC.startAt;
       const tEl = $('#recTime');
       if (tEl) tEl.textContent = mmss(el);
@@ -4951,6 +4983,31 @@
     try { mr.start(1000); } catch (e) { toast('开始录制失败：' + e.message); return; }
     REC.timer = setInterval(frame, 1000 / fps);
     frame();
+    // 整窗模式：服务端每 1/12 秒抓一帧窗口 JPEG，这里拉过来铺满画布，
+    // 由同一个 MediaRecorder 编码——所以录出来的就是屏幕上那个完整界面。
+    if (winMode) {
+      (async function pumpWin() {
+        while (REC.mr && REC.win) {
+          const t0 = performance.now();
+          try {
+            const r = await fetch('/api/rec/frame?t=' + Date.now(), { cache: 'no-store' });
+            if (r.ok) {
+              const blob = await r.blob();
+              if (blob.size > 1000) {
+                const bmp = await createImageBitmap(blob);
+                if (bmp.width > 100 && (cv.width !== bmp.width || cv.height !== bmp.height)) {
+                  cv.width = bmp.width; cv.height = bmp.height;   // 窗口改过大小
+                }
+                c2.drawImage(bmp, 0, 0);
+                if (bmp.close) bmp.close();
+              }
+            }
+          } catch (e) { }
+          const dt = performance.now() - t0;
+          await new Promise(res => setTimeout(res, Math.max(20, 66 - dt)));
+        }
+      })();
+    }
     // 顶部胶囊：红点 + 计时 + 停止
     const pill = $('#recPill');
     if (pill) {
@@ -5005,7 +5062,7 @@
       const first = REC.seen.values().next().value;
       REC.seen.delete(first);
     }
-    if (REC.mr) return;                            // 正在录就不重复开
+    if (REC.mr || REC.starting) return;            // 正在录（或正在起录）就不重复开
     REC.seg = false;
     startRec(pick);
   }
@@ -6500,7 +6557,7 @@
   }
   // ---- 自动录屏设置 ----
   const recEls = {
-    on: $('#optRec'), kbps: $('#optRecKbps'),
+    on: $('#optRec'), kbps: $('#optRecKbps'), view: $('#optRecView'),
     dir: $('#optRecDir'), jp: $('#optRecJP'), cn: $('#optRecCN'),
     tw: $('#optRecTW'), gq: $('#optRecGQ'),
   };
@@ -6509,6 +6566,7 @@
     if (recEls.on) recEls.on.checked = !!st.recOn;
     if (recEls.mag) recEls.mag.value = String(st.recMag ?? 4);
     if (recEls.kbps) recEls.kbps.value = String(st.recKbps ?? 2500);
+    if (recEls.view) recEls.view.value = st.recView || 'map';
     if (recEls.dir) recEls.dir.value = st.recDir || '';
     if (recEls.jp) recEls.jp.checked = src.jp !== false;
     if (recEls.cn) recEls.cn.checked = !!src.cn;
@@ -6573,6 +6631,10 @@
     };
     srcBind(recEls.jp, 'jp'); srcBind(recEls.cn, 'cn');
     srcBind(recEls.tw, 'tw'); srcBind(recEls.gq, 'gq');
+    if (recEls.view) recEls.view.addEventListener('change', e => {
+      state.settings.recView = e.target.value === 'window' ? 'window' : 'map';
+      recSaveSoon();
+    });
     const bp = $('#btnRecPick');
     if (bp) bp.addEventListener('click', async () => {
       bp.disabled = true;
@@ -7657,8 +7719,11 @@
     if (Date.now() - lastTickAt > 1500) tick();
   }, 500);
   window.__tickAt = () => lastTickAt;   // 调试/测试：看画面刷新有没有在走
-  window.__rec = () => ({ mr: !!REC.mr, uid: (REC.ev && REC.ev.uid) || '',
+  window.__rec = () => ({ mr: !!REC.mr, win: REC.win, uid: (REC.ev && REC.ev.uid) || '',
                           seen: Array.from(REC.seen).slice(0, 20) });
+  // 测试钩子：不走地震判定，直接起一段录制（验收录屏用）
+  window.__recTest = (ev) => startRec(ev || { mag: 5.0, place: '录制测试', depth: 30,
+    source: 'jma_eew', source_name: 'テスト', serial: 1, uid: 'TEST-REC', origin_ts: nowSec() });
   window.__eew = state;   // 调试用：可以在控制台里看/改状态
   // 任何未捕获异常都留个记号：主循环一旦被 draw() 里的异常打断，
   // 之后卡片就再也不刷新，而控制台在打包版里看不到——只能靠自己记。

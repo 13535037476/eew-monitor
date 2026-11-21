@@ -494,6 +494,15 @@ try{if(localStorage.getItem('eew.theme')==='light')document.documentElement.clas
         <div class="row between"><label>开启自动录屏</label>
           <input type="checkbox" id="optRec" class="switch"></div>
         <div class="row">
+          <label style="flex:none;width:76px">录制画面</label>
+          <select id="optRecView" class="select" style="width:auto">
+            <option value="map">地图（省资源，熄屏也能录）</option>
+            <option value="window">整个窗口（和屏幕上一致）</option>
+          </select>
+        </div>
+        <p class="hint" style="margin:2px 0 6px">整窗模式连卡片、面板一起录，画面和屏幕一致；熄屏时抓不到窗口，
+          会自动退回地图模式。窗口被别的窗口挡住也不影响（直接抓窗口自己的画面）。</p>
+        <div class="row">
           <label style="flex:none;width:76px">码率(kbps)</label>
           <input id="optRecKbps" class="input mono" style="width:84px" value="2500">
           <span class="hint" style="margin:0">录到你自己点「停止」为止；顶部胶囊随时可停。</span>
