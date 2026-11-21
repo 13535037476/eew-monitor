@@ -5532,12 +5532,10 @@
       ? '粘贴 Jian Project 的登录密钥（lk_ 开头），填一次就行；这是你账号自己的授权'
       : '粘贴这个数据源的令牌（填一次就存在本机）';
     if (sid === 'jian') {
-      const box = $('#jianHelp');
-      if (box) {
-        box.hidden = false;
-        box.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-        const inp = $('#jianTok');
-        if (inp) inp.focus();
+      const inp = $('#myTokInput');
+      if (inp) {
+        inp.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        setTimeout(() => { try { inp.focus(); } catch (e) { } }, 260);
       }
       return;
     }
@@ -5553,36 +5551,16 @@
     } catch (err) { toast('保存失败：' + err.message, 6000); }
   });
 
-  // Jian 引导面板：打开申请页 / 保存密钥
+  // Jian 引导：只负责「用浏览器打开申请页」；密钥的保存走「我的 Jian 密钥」那套接口
   (function bindJianHelp() {
-    const box = $('#jianHelp');
-    if (!box) return;
-    const cls = $('#jianHelpClose');
-    if (cls) cls.addEventListener('click', () => { box.hidden = true; });
-    const ap = $('#jianApply');
-    if (ap) ap.addEventListener('click', () => {
-      try { fetch('/api/open-url', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: 'https://auth.sismotide.top/' }) }); } catch (e) { }
-    });
-    const sv = $('#jianTokSave');
-    const inp = $('#jianTok');
-    if (sv && inp) sv.addEventListener('click', async () => {
-      const tok = (inp.value || '').trim();
-      if (!tok) { toast('先粘贴 lk_ 开头的登录密钥', 4000); inp.focus(); return; }
-      if (tok.indexOf('lk_') !== 0) { toast('格式不对：登录密钥应该以 lk_ 开头', 5000); }
-      sv.disabled = true;
+    const ap = $('#jianOpenApply');
+    if (!ap) return;
+    ap.addEventListener('click', () => {
       try {
-        const j = await (await fetch('/api/source/token', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: 'jian', token: tok }),
-        })).json();
-        if (j.ok) {
-          toast('已保存，正在连接 Jian');
-          inp.value = '';
-          box.hidden = true;
-        } else toast('保存失败：' + (j.error || ''), 6000);
-      } catch (e) { toast('保存失败：' + e.message, 6000); }
-      finally { sv.disabled = false; }
+        fetch('/api/open-url', { method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: 'https://auth.sismotide.top/' }) });
+      } catch (e) { }
     });
   })();
 

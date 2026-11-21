@@ -407,21 +407,7 @@ try{if(localStorage.getItem('eew.theme')==='light')document.documentElement.clas
           <thead><tr><th>数据</th><th>频率</th><th>状态</th><th>开</th></tr></thead>
           <tbody id="srcTable"></tbody>
         </table>
-        <div class="jianhelp" id="jianHelp" hidden>
-          <div class="jh-hd">Jian Project 访问令牌 <button type="button" class="btn" id="jianHelpClose" style="float:right">关闭</button></div>
-          <ol class="jh-steps">
-            <li>打开申请页 <a href="https://auth.sismotide.top/" target="_blank" rel="noopener" id="jianApply">auth.sismotide.top</a>
-              （也可以点下面的按钮，会用系统浏览器打开）</li>
-            <li>填 <b>QQ 邮箱</b>（@qq.com / @foxmail.com / @vip.qq.com），点「发送登录密钥」</li>
-            <li>去邮箱收信，复制 <b>lk_ 开头</b>的登录密钥，粘到下面</li>
-          </ol>
-          <div class="row">
-            <input id="jianTok" class="input mono" placeholder="lk_…（登录密钥）" style="flex:1">
-            <button type="button" class="btn primary" id="jianTokSave">保存并连接</button>
-          </div>
-          <p class="hint" style="margin:6px 0 0">同一邮箱 60 秒只能发一次；密钥泄露可在申请页「注销全部旧 Token」。
-            密钥按账号保存，换号要各自填。</p>
-        </div>
+
         <p class="hint">已接入：日本气象厅 / 中国地震预警 / 中国地震台网 / 台湾 P-Alert 强震网（实时 PGA）/
           WHEWS（待授权）/ EQSC（待授权）。</p>
 
@@ -430,8 +416,18 @@ try{if(localStorage.getItem('eew.theme')==='light')document.documentElement.clas
             <label>我的 Jian 密钥</label>
             <span class="hint mono" id="myTokState">—</span>
           </div>
+          <div class="jh-guide">
+            <div class="jh-t">这个密钥怎么拿（三步，1 分钟）</div>
+            <ol class="jh-steps">
+              <li>打开申请页 <a href="https://auth.sismotide.top/" target="_blank" rel="noopener">auth.sismotide.top</a>
+                　<button type="button" class="btn" id="jianOpenApply">用浏览器打开</button></li>
+              <li>填 <b>QQ 邮箱</b>（@qq.com / @foxmail.com / @vip.qq.com）→ 点「发送登录密钥」</li>
+              <li>去邮箱收信，把 <b>lk_ 开头</b>的登录密钥粘到下面 → 保存（程序会自动换成访问票）</li>
+            </ol>
+            <div class="hint" style="margin:2px 0 8px">同一邮箱 60 秒只能发一次；怀疑泄露可在申请页「注销本邮箱所有长期 Token」。</div>
+          </div>
           <div class="row">
-            <input id="myTokInput" class="input mono" placeholder="rt_…（留空则用本机共享密钥）"
+            <input id="myTokInput" class="input mono" placeholder="lk_…（登录密钥，留空则不用 Jian）"
               autocomplete="off" spellcheck="false">
             <button type="button" class="btn" id="btnMyTokSave">保存</button>
             <button type="button" class="btn" id="btnMyTokClear">清除</button>

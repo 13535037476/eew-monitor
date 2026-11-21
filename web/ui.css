@@ -940,3 +940,14 @@ html.light #updNote.warn{color:#a3730f}
   color: rgba(150, 168, 186, .75);
 }
 .thxline b { color: rgba(200, 214, 228, .92); font-weight: 600; }
+
+
+/* Jian 密钥引导（常驻在「我的 Jian 密钥」区块里，不用点按钮才出现） */
+.jh-guide {
+  margin: 4px 0 10px; padding: 10px 12px; border-radius: 12px;
+  border: 1px solid rgba(255, 196, 107, .30); background: rgba(255, 196, 107, .06);
+}
+.jh-guide .jh-t { font-weight: 700; font-size: 12.5px; color: #ffc46b; margin-bottom: 4px; }
+.jh-guide .jh-steps { margin: 0 0 2px 18px; padding: 0; font-size: 12px; line-height: 1.75; }
+.jh-guide .jh-steps a { color: #7cb7ff; }
+.jh-guide .btn { padding: 2px 8px; font-size: 11.5px; }
