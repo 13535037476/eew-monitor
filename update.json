@@ -1,8 +1,8 @@
 {
-  "version": "1.38.9",
-  "url": "https://github.com/13535037476/eew-monitor/releases/latest/download/ZhenXianEEW-Setup-1.38.9.exe",
-  "size": 57343710,
-  "sha256": "32bdd71771ce518313d1fd1da1cc8cda7cb68dca7aa1bf642761d78dd69d76cb",
-  "notes": "· 以前引导藏在「填令牌」按钮后面，不点就看不到，别人根本不知道去哪申请\n· 现在「我的 Jian 密钥」区块里常驻三步说明：申请页 → 填 QQ 邮箱收信 → 粘贴 lk_ 密钥，带「用浏览器打开」按钮\n· 表格里的「填令牌」点一下会直接滚到这个区块并聚焦输入框，不再弹独立面板\n· 输入框提示改成 lk_ 开头（程序会自动换成访问票），不再误导成 rt_",
+  "version": "1.39.1",
+  "url": "https://github.com/13535037476/eew-monitor/releases/latest/download/ZhenXianEEW-Setup-1.39.1.exe",
+  "size": 57350330,
+  "sha256": "e55b7f0322d2e7ce233ae0c38acfef98afc6f8c4f8bb2f3d3385736e4a3206e9",
+  "notes": "· 扫码成功后 B站 事后可能对同一个 key 回「二维码已过期」，晚到的一包会把「登录成功」改写成过期——现在成功结果缓存 5 分钟，直接回放\n· 登录回调缺字段时说清缺哪个：缺 SESSDATA 或 bili_jct / DedeUserID 各自给中文提示（缺后两者能登录但投稿会被拒）\n· 感谢条：技术支持 Mon3tr，QQ 2979565286",
   "published": "2026-11-21"
 }

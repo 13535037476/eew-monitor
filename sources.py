@@ -182,6 +182,26 @@ SOURCES = [
         "provider": "SeedLink",
         "need_token": "seedlink",
     },
+    # CapQuake 中继：免令牌的公开 JSON 中继，字段各自贴近原平台。
+    # 和 Wolfx 的同名源并列跑、互为备份，谁先到谁上屏（uid 同一套，重复的会合并）。
+    {
+        "id": "cap_cea", "country": "CN", "kind": "eew", "poll": 2,
+        "name": "CapQuake CEA", "name_zh": "CapQuake 中国预警网",
+        "url": "https://api.capquake.top/v1/cea", "provider": "CapQuake",
+        "fetch": "cap_cea",
+    },
+    {
+        "id": "cap_jma", "country": "JP", "kind": "eew", "poll": 1.5,
+        "name": "CapQuake JMA", "name_zh": "CapQuake 気象庁 EEW",
+        "url": "https://api.capquake.top/v1/jma_eew", "provider": "CapQuake",
+        "fetch": "cap_jma",
+    },
+    {
+        "id": "cap_cwa", "country": "TW", "kind": "eew", "poll": 2,
+        "name": "CapQuake CWA", "name_zh": "CapQuake 台湾 CWA",
+        "url": "https://api.capquake.top/v1/cwa_eew", "provider": "CapQuake",
+        "fetch": "cap_cwa",
+    },
     # Jian Project：wss://api.sismotide.top/all（备用 api.jianproject.cloud），
     # 聚合 JMA/CEA/CWA 预警 + /kmoni、/s-net 测站通道。鉴权分两步：
     # 登录密钥 lk_ → POST auth.sismotide.top/api/refresh 换长期票 rt_ →
@@ -979,7 +999,87 @@ def norm_cwa_eew(d):
     }
 
 
+# ---------------- CapQuake：三路公开中继 ----------------
+# 返回的是「当前这一报」的单条 JSON（没有事件时可能 503 / null）。
+# 字段跟 Wolfx 不完全一样：JMA 用 Magunitude/MaxIntensity，CEA 用 event_id/max_intensity，
+# CWA 用 identifier/epicenter_name。这里先翻译成自家 normalizer 认识的形状，
+# 免得为三路再写三套事件模型。
+CAPQ_BASE = "https://api.capquake.top/v1/"
+
+
+def capq_fetch(path, timeout=10):
+    try:
+        d = session_json(CAPQ_BASE + path, timeout=timeout)
+    except urllib.error.HTTPError as exc:
+        if exc.code in (204, 404, 503):
+            return None                      # 「暂无事件」不是故障，别刷红
+        raise
+    if isinstance(d, list):
+        d = d[0] if d else None
+    return d if isinstance(d, dict) and d else None
+
+
+def norm_cap_jma(d):
+    ev = norm_jma_eew({
+        "EventID": d.get("EventID"), "Serial": d.get("Serial"),
+        "OriginTime": d.get("OriginTime"), "AnnouncedTime": d.get("AnnouncedTime"),
+        "Hypocenter": d.get("Hypocenter"), "Latitude": d.get("Latitude"),
+        "Longitude": d.get("Longitude"), "Depth": d.get("Depth"),
+        "Magunitude": d.get("Magunitude"), "MaxIntensity": d.get("MaxIntensity"),
+        "isWarn": d.get("isWarn"), "isFinal": d.get("isFinal"),
+        "isCancel": d.get("isCancel"), "isTraining": d.get("isTraining"),
+        "isAssumption": d.get("isAssumption"), "isSea": d.get("isSea"),
+        "Title": d.get("Title"), "WarnArea": d.get("WarnArea") or [],
+    })
+    if ev:
+        ev["source"] = "cap_jma"
+        ev["source_name"] = "CapQuake 気象庁 中継"
+    return ev
+
+
+def norm_cap_cea(d):
+    mi = to_float(d.get("max_intensity"), 0.0) or 0.0
+    ev = norm_cn_eew({
+        "EventID": d.get("event_id"), "Latitude": d.get("latitude"),
+        "Longitude": d.get("longitude"),
+        "Magnitude": d.get("magnitude"),
+        "Depth": d.get("depth") if d.get("depth") is not None else 10,
+        "HypoCenter": d.get("location"),
+        "OriginTime": d.get("OriginTime"),
+        "ReportTime": d.get("AnnouncedTime"),
+        "ReportNum": d.get("serial"),
+        "MaxIntensity": mi,
+    }, "cap_cea", "CapQuake 中国预警网")
+    if ev:
+        ev["cancel"] = bool(d.get("is_cancel"))
+        ev["warn"] = not ev["cancel"]
+        ev["source"] = "cap_cea"
+        ev["source_name"] = "CapQuake 中国预警网"
+    return ev
+
+
+def norm_cap_cwa(d):
+    ev = norm_cwa_eew({
+        "ID": d.get("identifier") or d.get("event_id"),
+        "Latitude": d.get("latitude"), "Longitude": d.get("longitude"),
+        "Magnitude": d.get("magnitude"), "Depth": d.get("depth"),
+        "HypoCenter": d.get("epicenter_name"),
+        "OriginTime": d.get("OriginTime"),
+        "ReportTime": d.get("AnnouncedTime"),
+        "ReportNum": d.get("serial"),
+        "MaxIntensity": d.get("max_intensity"),
+        "isCancel": d.get("is_cancel"),
+    })
+    if ev:
+        ev["source"] = "cap_cwa"
+        ev["source_name"] = "CapQuake 台湾 CWA 中継"
+    return ev
+
+
 NORMALIZERS = {
+    "cap_cea": norm_cap_cea,
+    "cap_jma": norm_cap_jma,
+    "cap_cwa": norm_cap_cwa,
     "jma_eew": norm_jma_eew,
     "cn_eew": lambda p: norm_cn_eew(p, "cn_eew", "中国地震台网"),
     "sc_eew": lambda p: norm_cn_eew(p, "sc_eew", "四川省地震局"),
@@ -1322,6 +1422,48 @@ def is_active(e, now=None, max_age=900):
 # 未授权累计被掐断 10 次会封 IP 一小时，所以这里所有失败都退避，绝不猛重连。
 
 JIAN_AUTH = "https://auth.sismotide.top/api/access"
+JIAN_REFRESH = "https://auth.sismotide.top/api/refresh"
+
+
+def jian_exchange(lk, timeout=15):
+    """lk_ 登录密钥 → rt_ 长期令牌。
+
+    邮件里发的是 lk_（一次性、5 分钟），连流用的是 rt_。以前界面只收 rt_，
+    用户拿着邮件里的 lk_ 怎么填都连不上——这里按官方文档换一次票，
+    成功就把 rt_ 存下来，之后启动直接用，不用再换。
+    返回 (rt, 错误说明)。
+    """
+    lk = str(lk or "").strip()
+    if not lk.startswith("lk_"):
+        return "", "不是 lk_ 开头的登录密钥"
+    req = urllib.request.Request(
+        JIAN_REFRESH, data=b"", method="POST",
+        headers={"Authorization": "Bearer " + lk,
+                 "Accept": "application/json", "User-Agent": UA})
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    try:
+        with opener.open(req, timeout=timeout) as r:
+            d = json.loads(r.read().decode("utf-8", "replace"))
+    except urllib.error.HTTPError as exc:
+        text = b""
+        try:
+            text = exc.read()
+        except Exception:
+            pass
+        t = text.decode("utf-8", "replace")
+        if "invalid_login_key" in t or "4101" in t:
+            return "", "登录密钥无效或已被使用（lk_ 只能换一次，请去申请页重新发一封）"
+        if "invalid_token_format" in t or "4002" in t:
+            return "", "登录密钥格式不对（应为 lk_ 开头的一整串）"
+        if "account_banned" in t:
+            return "", "该账号在 Jian 已被封禁，请联系 Jian Project"
+        return "", "换票失败：%s" % (t.strip()[:120] or exc.code)
+    except Exception as exc:
+        return "", "换票请求失败：%s" % str(exc)[:120]
+    tok = str(d.get("token") or d.get("refresh_token") or d.get("rt") or "")
+    if not tok.startswith("rt_"):
+        return "", "换票返回里没有 rt_：%s" % str(d)[:120]
+    return tok, ""
 JIAN_HOST = "api.sismotide.top"
 JIAN_BACKUP_HOST = "api.jianproject.cloud"
 

@@ -84,7 +84,7 @@ def user_dir(name):
 
 def user_file(name, fn):
     return os.path.join(user_dir(name), fn)
-VERSION = "1.38.9"
+VERSION = "1.39.1"
 APP_NAME = "震线 EEW"
 HOMEPAGE = "https://github.com/13535037476/eew-monitor"
 INSTALL_FILE = os.path.join(APP_DIR, "install.json")
@@ -843,6 +843,38 @@ def bucket_of(user):
     return (user or {}).get("name") or ""
 
 
+def migrate_lk_tokens():
+    """把各账号 tokens.json 里遗留的 lk_ 换成 rt_（后台跑，不挡启动）。"""
+    try:
+        names = auth.usernames()
+    except Exception:
+        return 0
+    n = 0
+    for name in names:
+        try:
+            p = user_file(name, "tokens.json")
+            if not os.path.exists(p):
+                continue
+            cur = _read_tokens(p)
+            tok = str(cur.get("jian") or "").strip()
+            if not tok.startswith("lk_"):
+                continue
+            rt, err = sources.jian_exchange(tok)
+            if not rt:
+                continue
+            cur["jian"] = rt
+            tmp = p + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(cur, f, ensure_ascii=False, indent=2)
+            os.replace(tmp, p)
+            n += 1
+        except Exception:
+            continue
+    if n:
+        refresh_own_tokens()
+    return n
+
+
 def refresh_own_tokens():
     """重扫各账号的令牌文件，更新「谁有专属 Jian 密钥」的索引。
 
@@ -1595,6 +1627,10 @@ def poll_once(src):
         return sources.earlyest_fetch()
     if src.get("fetch") == "shakealert":
         return sources.shakealert_fetch()
+    if src.get("fetch") in ("cap_cea", "cap_jma", "cap_cwa"):
+        # CapQuake 三路中继：免令牌，字段各异，归一化在 sources 里做
+        return sources.capq_fetch(src["fetch"].replace("cap_", "") +
+                                  ("_eew" if src["fetch"] != "cap_cea" else ""))
     if src.get("fetch") == "lpgm":
         # 气象厅长周期：HTML 列表 + Shift_JIS CSV，不能走 JSON 通道
         return sources.lpgm_fetch()
@@ -2719,53 +2755,6 @@ class Handler(SimpleHTTPRequestHandler):
                 pass
             publish()
             return self._json({"ok": True, "id": sid, "enabled": on})
-        if path == "/api/source/token":
-            u = self._user()
-            if not u:
-                return self._json({"ok": False, "error": "未登录"}, 401)
-            enter(bucket_of(u))
-            sid = str(body.get("id") or "").strip()
-            src = next((x for x in sources.SOURCES if x["id"] == sid), None)
-            if not src or not src.get("need_token"):
-                return self._json({"ok": False, "error": "这个源不需要令牌"}, 400)
-            tok = str(body.get("token") or "").strip()
-            name = u.get("name") or ""
-            # jian 是按账号存的个人授权；其它（trem/eqsc/seedlink）是机器级
-            path_tok = user_file(name, "tokens.json") if src["need_token"] == "jian" \
-                else _data_file("tokens.json")
-            cur = _read_tokens(path_tok)
-            if tok:
-                cur[src["need_token"]] = tok
-            else:
-                cur.pop(src["need_token"], None)
-            try:
-                os.makedirs(os.path.dirname(path_tok), exist_ok=True)
-                tmp = path_tok + ".tmp"
-                with open(tmp, "w", encoding="utf-8") as f:
-                    json.dump(cur, f, ensure_ascii=False, indent=2)
-                os.replace(tmp, path_tok)
-            except OSError as exc:
-                return self._json({"ok": False, "error": "写入失败：%s" % exc}, 500)
-            try:
-                sources.set_tokens(cur, name if src["need_token"] == "jian" else "")
-            except Exception:
-                pass
-            if src["need_token"] == "jian":
-                try:
-                    restart_jian(name)
-                except Exception:
-                    pass
-            else:
-                try:
-                    start_pending_sources()
-                except Exception:
-                    pass
-            try:
-                refresh_sources_meta()   # 面板立刻从「待授权」切到正常
-            except Exception:
-                pass
-            publish()
-            return self._json({"ok": True, "has_token": True})
         if path in ("/api/bili/qr/new", "/api/bili/logout"):
             u = self._user()
             if not u:
@@ -3007,10 +2996,17 @@ class Handler(SimpleHTTPRequestHandler):
             if not name:
                 return self._json({"ok": False, "error": "未登录"}, 401)
             tok = str(body.get("jian") or "").strip()
-            if tok and not tok.startswith("rt_"):
+            if tok.startswith("lk_"):
+                # 邮件里发的是 lk_（一次性），连流要 rt_：这里当场换票，
+                # 换成功只把 rt_ 存下来，用户下次不用再管
+                rt2, err2 = sources.jian_exchange(tok)
+                if not rt2:
+                    return self._json({"ok": False, "error": err2 or "登录密钥换票失败"}, 400)
+                tok = rt2
+            elif tok and not tok.startswith("rt_"):
                 return self._json(
                     {"ok": False,
-                     "error": "Jian 的密钥以 rt_ 开头；lk_ 是登录密钥，要先换票才能用"}, 400)
+                     "error": "密钥应为 lk_（登录密钥）或 rt_（长期令牌）"}, 400)
             if len(tok) > 400:
                 return self._json({"ok": False, "error": "密钥过长"}, 400)
             try:
@@ -4141,6 +4137,10 @@ def boot(host="127.0.0.1", port=8765, tls_cert=None, tls_key=None):
         pass
     try:
         _src_off_load()
+    except Exception:
+        pass
+    try:
+        threading.Thread(target=migrate_lk_tokens, daemon=True).start()
     except Exception:
         pass
     _t = threading.Timer(20.0, _cloud_catchup)

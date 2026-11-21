@@ -88,7 +88,8 @@ def _cookies(c=None):
         c.get("sessdata", ""), c.get("bili_jct", ""), c.get("dedeuserid", ""))
 
 
-def _req(url, data=None, method=None, headers=None, timeout=60, c=None):
+def _req_full(url, data=None, method=None, headers=None, timeout=60, c=None):
+    """和 _req 一样，但连响应头一起返回（扫码登录要从 Set-Cookie 收票）。"""
     # 登录（passport）和投稿（member）要各自正确的 Referer/Origin，
     # 全部塞 member 的头会被 passport 当成跨站请求挡掉。
     if "passport.bilibili.com" in url:
@@ -109,7 +110,80 @@ def _req(url, data=None, method=None, headers=None, timeout=60, c=None):
         h["Content-Type"] = "application/json"
     req = urllib.request.Request(url, data=body, headers=h, method=method)
     with urllib.request.urlopen(req, timeout=timeout) as r:
-        return r.getcode(), r.read()
+        return r.getcode(), r.read(), r.headers
+
+
+def _req(url, data=None, method=None, headers=None, timeout=60, c=None):
+    code, raw, _h = _req_full(url, data=data, method=method, headers=headers,
+                              timeout=timeout, c=c)
+    return code, raw
+
+
+def _cookies_from_headers(headers):
+    """从 Set-Cookie 里挑出登录要用的三样（B站新版只在这里给）。"""
+    out = {}
+    try:
+        items = headers.get_all("Set-Cookie") or []
+    except Exception:
+        items = []
+    for line in items:
+        first = line.split(";", 1)[0]
+        if "=" not in first:
+            continue
+        k, v = first.split("=", 1)
+        k = k.strip()
+        if k in ("SESSDATA", "bili_jct", "DedeUserID"):
+            out[k] = v.strip()
+    return out
+
+
+_NO_REDIRECT = None
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+def _follow_cookies(url, max_hops=5):
+    """逐跳跟随 302，收集每一跳 Set-Cookie 里的登录票。
+
+    新版 B站 扫码成功后不再把 cookie 直接拼在 data.url 里，
+    而是给一个 crossDomain/ticket 地址，票在跳转响应的 Set-Cookie 上。
+    必须禁用自动重定向、自己跟，才能看到中间每一跳的响应头。
+    """
+    global _NO_REDIRECT
+    if _NO_REDIRECT is None:
+        _NO_REDIRECT = urllib.request.build_opener(
+            urllib.request.ProxyHandler({}), _NoRedirect())
+    got = {}
+    cur = url
+    for _ in range(max_hops):
+        if not cur.startswith("http"):
+            break
+        req = urllib.request.Request(cur, headers={
+            "User-Agent": UA, "Referer": "https://www.bilibili.com/",
+            "Accept": "text/html,application/xhtml+xml,*/*",
+        })
+        try:
+            r = _NO_REDIRECT.open(req, timeout=20)
+        except urllib.error.HTTPError as exc:
+            r = exc
+            hdrs = exc.headers
+        else:
+            hdrs = r.headers
+        got.update({k: v for k, v in _cookies_from_headers(hdrs).items() if v})
+        if "SESSDATA" in got and got["SESSDATA"]:
+            break
+        nxt = ""
+        try:
+            nxt = hdrs.get("Location") or ""
+        except Exception:
+            nxt = ""
+        if not nxt:
+            break
+        cur = urllib.parse.urljoin(cur, nxt)
+    return got
 
 
 def check_login(c=None):
@@ -348,6 +422,8 @@ def status():
 # 里面带着 SESSDATA / bili_jct / DedeUserID，存下来就是「用户的账号」。
 # 同时保留多个未过期的二维码：点两次「刷新」不会再互相把对方顶成过期
 _QR = {"keys": {}, "state": "idle", "uname": "", "mid": 0, "err": ""}
+_DONE = {}          # key -> {at, uname, mid, sessdata, bili_jct, dedeuserid}
+_DONE_TTL = 300
 _QR_TTL = 240
 
 
@@ -385,6 +461,12 @@ def qr_new():
 
 
 def qr_poll(key):
+    # 已经成功过的码：直接回放成功结果。B站 事后可能对同一个 key 回 86038，
+    # 前端在成功那一刻还在轮询，晚到的一包会把「登录成功」改写成「二维码过期」。
+    done = _DONE.get(key) if key else None
+    if done and time.time() - done["at"] < _DONE_TTL:
+        return {"ok": True, "state": "ok", "uname": done.get("uname"),
+                "mid": done.get("mid"), "cached": True}
     born = _QR["keys"].get(key) if key else None
     if not born:
         return {"ok": False, "state": "expired", "error": "二维码已失效，请重新生成"}
@@ -392,7 +474,7 @@ def qr_poll(key):
         _QR["keys"].pop(key, None)
         return {"ok": False, "state": "expired", "error": "二维码已过期，请重新生成"}
     try:
-        code, raw = _req(
+        code, raw, hdrs = _req_full(
             "https://passport.bilibili.com/x/passport-login/web/qrcode/poll"
             "?qrcode_key=%s&source=main-fe-header" % urllib.parse.quote(key),
             headers={"Referer": "https://www.bilibili.com/"}, c={}, timeout=20)
@@ -413,8 +495,30 @@ def qr_poll(key):
             sess = (q.get("SESSDATA") or [""])[0]
             jct = (q.get("bili_jct") or [""])[0]
             uid = (q.get("DedeUserID") or [""])[0]
+            # 新版 B站 可能不在 url 查询串里给票：轮询响应自己的 Set-Cookie 先收一遍
             if not sess:
-                return {"ok": False, "state": "fail", "error": "登录成功但没拿到 cookie"}
+                ck = _cookies_from_headers(hdrs)
+                sess = ck.get("SESSDATA", "") or sess
+                jct = ck.get("bili_jct", "") or jct
+                uid = ck.get("DedeUserID", "") or uid
+            # 还不够就手动跟 302（crossDomain/ticket 那串），每跳的 Set-Cookie 都收
+            if not sess and url.startswith("http"):
+                ck2 = _follow_cookies(url)
+                sess = ck2.get("SESSDATA", "") or sess
+                jct = ck2.get("bili_jct", "") or jct
+                uid = ck2.get("DedeUserID", "") or uid
+            if not sess:
+                _STATE["err"] = "登录回调里没有 SESSDATA"
+                return {"ok": False, "state": "fail",
+                        "error": "登录成功但缺 SESSDATA（B站 回调既没带票也没给 Set-Cookie，"
+                                 "请重试；仍失败把这句发我）",
+                        "url": url[:180]}
+            if not jct or not uid:
+                # 能登录但投稿会 403：先把缺哪一项说清楚，别让人猜
+                miss = "bili_jct" if not jct else "DedeUserID"
+                _STATE["err"] = "登录回调缺 " + miss
+                return {"ok": False, "state": "fail",
+                        "error": "登录成功但缺 %s（换上后能登录，但投稿会被拒；请重扫码）" % miss}
             c = cfg()
             c.update({"sessdata": sess, "bili_jct": jct, "dedeuserid": uid})
             if "enabled" not in c:
