@@ -5441,13 +5441,13 @@
         ? '<i class="palt" title="' + esc(gqHostTip(s)) + '">备</i>' : '';
       const gqsw = (s.id === 'globalquake') ? gqSwitchHtml(s) : '';
       const off = s.enabled === false;
-      const st = off ? ['off', '已关闭']
-        : s.state === 'ok' ? ['ok', '正常' + (s.latency_ms ? ' ' + s.latency_ms + 'ms' : '')]
-        : s.state === 'wip' ? ['wait', '接入中']
-          : s.state === 'noauth' ? ['wait', '待授权']
-          : s.state === 'down' ? ['err', '失败']
-            : s.state === 'stale' ? ['warn', '缓存 ' + Math.round(s.age_s || 0) + 's']
-              : ['warn', '连接中'];
+      const st = off ? ['off', '已关', '']
+        : s.state === 'ok' ? ['ok', '正常', (s.latency_ms ? s.latency_ms + 'ms' : '')]
+        : s.state === 'wip' ? ['wait', '接入中', '']
+          : s.state === 'noauth' ? ['wait', '待授权', '']
+          : s.state === 'down' ? ['err', '失败', '']
+            : s.state === 'stale' ? ['warn', '缓存', '']
+              : ['warn', '连接中', ''];
       // 开关：每个源都能单独开/关（关掉就不再抓数据，重开立刻恢复）
       const sw = '<input type="checkbox" class="srcsw" data-sid="' + esc(s.id) + '"' +
         (off ? '' : ' checked') + ' title="开启/关闭这个数据源">';
@@ -5455,16 +5455,21 @@
       const tk = (s.need_token && !s.has_token)
         ? '<button type="button" class="srctok" data-sid="' + esc(s.id) + '" data-name="' +
           esc(SRC_TITLE[s.id] || s.name_zh) + '">填令牌</button>' : '';
+      // GQ 名字太长会把「主/备/自动」三个小标签挤成省略号：用短名，标签留出来
+      const nmTxt = (s.id === 'globalquake') ? 'GlobalQuake' : (SRC_TITLE[s.id] || s.name_zh);
+      const prov = '<span class="prov">' + esc(s.provider || 'Wolfx') + ' · ' + (s.poll || '—') + 's</span>';
+      // 延迟只留数字，状态词放小字：窄侧边栏里也放得下
+      const stTxt = st[2] ? st[2] : st[1];
       return '<tr' + (main ? ' class="is-main"' : '') + (off ? ' class="src-off"' : '') + '>' +
-        '<td>' + (SRC_TITLE[s.id] || s.name_zh) +
-        (main ? '<i class="pmain">主</i>' : '') + alt + gqsw + tk + '</td>' +
-        '<td class="pr">' + (s.provider || 'Wolfx') + '</td>' +
+        '<td class="nm" title="' + esc((SRC_TITLE[s.id] || s.name_zh) + ' · ' + (s.provider || '')) + '">' +
+        esc(nmTxt) +
+        (main ? '<i class="pmain">主</i>' : '') + alt + gqsw + tk + prov + '</td>' +
         '<td class="st">' + (s.poll || '—') + 's</td>' +
-        '<td class="st"><i class="sdot ' + st[0] + '"></i>' + st[1] + '</td>' +
-        '<td class="st">' + sw + '</td></tr>';
+        '<td class="st"><i class="sdot ' + st[0] + '"></i>' + esc(stTxt) + '</td>' +
+        '<td class="sw">' + sw + '</td></tr>';
     });
-    rows.push('<tr><td>历史目录 FDSN</td><td class="pr">USGS</td>' +
-      '<td class="st">按需</td><td class="st"><i class="sdot ok"></i>可查询</td></tr>');
+    rows.push('<tr><td class="nm">历史目录 FDSN<span class="prov">USGS · 按需</span></td>' +
+      '<td class="st">按需</td><td class="st"><i class="sdot ok"></i>可查询</td><td></td></tr>');
     body.innerHTML = rows.join('');
   }
   document.addEventListener('change', async (e) => {
@@ -5490,6 +5495,16 @@
     const tip = sid === 'jian'
       ? '粘贴 Jian Project 的登录密钥（lk_ 开头），填一次就行；这是你账号自己的授权'
       : '粘贴这个数据源的令牌（填一次就存在本机）';
+    if (sid === 'jian') {
+      const box = $('#jianHelp');
+      if (box) {
+        box.hidden = false;
+        box.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        const inp = $('#jianTok');
+        if (inp) inp.focus();
+      }
+      return;
+    }
     const tok = window.prompt(nm + ' 的令牌：\n' + tip, '');
     if (tok == null) return;
     try {
@@ -5501,6 +5516,39 @@
       else toast('保存失败：' + (j.error || ''), 6000);
     } catch (err) { toast('保存失败：' + err.message, 6000); }
   });
+
+  // Jian 引导面板：打开申请页 / 保存密钥
+  (function bindJianHelp() {
+    const box = $('#jianHelp');
+    if (!box) return;
+    const cls = $('#jianHelpClose');
+    if (cls) cls.addEventListener('click', () => { box.hidden = true; });
+    const ap = $('#jianApply');
+    if (ap) ap.addEventListener('click', () => {
+      try { fetch('/api/open-url', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: 'https://auth.sismotide.top/' }) }); } catch (e) { }
+    });
+    const sv = $('#jianTokSave');
+    const inp = $('#jianTok');
+    if (sv && inp) sv.addEventListener('click', async () => {
+      const tok = (inp.value || '').trim();
+      if (!tok) { toast('先粘贴 lk_ 开头的登录密钥', 4000); inp.focus(); return; }
+      if (tok.indexOf('lk_') !== 0) { toast('格式不对：登录密钥应该以 lk_ 开头', 5000); }
+      sv.disabled = true;
+      try {
+        const j = await (await fetch('/api/source/token', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: 'jian', token: tok }),
+        })).json();
+        if (j.ok) {
+          toast('已保存，正在连接 Jian');
+          inp.value = '';
+          box.hidden = true;
+        } else toast('保存失败：' + (j.error || ''), 6000);
+      } catch (e) { toast('保存失败：' + e.message, 6000); }
+      finally { sv.disabled = false; }
+    });
+  })();
 
   function renderAll() {
     renderDots();

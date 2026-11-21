@@ -84,7 +84,7 @@ def user_dir(name):
 
 def user_file(name, fn):
     return os.path.join(user_dir(name), fn)
-VERSION = "1.38.1"
+VERSION = "1.38.2"
 APP_NAME = "震线 EEW"
 HOMEPAGE = "https://github.com/13535037476/eew-monitor"
 INSTALL_FILE = os.path.join(APP_DIR, "install.json")
@@ -2670,6 +2670,19 @@ class Handler(SimpleHTTPRequestHandler):
             if not u:
                 return self._json({"ok": False, "error": "未登录"}, 401)
             return self._json({"ok": True, "awake": set_awake(bool(body.get("on")))})
+        if path == "/api/open-url":
+            u = self._user()
+            if not u:
+                return self._json({"ok": False, "error": "未登录"}, 401)
+            url = str(body.get("url") or "")
+            if not url.startswith("https://") and not url.startswith("http://"):
+                return self._json({"ok": False, "error": "只允许 http(s) 链接"}, 400)
+            try:
+                import webbrowser
+                webbrowser.open(url)
+            except Exception as exc:
+                return self._json({"ok": False, "error": str(exc)[:120]}, 500)
+            return self._json({"ok": True})
         if path == "/api/source/toggle":
             u = self._user()
             if not u:

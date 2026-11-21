@@ -909,3 +909,26 @@ html.light #updNote.warn{color:#a3730f}
 }
 .srctbl .srctok:hover { background: rgba(255, 196, 107, .22); }
 .sdot.off { background: #6b7785; box-shadow: none; }
+
+
+/* 数据源表：固定列宽，开关永远点得到（侧边栏窄也不挤掉） */
+.srctbl { table-layout: fixed; width: 100%; }
+.srctbl col.c-name { width: auto; }
+.srctbl col.c-poll { width: 44px; }
+.srctbl col.c-state { width: 84px; }
+.srctbl col.c-sw { width: 34px; }
+.srctbl th, .srctbl td { padding: 4px 5px; }
+.srctbl td.nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.srctbl td.nm .prov { display: block; font-size: 10px; opacity: .55; line-height: 1.15; }
+.srctbl td.sw { text-align: center; padding-right: 2px; }
+.srctbl .gqsw, .srctbl .gqauto { font-size: 10px; padding: 0 4px; line-height: 14px; margin-left: 2px; }
+
+/* Jian 令牌引导 */
+.jianhelp {
+  margin-top: 8px; padding: 10px 12px; border-radius: 12px;
+  border: 1px solid rgba(255, 196, 107, .35); background: rgba(255, 196, 107, .07);
+}
+.jianhelp .jh-hd { font-weight: 700; font-size: 13px; margin-bottom: 6px; color: #ffc46b; }
+.jianhelp .jh-steps { margin: 0 0 8px 18px; padding: 0; font-size: 12px; line-height: 1.7; }
+.jianhelp .jh-steps a { color: #7cb7ff; }
+.jianhelp .row { display: flex; gap: 8px; margin: 0; }
