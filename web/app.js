@@ -2733,11 +2733,18 @@
   // 两个台站到计测震度 0.7（震度1 的下沿）就先亮绿框，告诉人「这边在动」。
   // 这一步**不做任何反演**——只是视觉提示，够不上「7 站聚拢 + 两站 1.5」的推算门槛。
   // 真发展起来（站更多、两站过 1.5），autoHypo 那套才会接管去找震源。
-  const SHAKE = { lv: 0.7, minSt: 2, hz: 4.6, max: 14 };
+  // 绿框的规则：
+  //   · 必须先有「测算」（真实事件或本地推算），纯 P 波掠过不画框
+  //   · 每个框最多圈 25 个正在摇晃的测站，多了就只取最强的 25 个
+  const SHAKE = { lv: 0.7, minSt: 2, hz: 4.6, max: 14, boxMax: 25 };
 
   let hitKey = '', hitAt = 0, hitCache = [];
   function shakeHits(ev) {
     const hits = [];
+    // 只在「有测算」的时候才谈得上摇晃：真实事件或本地推算，二者有一即可。
+    // 以前只看台站数值，P 波刚掠过两个站就亮框，看起来像已经震起来了。
+    const node = ev || state.autoEv;
+    if (!node) return hits;
     if (kmoniFresh()) {
       const lv = state.kmoni.lv || {};
       for (let i = 0; i < state.stations.length; i++) {
@@ -2770,7 +2777,9 @@
     const el = elapsedOf(ev), mag = srcOf(ev).mag || 5, jp = usesShindo(ev);
     const out = [];
     for (const st of state.stations) {
-      const lv = shakeLevel(estOf(ev, st), el, mag, jp);
+      const est = estOf(ev, st);
+      if (el < est.ts) continue;          // P 波阶段不画：还没真正摇起来
+      const lv = shakeLevel(est, el, mag, jp);
       if (!lv || lv.risk < 1) continue;
       out.push({ lat: st.lat, lon: st.lon, v: SHAKE.lv + lv.risk });
     }
@@ -2881,6 +2890,12 @@
             used[j] = true; g.push(pts[j]);
           }
         }
+      }
+      // 一个框最多圈 25 个站：簇里的站按强度排序后截断，
+      // 再多也不画——真实一场地震不会让几十上百个站同时进同一个框。
+      if (g.length > SHAKE.boxMax) {
+        g.sort((a, b) => b.v - a.v);
+        g.length = SHAKE.boxMax;
       }
       groups.push(g);
     }
