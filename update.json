@@ -1,7 +1,7 @@
 {
-  "version": "1.35.1",
-  "url": "https://github.com/13535037476/eew-monitor/releases/latest/download/震线EEW-Setup-1.35.1.exe",
-  "size": 49937969,
-  "notes": "· 国内直连 GitHub 常常不通：现在检查更新会自动尝试本地代理（系统代理、注册表里写的地址、v2rayN/Clash 常见端口），找到能用的就记住\n· 下载安装包走同样的代理回退，以前「检查更新」转半天失败的现在能通了",
+  "version": "1.37.0",
+  "url": "https://github.com/13535037476/eew-monitor/releases/latest/download/ZhenXianEEW-Setup-1.37.0.exe",
+  "size": 56167263,
+  "notes": "· 设置→自动录屏新增「录制画面」：整个窗口 / 地图。默认整窗，录像里连卡片、右侧面板、最近地震列表都在\n· 整窗是直接抓应用窗口自己的画面：被别的窗口挡住也不影响，也不会录到桌面上的其他内容\n· 最小化的窗口起录前会自动还原；熄屏时抓不到窗口，自动退回地图模式（不影响熄屏录制）\n· 地图模式保留：省资源，熄屏可用",
   "published": "2026-11-21"
 }
