@@ -1,7 +1,7 @@
 {
-  "version": "1.38.2",
-  "url": "https://github.com/13535037476/eew-monitor/releases/latest/download/ZhenXianEEW-Setup-1.38.2.exe",
-  "size": 57332312,
-  "notes": "· 侧边栏窄的时候开关会被挤出去点不到：表格改成固定列宽（数据/频率/状态/开关），提供方和频率并到名字下面一行，开关永远在右边缘\n· 状态列只留延迟数字（279ms 这种），GQ 的行名缩短，主/备/自动 三个小标签不再被省略号吃掉\n· Jian 密钥改成引导式：点「填令牌」展开三步说明（申请页 → 填 QQ 邮箱收信 → 粘贴 lk_ 密钥），带一键用系统浏览器打开申请页\n· 新增 /api/open-url：只允许 http(s)，用于从界面打开 Jian 申请页",
+  "version": "1.38.3",
+  "url": "https://github.com/13535037476/eew-monitor/releases/latest/download/ZhenXianEEW-Setup-1.38.3.exe",
+  "size": 57332683,
+  "notes": "· WebView2 会拿旧的 app.js/ui.css，导致升级后界面没变：静态资源改成 no-store，并给 index.html 里的引用加版本戳（ui.css?v=12 / app.js?v=308）\n· 之前 1.38.2 的安装包里带的还是旧界面资源，这次重新打包，装完就是新界面（数据源表格 4 列 + 开关、Jian 引导）",
   "published": "2026-11-21"
 }

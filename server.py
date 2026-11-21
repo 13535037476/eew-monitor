@@ -84,7 +84,7 @@ def user_dir(name):
 
 def user_file(name, fn):
     return os.path.join(user_dir(name), fn)
-VERSION = "1.38.2"
+VERSION = "1.38.3"
 APP_NAME = "震线 EEW"
 HOMEPAGE = "https://github.com/13535037476/eew-monitor"
 INSTALL_FILE = os.path.join(APP_DIR, "install.json")
@@ -2380,7 +2380,9 @@ class Handler(SimpleHTTPRequestHandler):
         if p.endswith(".html") or p == "/":
             self.send_header("Cache-Control", "no-store, must-revalidate")
         elif p.endswith((".js", ".css")):
-            self.send_header("Cache-Control", "no-cache")
+            # 升级后 WebView2 会拿旧缓存，导致「装了新版本界面还是老的」：
+            # 静态资源一律不缓存，配合 index.html 里的 ?v= 版本戳
+            self.send_header("Cache-Control", "no-store, must-revalidate")
         super().end_headers()
 
     def do_GET(self):
