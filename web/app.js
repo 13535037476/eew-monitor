@@ -4920,6 +4920,7 @@
           // 稿件信息：服务端拿来拼标题/简介（B站投稿用）
           'X-Rec-Place': encodeURIComponent(String(e0.place || '')),
           'X-Rec-Mag': encodeURIComponent(String(e0.mag != null ? e0.mag : '')),
+          'X-Rec-Depth': encodeURIComponent(String(e0.depth != null ? Math.round(e0.depth) : '')),
           'X-Rec-Inten': encodeURIComponent(String(e0.max_intensity || '')),
           'X-Rec-Src': encodeURIComponent(String(e0.source_name || e0.source || '')),
           'X-Rec-Serial': encodeURIComponent(String(e0.serial || '')),
@@ -6826,6 +6827,7 @@
     qrNew: $('#btnBiliQrNew'),
   };
   let biliPollTimer = 0;
+  let biliQrKey = '';
   function biliPayload() {
     return {
       enabled: !!(biliEls.on && biliEls.on.checked),
@@ -6888,9 +6890,17 @@
       if (svg) { svg.setAttribute('width', '100%'); svg.setAttribute('height', '100%'); }
       biliEls.qrState.textContent = '请用手机 B站 App 扫码';
       const key = j.key;
+      biliQrKey = key;
       biliPollTimer = setInterval(async () => {
+        if (key !== biliQrKey) { biliStopPoll(); return; }   // 已经换了新码，旧回包不要
         try {
           const r = await (await fetch('/api/bili/qr/poll?key=' + encodeURIComponent(key))).json();
+          if (key !== biliQrKey) { biliStopPoll(); return; }
+          if (r.ok === false && r.state !== 'expired') {
+            biliStopPoll();
+            biliEls.qrState.textContent = '登录失败：' + (r.error || '未知错误');
+            return;
+          }
           if (r.state === 'scanned') biliEls.qrState.textContent = '已扫码，请在手机上确认登录';
           if (r.state === 'expired') {
             biliStopPoll();

@@ -84,7 +84,7 @@ def user_dir(name):
 
 def user_file(name, fn):
     return os.path.join(user_dir(name), fn)
-VERSION = "1.38.6"
+VERSION = "1.38.7"
 APP_NAME = "震线 EEW"
 HOMEPAGE = "https://github.com/13535037476/eew-monitor"
 INSTALL_FILE = os.path.join(APP_DIR, "install.json")
@@ -2364,6 +2364,7 @@ class Handler(SimpleHTTPRequestHandler):
                 meta = {
                     "place": _up.unquote(self.headers.get("X-Rec-Place") or ""),
                     "mag": _up.unquote(self.headers.get("X-Rec-Mag") or ""),
+                    "depth": _up.unquote(self.headers.get("X-Rec-Depth") or ""),
                     "inten": _up.unquote(self.headers.get("X-Rec-Inten") or ""),
                     "src": _up.unquote(self.headers.get("X-Rec-Src") or ""),
                     "serial": _up.unquote(self.headers.get("X-Rec-Serial") or ""),

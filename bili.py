@@ -269,7 +269,10 @@ def upload_one(path, meta, c=None):
         try:
             import cover as cover_mod
             cp = os.path.join(_data_dir(), "covers", os.path.splitext(name)[0] + ".jpg")
-            cover_mod.make_cover(meta, cp)
+            m2 = dict(meta)
+            # 中国的事件用「烈度」，日本/其他用「震度」；按数据源名判断
+            m2["jp"] = not any(k in str(meta.get("src") or "") for k in ("中国", "CENC", "台网"))
+            cover_mod.make_cover(m2, cp)
             url = upload_cover(cp, c)
             if url:
                 meta = dict(meta)
@@ -343,7 +346,9 @@ def status():
 # ---------------- 扫码登录 ----------------
 # 和网页版同一条路：生成二维码 → 手机 B站扫码 → 轮询拿到跨域 url，
 # 里面带着 SESSDATA / bili_jct / DedeUserID，存下来就是「用户的账号」。
-_QR = {"key": "", "at": 0.0, "state": "idle", "uname": "", "mid": 0, "err": ""}
+# 同时保留多个未过期的二维码：点两次「刷新」不会再互相把对方顶成过期
+_QR = {"keys": {}, "state": "idle", "uname": "", "mid": 0, "err": ""}
+_QR_TTL = 240
 
 
 def _qr_svg(url):
@@ -369,16 +374,23 @@ def qr_new():
         url, key = data.get("url") or "", data.get("qrcode_key") or ""
         if not url or not key:
             return {"ok": False, "error": "二维码生成失败"}
-        _QR.update({"key": key, "at": time.time(), "state": "waiting",
-                    "uname": "", "mid": 0, "err": ""})
+        now = time.time()
+        for k in [k for k, t in _QR["keys"].items() if now - t > _QR_TTL]:
+            _QR["keys"].pop(k, None)          # 顺手清掉过期的
+        _QR["keys"][key] = now
+        _QR.update({"state": "waiting", "uname": "", "mid": 0, "err": ""})
         return {"ok": True, "key": key, "svg": _qr_svg(url)}
     except Exception as e:
         return {"ok": False, "error": str(e)[:160]}
 
 
 def qr_poll(key):
-    if not key or key != _QR["key"]:
+    born = _QR["keys"].get(key) if key else None
+    if not born:
         return {"ok": False, "state": "expired", "error": "二维码已失效，请重新生成"}
+    if time.time() - born > _QR_TTL:
+        _QR["keys"].pop(key, None)
+        return {"ok": False, "state": "expired", "error": "二维码已过期，请重新生成"}
     try:
         code, raw = _req(
             "https://passport.bilibili.com/x/passport-login/web/qrcode/poll"
@@ -392,6 +404,7 @@ def qr_poll(key):
         if st == 86090:
             return {"ok": True, "state": "scanned"}
         if st == 86038:
+            _QR["keys"].pop(key, None)
             _QR["state"] = "expired"
             return {"ok": False, "state": "expired", "error": "二维码已过期，请重新生成"}
         if st == 0:
@@ -434,5 +447,6 @@ def logout():
         save_cfg(c)
     except OSError:
         pass
-    _QR.update({"state": "idle", "uname": "", "mid": 0, "key": ""})
+    _QR["keys"].clear()
+    _QR.update({"state": "idle", "uname": "", "mid": 0})
     return {"ok": True}

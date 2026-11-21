@@ -1,7 +1,7 @@
 {
-  "version": "1.38.6",
-  "url": "https://github.com/13535037476/eew-monitor/releases/latest/download/ZhenXianEEW-Setup-1.38.6.exe",
-  "size": 57342018,
-  "notes": "· B站投稿现在会按事件参数自动画封面（A 版速报卡：地点/M/震度/深度/第几报/数据源），先传封面再交稿件\n· 修「扫码登录炸了」：登录接口用错了 Referer/Origin（一律按投稿站发，被 B站 当跨站），现在按域名分开；空 cookie 也不再发\n· P 波如果本身造成强摇（两站以上 ≥1.5）照样画绿框，不再一律等 S 波；普通 P 波微动仍然不画\n· 关于页增加：技术支持 Mon3tr",
+  "version": "1.38.7",
+  "url": "https://github.com/13535037476/eew-monitor/releases/latest/download/ZhenXianEEW-Setup-1.38.7.exe",
+  "size": 57342515,
+  "notes": "· 二维码几秒就过期：原来服务端只记一个 key，连点两次「刷新二维码」会互相顶掉，旧码立刻被判过期。现在允许多个未过期二维码并存，前端也会丢弃旧计时器的回包\n· 封面补上深度：之前只传了震级/震度，封面上深度显示「—」\n· 设置最上面加一行低对比度的「感谢 · 技术支持 Mon3tr」，不占地方",
   "published": "2026-11-21"
 }
