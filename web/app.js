@@ -4823,7 +4823,7 @@
       p2(d.getHours()) + p2(d.getMinutes()) + p2(d.getSeconds());
     return 'EEW_' + ts + '_' + String(ev.source || 'eew').toUpperCase() +
       '_M' + (ev.mag || 0).toFixed(1) +
-      (REC.seg && ev.serial ? '_R' + ev.serial + '\u5831' : '') + '.webm';
+      (REC.seg && ev.serial ? '_R' + ev.serial + '\u5831' : '') + (REC.ext || '.webm');
   }
 
   function recHud(c2, ev, w, h) {
@@ -4870,13 +4870,25 @@
   }
 
   async function saveRec(blob, ev) {
+    const d = new Date();
+    const p2 = n => String(n).padStart(2, '0');
+    const dt = d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate()) +
+      ' ' + p2(d.getHours()) + ':' + p2(d.getMinutes());
+    const e0 = ev || {};
     try {
       const r = await fetch('/api/rec/save', {
         method: 'POST', body: blob,
         headers: {
-          'Content-Type': 'video/webm',
-          'X-Rec-Name': encodeURIComponent(recName(ev || {})),
+          'Content-Type': blob.type || 'video/webm',
+          'X-Rec-Name': encodeURIComponent(recName(e0)),
           'X-Rec-Dir': encodeURIComponent(state.settings.recDir || ''),
+          // 稿件信息：服务端拿来拼标题/简介（B站投稿用）
+          'X-Rec-Place': encodeURIComponent(String(e0.place || '')),
+          'X-Rec-Mag': encodeURIComponent(String(e0.mag != null ? e0.mag : '')),
+          'X-Rec-Inten': encodeURIComponent(String(e0.max_intensity || '')),
+          'X-Rec-Src': encodeURIComponent(String(e0.source_name || e0.source || '')),
+          'X-Rec-Serial': encodeURIComponent(String(e0.serial || '')),
+          'X-Rec-Date': encodeURIComponent(dt),
         },
       });
       const j = await r.json();
@@ -4933,9 +4945,19 @@
     const kbps = Math.max(400, Math.min(20000, parseInt(state.settings.recKbps, 10) || 2500));
     let stream;
     try { stream = cv.captureStream(fps); } catch (e) { toast('拿不到画布流：' + e.message); return; }
-    let mime = 'video/webm;codecs=vp9';
-    if (!MediaRecorder.isTypeSupported(mime)) mime = 'video/webm;codecs=vp8';
-    if (!MediaRecorder.isTypeSupported(mime)) mime = 'video/webm';
+    // 优先录 MP4（H.264）：Windows 播放器/视频平台都直接吃这个；
+    // 内核不支持 MP4 时退回 webm（老版本 WebView2）。
+    const wantWebm = state.settings.recFmt === 'webm';
+    let mime = '';
+    if (!wantWebm && MediaRecorder.isTypeSupported('video/mp4;codecs=avc1')) mime = 'video/mp4;codecs=avc1';
+    else if (!wantWebm && MediaRecorder.isTypeSupported('video/mp4')) mime = 'video/mp4';
+    if (!mime) {
+      mime = 'video/webm;codecs=vp9';
+      if (!MediaRecorder.isTypeSupported(mime)) mime = 'video/webm;codecs=vp8';
+      if (!MediaRecorder.isTypeSupported(mime)) mime = 'video/webm';
+    }
+    REC.ext = mime.indexOf('mp4') >= 0 ? '.mp4' : '.webm';
+    REC.mime = mime;
     let mr;
     try {
       mr = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: kbps * 1000 });
@@ -4945,7 +4967,7 @@
     const chunks = [];
     mr.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
     mr.onstop = () => {
-      const blob = new Blob(chunks, { type: 'video/webm' });
+      const blob = new Blob(chunks, { type: REC.mime || 'video/webm' });
       saveRec(blob, REC.ev || ev);
       try { stream.getTracks().forEach(t => t.stop()); } catch (e) { }
       if (REC.win) {
@@ -6657,6 +6679,148 @@
     });
   }
 
+  // ---- B站投稿 ----
+  const biliEls = {
+    on: $('#optBili'), sess: $('#optBiliSess'), jct: $('#optBiliJct'),
+    uid: $('#optBiliUid'), tid: $('#optBiliTid'), tags: $('#optBiliTags'),
+    hint: $('#biliHint'), test: $('#btnBiliTest'), save: $('#btnBiliSave'),
+    acc: $('#biliAcc'), login: $('#btnBiliLogin'), logout: $('#btnBiliLogout'),
+    qrRow: $('#biliQrRow'), qr: $('#biliQr'), qrState: $('#biliQrState'),
+    qrNew: $('#btnBiliQrNew'),
+  };
+  let biliPollTimer = 0;
+  function biliPayload() {
+    return {
+      enabled: !!(biliEls.on && biliEls.on.checked),
+      sessdata: (biliEls.sess.value || '').trim(),
+      bili_jct: (biliEls.jct.value || '').trim(),
+      dedeuserid: (biliEls.uid.value || '').trim(),
+      tid: parseInt(biliEls.tid.value, 10) || 188,
+      tags: (biliEls.tags.value || '').trim(),
+    };
+  }
+  function biliSetAccount(uname, mid) {
+    if (!biliEls.acc) return;
+    if (uname || mid) {
+      biliEls.acc.textContent = '已登录：' + (uname || '（未知昵称）') + '（UID ' + (mid || '?') + '）';
+      if (biliEls.logout) biliEls.logout.hidden = false;
+      if (biliEls.login) biliEls.login.textContent = '重新扫码';
+    } else {
+      biliEls.acc.textContent = '未登录';
+      if (biliEls.logout) biliEls.logout.hidden = true;
+      if (biliEls.login) biliEls.login.textContent = '扫码登录';
+    }
+  }
+  async function loadBili() {
+    if (!biliEls.on) return;
+    try {
+      const j = await (await fetch('/api/bili/status')).json();
+      if (!j.ok) return;
+      biliEls.on.checked = !!j.enabled;
+      biliEls.tid.value = String(j.tid || 188);
+      biliEls.tags.value = j.tags || '';
+      if (j.sessdata_set) biliEls.sess.placeholder = '已保存（留空不改）';
+      if (j.uid_set) biliEls.uid.placeholder = '已保存（留空不改）';
+      biliSetAccount(j.uname || '', j.mid || 0);
+      const rec = (j.recent || [])[0];
+      biliEls.hint.textContent =
+        (j.enabled ? '已开启' : '未开启') +
+        ' · 成功 ' + (j.ok_count || 0) + ' 个 / 失败 ' + (j.fail_count || 0) +
+        (j.busy ? ' · 正在上传' : '') + (j.queued ? ' · 排队 ' + j.queued : '') +
+        (rec ? ' · 最近：' + rec.name + ' → ' + (rec.state === 'ok' ? ('BV ' + (rec.bvid || '')) : ('失败 ' + (rec.err || ''))) : '') +
+        (j.last_err ? ' · ' + j.last_err : '');
+    } catch (e) {
+      biliEls.hint.textContent = '状态读取失败';
+    }
+  }
+  function biliStopPoll() {
+    if (biliPollTimer) { clearInterval(biliPollTimer); biliPollTimer = 0; }
+  }
+  async function biliQrNew() {
+    biliStopPoll();
+    if (!biliEls.qrRow) return;
+    biliEls.qrRow.hidden = false;
+    biliEls.qr.innerHTML = '';
+    biliEls.qrState.textContent = '正在生成二维码…';
+    try {
+      const j = await (await fetch('/api/bili/qr/new', { method: 'POST',
+        headers: { 'Content-Type': 'application/json' }, body: '{}' })).json();
+      if (!j.ok) { biliEls.qrState.textContent = '生成失败：' + (j.error || ''); return; }
+      biliEls.qr.innerHTML = j.svg || '';
+      const svg = biliEls.qr.querySelector('svg');
+      if (svg) { svg.setAttribute('width', '100%'); svg.setAttribute('height', '100%'); }
+      biliEls.qrState.textContent = '请用手机 B站 App 扫码';
+      const key = j.key;
+      biliPollTimer = setInterval(async () => {
+        try {
+          const r = await (await fetch('/api/bili/qr/poll?key=' + encodeURIComponent(key))).json();
+          if (r.state === 'scanned') biliEls.qrState.textContent = '已扫码，请在手机上确认登录';
+          if (r.state === 'expired') {
+            biliStopPoll();
+            biliEls.qrState.textContent = '二维码过期了，点「刷新二维码」';
+          }
+          if (r.state === 'ok') {
+            biliStopPoll();
+            biliEls.qrState.textContent = '登录成功';
+            biliEls.qrRow.hidden = true;
+            biliSetAccount(r.uname, r.mid);
+            toast('B站登录成功：' + (r.uname || ''));
+            try { await fetch('/api/bili/save', { method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(Object.assign(biliPayload(), { enabled: true })) }); } catch (e) { }
+            loadBili();
+          }
+        } catch (e) { }
+      }, 2000);
+    } catch (e) {
+      biliEls.qrState.textContent = '生成失败：' + e.message;
+    }
+  }
+  if (biliEls.on) {
+    if (biliEls.login) biliEls.login.addEventListener('click', biliQrNew);
+    if (biliEls.qrNew) biliEls.qrNew.addEventListener('click', biliQrNew);
+    if (biliEls.logout) biliEls.logout.addEventListener('click', async () => {
+      biliStopPoll();
+      try { await fetch('/api/bili/logout', { method: 'POST' }); } catch (e) { }
+      if (biliEls.qrRow) biliEls.qrRow.hidden = true;
+      biliSetAccount('', 0);
+      toast('已退出 B站登录');
+      loadBili();
+    });
+    if (biliEls.save) biliEls.save.addEventListener('click', async () => {
+      biliEls.save.disabled = true;
+      try {
+        const j = await (await fetch('/api/bili/save', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(biliPayload()),
+        })).json();
+        if (j.ok) { toast('B站投稿设置已保存'); loadBili(); }
+        else toast('保存失败：' + (j.error || '未知错误'), 5000);
+      } catch (e) { toast('保存失败：' + e.message, 5000); }
+      finally { biliEls.save.disabled = false; }
+    });
+    if (biliEls.test) biliEls.test.addEventListener('click', async () => {
+      biliEls.test.disabled = true;
+      const old = biliEls.test.textContent;
+      biliEls.test.textContent = '测试中…';
+      try {
+        const j = await (await fetch('/api/bili/test', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(biliPayload()),
+        })).json();
+        if (j.ok) {
+          biliEls.hint.textContent = '登录正常：' + (j.uname || '') + '（UID ' + (j.mid || '') + '）';
+          biliSetAccount(j.uname, j.mid);
+          toast('B站登录正常：' + (j.uname || ''));
+        } else {
+          biliEls.hint.textContent = '测试失败：' + (j.error || '未知错误');
+          toast('B站登录失败：' + (j.error || '未知错误'), 6000);
+        }
+      } catch (e) { toast('测试失败：' + e.message, 6000); }
+      finally { biliEls.test.disabled = false; biliEls.test.textContent = old; }
+    });
+  }
+
   // ---- 网盘备份（WebDAV，录像自动上传） ----
   const cloudEls = {
     on: $('#optCloud'), url: $('#optCloudUrl'), folder: $('#optCloudFolder'),
@@ -7313,6 +7477,7 @@
     paintFocus(); dlg.showModal(); loadMyTokens(); loadSrcTokens();
     try { loadAppInfo(); } catch (e) { }
     try { loadCloud(); } catch (e) { }
+    try { loadBili(); } catch (e) { }
   });
 
   $('#btnImport').addEventListener('click', async () => {

@@ -572,6 +572,55 @@ try{if(localStorage.getItem('eew.theme')==='light')document.documentElement.clas
       </div>
 
       <div class="sec">
+        <h3>B站投稿</h3>
+        <p class="hint" style="margin-top:0">用你自己的 B站账号登录，录完像自动投稿（默认直接公开，平台审核几分钟）。
+          扫码一次就行，登录态一般能管几个月；过期后这里会提示重新扫码。</p>
+        <div class="row between"><label>开启自动投稿</label>
+          <input type="checkbox" id="optBili" class="switch"></div>
+        <div id="biliLoginBox">
+          <div class="row" id="biliQrRow" hidden>
+            <div id="biliQr" style="width:168px;height:168px;background:#fff;border-radius:8px;padding:6px"></div>
+            <div style="margin-left:12px;flex:1">
+              <div id="biliQrState" class="hint" style="margin:0">请用手机 B站 App 扫码</div>
+              <button type="button" class="btn" id="btnBiliQrNew" style="margin-top:8px">刷新二维码</button>
+            </div>
+          </div>
+          <div class="row" id="biliAccRow">
+            <span id="biliAcc" class="hint" style="margin:0">未登录</span>
+            <button type="button" class="btn" id="btnBiliLogin">扫码登录</button>
+            <button type="button" class="btn" id="btnBiliLogout" hidden>退出登录</button>
+          </div>
+        </div>
+        <div class="row">
+          <label style="flex:none;width:76px">分区 tid</label>
+          <input id="optBiliTid" class="input mono" style="width:92px" value="188">
+          <span class="hint" style="margin:0">188=科技，201=科学科普，207=财经商业</span>
+        </div>
+        <div class="row">
+          <label style="flex:none;width:76px">标签</label>
+          <input id="optBiliTags" class="input" placeholder="地震,地震预警,EEW">
+          <button type="button" class="btn primary" id="btnBiliSave">保存</button>
+        </div>
+        <details style="margin-top:6px">
+          <summary class="hint" style="cursor:pointer">手动填 cookie（扫码不好用时）</summary>
+          <div class="row">
+            <label style="flex:none;width:76px">SESSDATA</label>
+            <input id="optBiliSess" class="input mono" placeholder="cookie 里最长的那段">
+          </div>
+          <div class="row">
+            <label style="flex:none;width:76px">bili_jct</label>
+            <input id="optBiliJct" class="input mono" placeholder="csrf token">
+          </div>
+          <div class="row">
+            <label style="flex:none;width:76px">DedeUserID</label>
+            <input id="optBiliUid" class="input mono" placeholder="你的 UID">
+          </div>
+          <div class="row"><button type="button" class="btn" id="btnBiliTest">测试登录</button></div>
+        </details>
+        <p class="hint" style="margin:6px 0 0" id="biliHint">—</p>
+      </div>
+
+      <div class="sec">
         <h3>安装与更新</h3>
         <div class="row between">
           <label>当前版本</label>

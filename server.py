@@ -31,6 +31,7 @@ import history
 import auth
 import stations as station_data
 import ttable
+import bili
 try:
     import gq_client
 except Exception:
@@ -83,7 +84,7 @@ def user_dir(name):
 
 def user_file(name, fn):
     return os.path.join(user_dir(name), fn)
-VERSION = "1.37.0"
+VERSION = "1.38.0"
 APP_NAME = "震线 EEW"
 HOMEPAGE = "https://github.com/13535037476/eew-monitor"
 INSTALL_FILE = os.path.join(APP_DIR, "install.json")
@@ -2272,14 +2273,15 @@ class Handler(SimpleHTTPRequestHandler):
             return {}
 
     def _rec_save(self):
-        """保存自动录屏上传的 webm。二进制直传，文件名/目录放在请求头里。"""
+        """保存自动录屏上传的录像。二进制直传，文件名/目录放在请求头里。"""
         import urllib.parse as _up
         n = int(self.headers.get("Content-Length") or 0)
         if n <= 0 or n > 400 * 1024 * 1024:
             return self._json({"ok": False, "error": "录像大小异常"}, 400)
         name = os.path.basename(_up.unquote(self.headers.get("X-Rec-Name") or "")) or "quake.webm"
         folder = _up.unquote(self.headers.get("X-Rec-Dir") or "")
-        if not name.lower().endswith(".webm"):
+        low = name.lower()
+        if not low.endswith((".webm", ".mp4")):
             name += ".webm"
         raw = self.rfile.read(n)
         if not folder:
@@ -2292,6 +2294,21 @@ class Handler(SimpleHTTPRequestHandler):
         except Exception as exc:
             return self._json({"ok": False, "error": str(exc)[:160]}, 500)
         _cloud_enqueue(full)  # 开了网盘备份就排队上传
+        # 开了 B 站投稿就排队投稿（MP4 才投，webm 平台不收）
+        if full.lower().endswith(".mp4"):
+            try:
+                meta = {
+                    "place": _up.unquote(self.headers.get("X-Rec-Place") or ""),
+                    "mag": _up.unquote(self.headers.get("X-Rec-Mag") or ""),
+                    "inten": _up.unquote(self.headers.get("X-Rec-Inten") or ""),
+                    "src": _up.unquote(self.headers.get("X-Rec-Src") or ""),
+                    "serial": _up.unquote(self.headers.get("X-Rec-Serial") or ""),
+                    "date": _up.unquote(self.headers.get("X-Rec-Date") or ""),
+                    "title": _up.unquote(self.headers.get("X-Rec-Title") or ""),
+                }
+                bili.enqueue(full, meta)
+            except Exception:
+                pass
         return self._json({"ok": True, "path": full, "size": len(raw)})
 
     def end_headers(self):
@@ -2516,6 +2533,25 @@ class Handler(SimpleHTTPRequestHandler):
                 # 息屏录制：自动录屏开着时前端会让服务端守着「别休眠」
                 self._json({"ok": True, "awake": bool(_AWAKE["on"])})
                 return
+            if path == "/api/bili/qr/poll":
+                u = self._user()
+                if not u:
+                    return self._json({"ok": False, "error": "未登录"}, 401)
+                from urllib.parse import parse_qs, urlparse as _urlparse
+                q = parse_qs(_urlparse(self.path).query)
+                key = (q.get("key") or [""])[0]
+                return self._json(bili.qr_poll(key))
+            if path == "/api/bili/status":
+                u = self._user()
+                if not u:
+                    return self._json({"ok": False, "error": "未登录"}, 401)
+                cfg = bili.cfg()
+                d = bili.status()
+                d.update({"sessdata_set": bool(cfg.get("sessdata")),
+                          "uid_set": bool(cfg.get("dedeuserid")),
+                          "title_tpl": cfg.get("title_tpl") or "",
+                          "desc_tpl": cfg.get("desc_tpl") or ""})
+                return self._json(d)
             if path == "/api/rec/frame":
                 u = self._user()
                 if not u:
@@ -2570,6 +2606,44 @@ class Handler(SimpleHTTPRequestHandler):
             if not u:
                 return self._json({"ok": False, "error": "未登录"}, 401)
             return self._json({"ok": True, "awake": set_awake(bool(body.get("on")))})
+        if path in ("/api/bili/qr/new", "/api/bili/logout"):
+            u = self._user()
+            if not u:
+                return self._json({"ok": False, "error": "未登录"}, 401)
+            if path.endswith("/new"):
+                return self._json(bili.qr_new())
+            return self._json(bili.logout())
+        if path in ("/api/bili/save", "/api/bili/test"):
+            u = self._user()
+            if not u:
+                return self._json({"ok": False, "error": "未登录"}, 401)
+            cfg = bili.cfg()
+            new = {
+                "enabled": bool(body.get("enabled", cfg.get("enabled"))),
+                "sessdata": str(body.get("sessdata") or cfg.get("sessdata") or "").strip(),
+                "bili_jct": str(body.get("bili_jct") or cfg.get("bili_jct") or "").strip(),
+                "dedeuserid": str(body.get("dedeuserid") or cfg.get("dedeuserid") or "").strip(),
+                "tid": int(body.get("tid") or cfg.get("tid") or 188),
+                "tags": str(body.get("tags") if body.get("tags") is not None else cfg.get("tags") or ""),
+                "title_tpl": str(body.get("title_tpl") or cfg.get("title_tpl") or ""),
+                "desc_tpl": str(body.get("desc_tpl") or cfg.get("desc_tpl") or ""),
+                "min_mag": float(body.get("min_mag") or cfg.get("min_mag") or 0),
+            }
+            if path == "/api/bili/test":
+                if not new["sessdata"]:
+                    return self._json({"ok": False, "error": "先填 SESSDATA"})
+                r = bili.check_login(new)
+                if r.get("ok"):
+                    try:
+                        bili.save_cfg(new)
+                    except OSError:
+                        pass
+                return self._json(r)
+            try:
+                bili.save_cfg(new)
+            except OSError as exc:
+                return self._json({"ok": False, "error": "写入失败：%s" % exc}, 500)
+            return self._json({"ok": True})
         if path in ("/api/rec/win/start", "/api/rec/win/stop"):
             u = self._user()
             if not u:
@@ -3901,6 +3975,10 @@ def boot(host="127.0.0.1", port=8765, tls_cert=None, tls_key=None):
     threading.Thread(target=kmoni_loop, daemon=True).start()
     # 网盘备份：上传工作线程 + 启动后延迟补传没传成功的录像
     threading.Thread(target=_cloud_worker, daemon=True).start()
+    try:
+        bili.init()
+    except Exception:
+        pass
     _t = threading.Timer(20.0, _cloud_catchup)
     _t.daemon = True
     _t.start()
