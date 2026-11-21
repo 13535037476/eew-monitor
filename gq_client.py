@@ -331,6 +331,29 @@ def _pga_of(d):
         return None
 
 
+def _inten_of_pga(pga):
+    """峰值 PGA(gal) → JMA 震度标签 + 数值。
+
+    GQ 只给震源和台站振幅，没有官方震度；用经验式把 PGA 换算成「計測震度」
+    （I = 2.0·log10(PGA) + 0.7，100 gal≈計測震度4.7≈震度5弱），再按气象厅
+    的档位切成震度标签。卡上会标「估算」，不冒充官方数。
+    """
+    try:
+        p = float(pga)
+    except (TypeError, ValueError):
+        return None, 0
+    if p <= 0:
+        return None, 0
+    import math
+    i = 2.0 * math.log10(max(p, 0.1)) + 0.7
+    for th, lab, val in ((6.5, "7", 6.5), (6.0, "6強", 6.0), (5.5, "6弱", 5.5),
+                         (5.0, "5強", 5.0), (4.5, "5弱", 4.5), (3.5, "4", 4.0),
+                         (2.5, "3", 3.0), (1.5, "2", 2.0), (0.5, "1", 1.0)):
+        if i >= th:
+            return lab, val
+    return "0", 0
+
+
 def _base_event(u, lat, lon, depth, mag, origin, region, serial=1):
     now = time.time()
     return {
@@ -377,6 +400,11 @@ def _hypo_event(d):
     pga = _pga_of(d)
     if pga is not None:
         ev["gq_maxpga"] = pga
+        lab, val = _inten_of_pga(pga)
+        if lab:
+            ev["max_intensity"] = lab
+            ev["max_intensity_num"] = val
+            ev["intensity_est"] = True   # 前端据此标「估算」
     return ev
 
 
@@ -401,6 +429,11 @@ def _arch_event(d):
     pga = _pga_of(d)
     if pga is not None:
         ev["gq_maxpga"] = pga
+        lab, val = _inten_of_pga(pga)
+        if lab:
+            ev["max_intensity"] = lab
+            ev["max_intensity_num"] = val
+            ev["intensity_est"] = True
     return ev
 
 

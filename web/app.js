@@ -4343,6 +4343,10 @@
         const risk = riskOfLabel(ev, mx);
         mxEl.hidden = false;
         mxVal.textContent = (usesShindo(ev) ? '震度' : '烈度') + mx;
+        mxEl.title = ev.intensity_est
+          ? 'GQ 没有官方震度：按报文峰值 PGA ' + (ev.gq_maxpga != null ? ev.gq_maxpga + ' cm/s²' : '')
+            + ' 估算（经验式 I=2.0·log10(PGA)+0.7）'
+          : '';
         mxVal.style.background = risk > 0
           ? RISK[Math.max(0, Math.min(RISK.length - 1, risk))]
           : 'rgba(255,255,255,.12)';
@@ -4980,6 +4984,10 @@
       // 不挡的话演练会被当成真地震录下来；training 同理
       if (String(e.source) === 'sim' || String(e.uid || '').indexOf('SIM-') === 0) continue;
       if (e.training) continue;
+      // 已经收尾的事件不补录：打开软件时看到的上一次发报，不该触发录屏
+      if (e.active === false) continue;
+      const origin0 = e.origin_ts || 0;
+      if (origin0 && now - origin0 > 600) continue;   // 只录 10 分钟内发生的地震
       const th = srcThOf(e);
       if ((e.mag || 0) < (th.mag || 0)) continue;
       if (evIntenNum(e) < (th.int || 0)) continue;   // 强度用事件自身的最大震度
@@ -5381,12 +5389,25 @@
   }
 
   // ---------------- 数据 ----------------
+  // 首帧就把「已经在报的事件」标记为已见：打开软件时还挂着的上一次发报
+  // 只该显示，不该触发自动录屏。之后新到的事件才参与录制判断。
+  let recSeeded = false;
+  function seedRecSeen() {
+    if (recSeeded) return;
+    recSeeded = true;
+    const list = (state.eewList || []).slice();
+    if (state.autoEv) list.push(state.autoEv);
+    for (const e of list) {
+      if (e && e.uid) REC.seen.add(String(e.uid));
+    }
+  }
   function applyState(data) {
     if (!data || !data.ts) return;
     state.offset = data.ts - Date.now() / 1000;
     state.sources = data.sources || [];
     state.eew = data.eew || { JP: null, CN: null, GQ: null };
     state.eewList = data.eew_list || [];
+    seedRecSeen();
     state.gqAct = data.gq_act || [];
     state.events = data.events || [];
     state.alerts = data.alerts || [];
@@ -7636,6 +7657,8 @@
     if (Date.now() - lastTickAt > 1500) tick();
   }, 500);
   window.__tickAt = () => lastTickAt;   // 调试/测试：看画面刷新有没有在走
+  window.__rec = () => ({ mr: !!REC.mr, uid: (REC.ev && REC.ev.uid) || '',
+                          seen: Array.from(REC.seen).slice(0, 20) });
   window.__eew = state;   // 调试用：可以在控制台里看/改状态
   // 任何未捕获异常都留个记号：主循环一旦被 draw() 里的异常打断，
   // 之后卡片就再也不刷新，而控制台在打包版里看不到——只能靠自己记。
