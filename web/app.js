@@ -4339,6 +4339,30 @@
         qEl.hidden = true;
       }
     }
+    // GQ 的解算细节：台站用了几个、三轴误差、匹配率（包里带 advancedHypocenterData 才有）
+    const advEl = $('#heroAdv');
+    if (advEl) {
+      const a = ev.kind === 'gq' ? ev.gq_adv : null;
+      if (!a) { advEl.hidden = true; advEl.textContent = ''; }
+      else {
+        const parts = [];
+        if (a.used != null || a.total != null) {
+          let t = '台站 ' + (a.used != null ? a.used : '?') + '/' + (a.total != null ? a.total : '?');
+          if (a.reduced) t += '（剔除 ' + a.reduced + '）';
+          if (a.correct != null) t += ' · 合格 ' + a.correct;
+          parts.push(t);
+        }
+        const errs = [];
+        if (a.err_depth != null) errs.push('深度±' + a.err_depth.toFixed(1) + 'km');
+        if (a.err_ns != null) errs.push('N-S±' + a.err_ns.toFixed(1) + 'km');
+        if (a.err_ew != null) errs.push('E-W±' + a.err_ew.toFixed(1) + 'km');
+        if (a.err_origin != null) errs.push('发震±' + a.err_origin.toFixed(1) + 's');
+        if (errs.length) parts.push('误差 ' + errs.join(' · '));
+        if (a.pct != null) parts.push('匹配 ' + a.pct.toFixed(1) + '%');
+        advEl.hidden = !parts.length;
+        advEl.textContent = parts.join(' · ');
+      }
+    }
     $('#heroPlace').textContent = String(ev.place || '—').replace(/（演练）/g, '');
     $('#heroMag').textContent = (ev.mag || 0).toFixed(1);
     $('#heroDepth').textContent = Math.round(ev.depth || 10);

@@ -1,8 +1,8 @@
 {
-  "version": "1.39.3",
-  "url": "https://github.com/13535037476/eew-monitor/releases/latest/download/ZhenXianEEW-Setup-1.39.3.exe",
-  "size": 57355885,
-  "sha256": "1c1a0fcc48af063c7d152950f44e47a1dbc8498fbe2b804bdcd57765a81b1b26",
-  "notes": "· 上传的图现在当底图：地点、M、震度、深度、第几报、数据源照样按每场地震叠上去（压暗处理保证可读）\n· 设置里可勾选「在底图上自动叠加事件信息」，不勾就纯固定图\n· 预览直接显示合成效果（样例事件），不是原始上传图\n· 修：保存一次投稿设置会把封面模式洗回「自动」，导致自定义封面失效",
+  "version": "1.39.4",
+  "url": "https://github.com/13535037476/eew-monitor/releases/latest/download/ZhenXianEEW-Setup-1.39.4.exe",
+  "size": 57358991,
+  "sha256": "8786afc44f21895cfaa9f618a8a52165934d962cedd847c8c3c3501fe27a3664",
+  "notes": "· GQ 的 HypocenterDataPacket 里其实带 advancedHypocenterData（官方 records：HypocenterQualityData + StationCountData），以前只取了 data 把它丢了\n· 现在卡片里多一行小字：台站 14/15（剔除 n）· 合格 15 · 误差 深度±5.4km · N-S±4.6km · E-W±0.4km · 发震±0.4s · 匹配 100%\n· 只有实时检测包带这些细节；归档包没有 advanced 字段时不显示这一行，不占地方",
   "published": "2026-11-22"
 }

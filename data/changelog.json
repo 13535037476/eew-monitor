@@ -3,6 +3,17 @@
   "count": 20,
   "entries": [
     {
+      "ver": "1.39.4",
+      "date": "2026-11-22",
+      "kind": "release",
+      "title": "GQ 解算细节上屏：台站数 / 三轴误差 / 匹配率",
+      "items": [
+        "GQ 的 HypocenterDataPacket 里其实带 advancedHypocenterData（官方 records：HypocenterQualityData + StationCountData），以前只取了 data 把它丢了",
+        "现在卡片里多一行小字：台站 14/15（剔除 n）· 合格 15 · 误差 深度±5.4km · N-S±4.6km · E-W±0.4km · 发震±0.4s · 匹配 100%",
+        "只有实时检测包带这些细节；归档包没有 advanced 字段时不显示这一行，不占地方"
+      ]
+    },
+    {
       "ver": "1.39.3",
       "date": "2026-11-22",
       "kind": "release",

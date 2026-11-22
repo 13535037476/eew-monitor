@@ -378,6 +378,40 @@ def _base_event(u, lat, lon, depth, mag, origin, region, serial=1):
     }
 
 
+def _advanced_of(a):
+    """AdvancedHypocenterData → 前端要的细节字典。
+
+    对应 GQ 客户端里那几行：Stations total/used/err、Err. depth/N-S/E-W、
+    Err. origin、Match%。字段名来自官方 records：
+      HypocenterQualityData(errOrigin, errDepth, errNS, errEW, stations, pct)
+      StationCountData(total, reduced, used, correct)
+    """
+    if not isinstance(a, dict):
+        return None
+    q = a.get("qualityData") if isinstance(a.get("qualityData"), dict) else {}
+    sc = a.get("stationCountData") if isinstance(a.get("stationCountData"), dict) else {}
+
+    def num(x):
+        try:
+            return float(x)
+        except (TypeError, ValueError):
+            return None
+
+    out = {
+        "err_origin": num(q.get("errOrigin")),
+        "err_depth": num(q.get("errDepth")),
+        "err_ns": num(q.get("errNS")) if q.get("errNS") is not None else num(q.get("errNs")),
+        "err_ew": num(q.get("errEW")) if q.get("errEW") is not None else num(q.get("errEw")),
+        "pct": num(q.get("pct")),
+        "stations_q": num(q.get("stations")),
+        "total": num(sc.get("total")),
+        "reduced": num(sc.get("reduced")),
+        "used": num(sc.get("used")),
+        "correct": num(sc.get("correct")),
+    }
+    return out if any(v is not None for v in out.values()) else None
+
+
 def _hypo_event(d):
     """HypocenterData → 本程序统一事件模型（实时检测修订）"""
     try:
@@ -915,6 +949,9 @@ class GQClient:
             raise RuntimeError("服务器终止连接: %s" % (obj.get("cause") or ""))
         if cls.endswith("HypocenterDataPacket"):
             ev = _hypo_event(obj.get("data") or {})
+            adv = _advanced_of(obj.get("advancedHypocenterData"))
+            if ev and adv:
+                ev["gq_adv"] = adv
             self._set(ok=True, has_data=True,
                       packets=self.status["packets"] + 1)
             # 入库下限压到 M1.0：用户可把展示/预警阈值调到 M1/M1.5，
