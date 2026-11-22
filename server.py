@@ -84,7 +84,7 @@ def user_dir(name):
 
 def user_file(name, fn):
     return os.path.join(user_dir(name), fn)
-VERSION = "1.39.4"
+VERSION = "1.39.6"
 APP_NAME = "震线 EEW"
 HOMEPAGE = "https://github.com/13535037476/eew-monitor"
 INSTALL_FILE = os.path.join(APP_DIR, "install.json")
@@ -1934,7 +1934,7 @@ def build_state():
             # 这里的下限跟「全球检测最小震级」脱钩：那个只管「最近地震」列表，
             # 不该顺手把弹窗也滤掉（列表调到 M5 时，M4 的 GQ 仍要能弹）。
             # 活跃事件一律从 M2.5 起给，前端再按「弹窗震级」二次筛选。
-            gq_multi = gq_client.active_events(min_mag=2.5, limit=6)
+            gq_multi = gq_client.active_events(min_mag=max(1.0, min(minmag, 5.0)), limit=6)
             if gq_multi:
                 eew["GQ"] = gq_multi[0]
             gq_act = gq_client.active_intensities()
@@ -2080,7 +2080,12 @@ def refresh_sources_meta():
                 "name": "GlobalQuake Server",
                 "name_zh": "GlobalQuake 全球台网（%s）" % grole,
                 "url": "tcp://%s:%s" % (st.get("host"), st.get("port")),
-                "poll": 20, "provider": "GlobalQuake",
+                # GQ 是长连接推流（每秒都有测站/心跳包），不是 20 秒轮询一次。
+                # 以前这里写 poll=20，面板上就显示成「20s」，看着像很慢。
+                "poll": 0, "stream": True, "provider": "GlobalQuake",
+                "packets": st.get("packets") or 0,
+                "last_pkt_age": max(0, round(time.time() - (st.get("last_ok_ts") or 0), 1))
+                if st.get("last_ok_ts") else None,
                 "role": grole, "switch_count": st.get("switch_count") or 0,
                 "last_switch_str": st.get("last_switch_str") or "",
                 "last_switch_reason": st.get("last_switch_reason") or "",
@@ -2467,6 +2472,27 @@ class Handler(SimpleHTTPRequestHandler):
             if path == "/api/stream":
                 self._stream()
                 return
+            if path == "/api/gq/debug":
+                u = self._user()
+                if not u:
+                    return self._json({"ok": False, "error": "未登录"}, 401)
+                out = {"ok": True}
+                try:
+                    st = gq_client.status_snapshot()
+                    out["status"] = {k: st.get(k) for k in
+                                     ("ok", "host", "port", "role", "packets", "quakes",
+                                      "last_ok_ts", "has_data", "switch_count")}
+                    evs = gq_client.recent_events(min_mag=0.0, limit=5)
+                    out["events_n"] = len(gq_client.CLIENT.events)
+                    out["live_n"] = sum(1 for e in gq_client.CLIENT.events.values()
+                                        if e.get("gq_live"))
+                    out["min_mag_setting"] = _gq_min_mag()
+                    out["sample"] = [{"place": e.get("place"), "mag": e.get("mag"),
+                                      "age_s": round(time.time() - (e.get("origin_ts") or 0), 1),
+                                      "adv": e.get("gq_adv")} for e in evs[:3]]
+                except Exception as exc:
+                    out["error"] = str(exc)[:200]
+                return self._json(out)
             if path == "/api/kmoni":
                 # kmoni 实时震度 GIF 代理（浏览器端解码取色）
                 # ?ts= 条件请求：帧没更新就回 204，前端可以放心高频轮询

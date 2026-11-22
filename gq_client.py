@@ -496,6 +496,9 @@ class GQClient:
         self._st_chunks = {}          # index → 测站（StationsInfoPacket 分块累积）
         self._st_key = None           # stationsIndexing UUID（服务器重启会变，变了要重置）
         self.inten = {}               # index → (maxRatio, ts)  实时观测振幅比
+        # uuid → advancedHypocenterData。归档包不带这项，但它会覆盖同一个 uuid 的
+        # 实时事件；先把细节记下来，覆盖时再贴回去，卡片才不会一会儿有一会儿没有。
+        self.adv = {}
         self.status = {
             "ok": False, "err": None, "latency_ms": 0,
             "last_ok_ts": 0, "last_ok_str": "", "errors_total": 0,
@@ -952,6 +955,11 @@ class GQClient:
             adv = _advanced_of(obj.get("advancedHypocenterData"))
             if ev and adv:
                 ev["gq_adv"] = adv
+                with self.lock:
+                    self.adv[str(ev.get("uid") or "")] = adv
+                    if len(self.adv) > 500:
+                        for k in list(self.adv)[:100]:
+                            self.adv.pop(k, None)
             self._set(ok=True, has_data=True,
                       packets=self.status["packets"] + 1)
             # 入库下限压到 M1.0：用户可把展示/预警阈值调到 M1/M1.5，
@@ -961,6 +969,11 @@ class GQClient:
                 self._pub()
         elif cls.endswith("ArchivedQuakePacket"):
             ev = _arch_event(obj.get("archivedQuakeData") or {})
+            if ev:
+                with self.lock:
+                    adv0 = self.adv.get(str(ev.get("uid") or ""))
+                if adv0:
+                    ev["gq_adv"] = adv0
             self._set(ok=True, has_data=True,
                       packets=self.status["packets"] + 1)
             if ev and (ev["mag"] or 0) >= 1.0:

@@ -535,9 +535,9 @@
     if (!ev) return false;
     if (ev.isSim || ev.auto || ev.warn) return true;
     if (ev.country === 'CN' || ev.country === 'JP' || ev.country === 'TW') return (ev.mag || 0) >= 3.0;
-    // 全球台网：门槛改由「全球检测弹窗震级」决定（默认 4.5）。
-    // 原来写死 5.0，GQ 推来的 M4~4.9 既不弹卡也不响铃，看起来就是「GQ 从来没预警」。
-    return (ev.mag || 0) >= Number(state.settings.gqAlert ?? 4.5);
+    // 全球台网：卡片门槛跟「全球检测最小震级」走（默认 3），
+    // 弹窗/响铃另有 gqAlert（默认 4.5）。两者分开：看得见 ≠ 要吵醒你。
+    return (ev.mag || 0) >= Number(state.settings.gqMag ?? 3);
   }
 
   function currentEvent() {
@@ -5493,14 +5493,19 @@
           esc(SRC_TITLE[s.id] || s.name_zh) + '">填令牌</button>' : '';
       // GQ 名字太长会把「主/备/自动」三个小标签挤成省略号：用短名，标签留出来
       const nmTxt = (s.id === 'globalquake') ? 'GlobalQuake' : (SRC_TITLE[s.id] || s.name_zh);
-      const prov = '<span class="prov">' + esc(s.provider || 'Wolfx') + ' · ' + (s.poll || '—') + 's</span>';
+      const rate = s.stream ? '实时流' : ((s.poll || '—') + 's');
+      const prov = '<span class="prov">' + esc(s.provider || 'Wolfx') + ' · ' + rate + '</span>';
       // 延迟只留数字，状态词放小字：窄侧边栏里也放得下
       const stTxt = st[2] ? st[2] : st[1];
       return '<tr' + (main ? ' class="is-main"' : '') + (off ? ' class="src-off"' : '') + '>' +
         '<td class="nm" title="' + esc((SRC_TITLE[s.id] || s.name_zh) + ' · ' + (s.provider || '')) + '">' +
         esc(nmTxt) +
         (main ? '<i class="pmain">主</i>' : '') + alt + gqsw + tk + prov + '</td>' +
-        '<td class="st">' + (s.poll || '—') + 's</td>' +
+        '<td class="st" title="' + esc(s.stream
+          ? ('长连接推流 · 已收 ' + (s.packets || 0) + ' 包 · 最后一包 ' +
+             (s.last_pkt_age != null ? s.last_pkt_age + 's 前' : '—'))
+          : ('每 ' + (s.poll || '—') + ' 秒抓一次')) + '">' +
+        (s.stream ? '流' : (s.poll || '—') + 's') + '</td>' +
         '<td class="st"><i class="sdot ' + st[0] + '"></i>' + esc(stTxt) + '</td>' +
         '<td class="sw">' + sw + '</td></tr>';
     });
