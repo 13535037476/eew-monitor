@@ -265,6 +265,55 @@ def _upload_file(path, name, c):
     return up["filename"]
 
 
+def cover_custom_path():
+    return os.path.join(_data_dir(), "bili_cover.jpg")
+
+
+def set_cover_custom(raw):
+    """保存用户上传的封面：居中裁成 1146×717（B站 推荐 16:10），存 JPEG。
+
+    返回 (ok, 错误)。图片不合格直接拒，别等投稿时才被 B站 打回。
+    """
+    try:
+        from PIL import Image
+        import io
+        im = Image.open(io.BytesIO(raw))
+        im = im.convert("RGB")
+        if im.width < 640 or im.height < 400:
+            return False, "图片太小（至少 640×400）"
+        tw, th = 1146, 717
+        scale = max(tw / im.width, th / im.height)
+        nw, nh = max(tw, int(im.width * scale + 0.5)), max(th, int(im.height * scale + 0.5))
+        im = im.resize((nw, nh), Image.LANCZOS)
+        left = (nw - tw) // 2
+        top = (nh - th) // 2
+        im = im.crop((left, top, left + tw, top + th))
+        p = cover_custom_path()
+        os.makedirs(os.path.dirname(p), exist_ok=True)
+        im.save(p, "JPEG", quality=92)
+        c = cfg()
+        c["cover_mode"] = "custom"
+        save_cfg(c)
+        return True, ""
+    except Exception as exc:
+        return False, "图片读不出来：%s" % str(exc)[:100]
+
+
+def clear_cover_custom():
+    c = cfg()
+    c["cover_mode"] = "auto"
+    save_cfg(c)
+    try:
+        os.remove(cover_custom_path())
+    except OSError:
+        pass
+    return True
+
+
+def has_cover_custom():
+    return cfg().get("cover_mode") == "custom" and os.path.isfile(cover_custom_path())
+
+
 def upload_cover(path, c):
     """封面走 /x/vu/web/cover/up，返回 B站给的图片 URL（失败返回空串）。"""
     import base64
@@ -341,12 +390,15 @@ def upload_one(path, meta, c=None):
     try:
         # 先出封面（A 版「速报卡」），传上去拿到 URL；失败就退回平台自动取帧
         try:
-            import cover as cover_mod
-            cp = os.path.join(_data_dir(), "covers", os.path.splitext(name)[0] + ".jpg")
-            m2 = dict(meta)
-            # 中国的事件用「烈度」，日本/其他用「震度」；按数据源名判断
-            m2["jp"] = not any(k in str(meta.get("src") or "") for k in ("中国", "CENC", "台网"))
-            cover_mod.make_cover(m2, cp)
+            if has_cover_custom():
+                cp = cover_custom_path()          # 用户自己传的封面
+            else:
+                import cover as cover_mod
+                cp = os.path.join(_data_dir(), "covers", os.path.splitext(name)[0] + ".jpg")
+                m2 = dict(meta)
+                # 中国的事件用「烈度」，日本/其他用「震度」；按数据源名判断
+                m2["jp"] = not any(k in str(meta.get("src") or "") for k in ("中国", "CENC", "台网"))
+                cover_mod.make_cover(m2, cp)
             url = upload_cover(cp, c)
             if url:
                 meta = dict(meta)
@@ -407,6 +459,7 @@ def status():
         "enabled": bool(cfg().get("enabled")),
         "has_login": bool(cfg().get("sessdata")),
         "tid": cfg().get("tid") or 188,
+        "cover_mode": "custom" if has_cover_custom() else "auto",
         "tags": cfg().get("tags") or "",
         "recent": [{"name": k, **v} for k, v in items],
         "ok_count": sum(1 for v in L.values() if v.get("state") == "ok"),

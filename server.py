@@ -84,7 +84,7 @@ def user_dir(name):
 
 def user_file(name, fn):
     return os.path.join(user_dir(name), fn)
-VERSION = "1.39.1"
+VERSION = "1.39.2"
 APP_NAME = "震线 EEW"
 HOMEPAGE = "https://github.com/13535037476/eew-monitor"
 INSTALL_FILE = os.path.join(APP_DIR, "install.json")
@@ -2661,6 +2661,22 @@ class Handler(SimpleHTTPRequestHandler):
                 q = parse_qs(_urlparse(self.path).query)
                 key = (q.get("key") or [""])[0]
                 return self._json(bili.qr_poll(key))
+            if path == "/api/bili/cover.jpg":
+                u = self._user()
+                if not u:
+                    return self._json({"ok": False, "error": "未登录"}, 401)
+                pth = bili.cover_custom_path()
+                if not os.path.isfile(pth):
+                    return self._json({"ok": False, "error": "没有自定义封面"}, 404)
+                with open(pth, "rb") as f:
+                    raw = f.read()
+                self.send_response(200)
+                self.send_header("Content-Type", "image/jpeg")
+                self.send_header("Content-Length", str(len(raw)))
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                self.wfile.write(raw)
+                return
             if path == "/api/bili/status":
                 u = self._user()
                 if not u:
@@ -2726,6 +2742,25 @@ class Handler(SimpleHTTPRequestHandler):
             if not u:
                 return self._json({"ok": False, "error": "未登录"}, 401)
             return self._json({"ok": True, "awake": set_awake(bool(body.get("on")))})
+        if path == "/api/bili/cover":
+            u = self._user()
+            if not u:
+                return self._json({"ok": False, "error": "未登录"}, 401)
+            if body.get("clear"):
+                bili.clear_cover_custom()
+                return self._json({"ok": True, "mode": "auto"})
+            data = str(body.get("data") or "")
+            if "," in data and data.startswith("data:"):
+                data = data.split(",", 1)[1]
+            try:
+                import base64
+                raw = base64.b64decode(data)
+            except Exception:
+                return self._json({"ok": False, "error": "图片数据不合法"}, 400)
+            if len(raw) > 8 * 1024 * 1024:
+                return self._json({"ok": False, "error": "图片太大（上限 8MB）"}, 400)
+            ok, err = bili.set_cover_custom(raw)
+            return self._json({"ok": ok, "error": err, "mode": "custom" if ok else "auto"})
         if path == "/api/open-url":
             u = self._user()
             if not u:

@@ -615,6 +615,17 @@ try{if(localStorage.getItem('eew.theme')==='light')document.documentElement.clas
           <input id="optBiliTags" class="input" placeholder="地震,地震预警,EEW">
           <button type="button" class="btn primary" id="btnBiliSave">保存</button>
         </div>
+        <div class="row">
+          <label style="flex:none;width:76px">投稿封面</label>
+          <input type="file" id="biliCoverFile" class="input" accept="image/*" style="flex:1;padding:3px">
+          <button type="button" class="btn" id="biliCoverClear">用自动</button>
+        </div>
+        <div class="row" id="biliCoverBox" hidden>
+          <img id="biliCoverPrev" alt="自定义封面"
+               style="width:200px;border-radius:8px;border:1px solid rgba(255,255,255,.12)">
+          <span class="hint" style="margin:0" id="biliCoverHint">自定义封面生效中（自动裁成 1146×717）</span>
+        </div>
+        <p class="hint" style="margin:2px 0 6px">不传就用 A 版速报卡按事件自动生成；传了每场都套你这张。</p>
         <details style="margin-top:6px">
           <summary class="hint" style="cursor:pointer">手动填 cookie（扫码不好用时）</summary>
           <div class="row">

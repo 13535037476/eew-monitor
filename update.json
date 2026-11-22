@@ -1,8 +1,8 @@
 {
-  "version": "1.39.1",
-  "url": "https://github.com/13535037476/eew-monitor/releases/latest/download/ZhenXianEEW-Setup-1.39.1.exe",
-  "size": 57350330,
-  "sha256": "e55b7f0322d2e7ce233ae0c38acfef98afc6f8c4f8bb2f3d3385736e4a3206e9",
-  "notes": "· 扫码成功后 B站 事后可能对同一个 key 回「二维码已过期」，晚到的一包会把「登录成功」改写成过期——现在成功结果缓存 5 分钟，直接回放\n· 登录回调缺字段时说清缺哪个：缺 SESSDATA 或 bili_jct / DedeUserID 各自给中文提示（缺后两者能登录但投稿会被拒）\n· 感谢条：技术支持 Mon3tr，QQ 2979565286",
-  "published": "2026-11-21"
+  "version": "1.39.2",
+  "url": "https://github.com/13535037476/eew-monitor/releases/latest/download/ZhenXianEEW-Setup-1.39.2.exe",
+  "size": 57354354,
+  "sha256": "1321789c8e7d2bc8974f755fc353d3e2b70d726ff689ab7204987e4aaf4af26b",
+  "notes": "· 打开软件时，上一场还在有效期里的 JMA 预报会被当成新事件弹一次——现在启动后先把已存在的旧事件记成「已见」（8 秒内的新震照常提醒），不再误弹\n· 设置→B站投稿 新增「投稿封面」：可上传自己的图，服务端自动裁成 1146×717；点「用自动」恢复 A 版速报卡按事件生成\n· 状态里会显示当前是自定义封面还是自动生成",
+  "published": "2026-11-22"
 }

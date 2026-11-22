@@ -2357,21 +2357,6 @@
     return ev ? 'est' : 'obs';
   }
 
-  function stationModeText(mode) {
-    if (mode === 'kmoni') {
-      return '台站着色：NIED 实时震度（kmoni 逐秒）';
-    }
-    if (mode === 'idle') return '台站着色：震度速報（地域级，按都道府县上色）';
-    if (mode === 'est') return '台站着色：预计震度（衰减式推算）';
-    if (mode === 'obs') {
-      const o = state.obs;
-      if (!o) return '台站着色：观测（暂未收到震度速报）';
-      const age = Math.max(0, nowSec() - (o.origin_ts || nowSec()));
-      const when = age < 3600 ? Math.round(age / 60) + ' 分钟前' : (age / 3600).toFixed(1) + ' 小时前';
-      return '台站着色：实测震度 · ' + o.place + ' M' + (o.mag || 0).toFixed(1) + ' · ' + when;
-    }
-    return '台站着色：无事件（灰点）';
-  }
 
   // ---------------- 台站震度色阶 ----------------
   // 一档一色：颜色就是图例那排官方震度色（0 灰蓝 → 7 紫），越强越暖。
@@ -5397,15 +5382,6 @@
     }
     return null;
   }
-  function primaryList() {
-    const p = state.primary || {};
-    const out = [];
-    for (const kind in p) {
-      const grp = p[kind] || {};
-      for (const c in grp) if (grp[c]) out.push(grp[c]);
-    }
-    return out;
-  }
 
   function esc(s) {
     return String(s).replace(/[&<>"]/g, c =>
@@ -5523,32 +5499,22 @@
     } catch (err) { toast('操作失败：' + err.message, 5000); }
     finally { el.disabled = false; }
   });
-  document.addEventListener('click', async (e) => {
+  document.addEventListener('click', (e) => {
     const b = e.target;
     if (!b || !b.classList || !b.classList.contains('srctok')) return;
     const sid = b.getAttribute('data-sid');
-    const nm = b.getAttribute('data-name') || sid;
-    const tip = sid === 'jian'
-      ? '粘贴 Jian Project 的登录密钥（lk_ 开头），填一次就行；这是你账号自己的授权'
-      : '粘贴这个数据源的令牌（填一次就存在本机）';
-    if (sid === 'jian') {
-      const inp = $('#myTokInput');
-      if (inp) {
-        inp.scrollIntoView({ block: 'center', behavior: 'smooth' });
-        setTimeout(() => { try { inp.focus(); } catch (e) { } }, 260);
+    // 令牌只有两套正规入口：Jian 走「我的 Jian 密钥」，其余走「本机公开数据源令牌」。
+    // 这里只负责带路，不再弹第二套输入框（以前三处入口、三套保存逻辑，改一处崩两处）。
+    const target = sid === 'jian' ? $('#myTokInput') : $('#srcTokList');
+    if (target) {
+      target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      if (sid === 'jian') setTimeout(() => { try { target.focus(); } catch (err) { } }, 260);
+      else {
+        const box = $('#srcTokBox');
+        if (box) box.classList.add('flash');
+        setTimeout(() => { if (box) box.classList.remove('flash'); }, 1200);
       }
-      return;
     }
-    const tok = window.prompt(nm + ' 的令牌：\n' + tip, '');
-    if (tok == null) return;
-    try {
-      const j = await (await fetch('/api/source/token', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: sid, token: tok.trim() }),
-      })).json();
-      if (j.ok) { toast('令牌已保存，正在重连'); }
-      else toast('保存失败：' + (j.error || ''), 6000);
-    } catch (err) { toast('保存失败：' + err.message, 6000); }
   });
 
   // Jian 引导：只负责「用浏览器打开申请页」；密钥的保存走「我的 Jian 密钥」那套接口
@@ -5754,11 +5720,27 @@
     if (state.settings.notify) notifyReady(true);
   }, { once: true });
 
+  let alertSeeded = false;
+  const PAGE_START = nowSec();
   function checkAlarm() {
     // 逐起事件判定，而不是只看「当前主卡的那一起」：
     // 日本有 M3 在报时，主卡被它占着（本区域加权 +2.5），智利 M6 抢不到主卡，
     // 于是永远轮不到响铃——这就是「GQ 预警收不到」的另一半原因。
     // 主卡只有一张，但「该不该提醒」是每起地震自己的事。
+    // 刚打开软件：先把「已经挂在有效期里的旧事件」记成已见。
+    // 否则上一场 JMA 预报（可能已经过去几分钟）会立刻弹一次，看着像又震了。
+    if (!alertSeeded) {
+      const list = (state.eewList || []).slice();
+      if (state.autoEv) list.push(state.autoEv);
+      if (!list.length && nowSec() - PAGE_START < 6) return;   // 等首帧数据到齐
+      alertSeeded = true;
+      for (const e of list) {
+        if (!e) continue;
+        const age = nowSec() - (e.report_ts || e.origin_ts || 0);
+        if (!age || age > 8) state.seen.add(evKey(e));         // 只吞旧的，8 秒内的新震照常提醒
+      }
+      try { LS.set('seen', Array.from(state.seen).slice(-300)); } catch (err) { }
+    }
     const sim = liveSim();
     const cands = sim
       ? [Object.assign({}, sim, { active: true, isSim: true })]
@@ -6803,7 +6785,16 @@
     acc: $('#biliAcc'), login: $('#btnBiliLogin'), logout: $('#btnBiliLogout'),
     qrRow: $('#biliQrRow'), qr: $('#biliQr'), qrState: $('#biliQrState'),
     qrNew: $('#btnBiliQrNew'),
+    coverFile: $('#biliCoverFile'), coverClear: $('#biliCoverClear'),
+    coverBox: $('#biliCoverBox'), coverPrev: $('#biliCoverPrev'),
   };
+  function biliCoverShow(custom) {
+    if (!biliEls.coverBox) return;
+    biliEls.coverBox.hidden = !custom;
+    if (custom && biliEls.coverPrev) {
+      biliEls.coverPrev.src = '/api/bili/cover.jpg?ts=' + Date.now();
+    }
+  }
   let biliPollTimer = 0;
   let biliQrKey = '';
   function biliPayload() {
@@ -6839,6 +6830,7 @@
       if (j.sessdata_set) biliEls.sess.placeholder = '已保存（留空不改）';
       if (j.uid_set) biliEls.uid.placeholder = '已保存（留空不改）';
       biliSetAccount(j.uname || '', j.mid || 0);
+      biliCoverShow(j.cover_mode === 'custom');
       const rec = (j.recent || [])[0];
       biliEls.hint.textContent =
         (j.enabled ? '已开启' : '未开启') +
@@ -6911,6 +6903,35 @@
       biliSetAccount('', 0);
       toast('已退出 B站登录');
       loadBili();
+    });
+    if (biliEls.coverFile) biliEls.coverFile.addEventListener('change', () => {
+      const f = biliEls.coverFile.files && biliEls.coverFile.files[0];
+      if (!f) return;
+      if (f.size > 8 * 1024 * 1024) { toast('图片太大（上限 8MB）', 5000); return; }
+      const fr = new FileReader();
+      fr.onload = async () => {
+        try {
+          const j = await (await fetch('/api/bili/cover', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ data: fr.result }),
+          })).json();
+          if (j.ok) {
+            toast('封面已保存（自动裁成 1146×717）');
+            biliCoverShow(true);
+          } else toast('封面保存失败：' + (j.error || ''), 6000);
+        } catch (e) { toast('封面保存失败：' + e.message, 6000); }
+        biliEls.coverFile.value = '';
+      };
+      fr.readAsDataURL(f);
+    });
+    if (biliEls.coverClear) biliEls.coverClear.addEventListener('click', async () => {
+      try {
+        await fetch('/api/bili/cover', { method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ clear: true }) });
+        biliCoverShow(false);
+        toast('已改回自动生成封面');
+      } catch (e) { toast('操作失败：' + e.message, 5000); }
     });
     if (biliEls.save) biliEls.save.addEventListener('click', async () => {
       biliEls.save.disabled = true;
