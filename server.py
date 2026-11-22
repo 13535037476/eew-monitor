@@ -84,7 +84,7 @@ def user_dir(name):
 
 def user_file(name, fn):
     return os.path.join(user_dir(name), fn)
-VERSION = "1.39.2"
+VERSION = "1.39.3"
 APP_NAME = "震线 EEW"
 HOMEPAGE = "https://github.com/13535037476/eew-monitor"
 INSTALL_FILE = os.path.join(APP_DIR, "install.json")
@@ -2662,12 +2662,33 @@ class Handler(SimpleHTTPRequestHandler):
                 key = (q.get("key") or [""])[0]
                 return self._json(bili.qr_poll(key))
             if path == "/api/bili/cover.jpg":
+                qs0 = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
                 u = self._user()
                 if not u:
                     return self._json({"ok": False, "error": "未登录"}, 401)
                 pth = bili.cover_custom_path()
                 if not os.path.isfile(pth):
                     return self._json({"ok": False, "error": "没有自定义封面"}, 404)
+                if (qs0.get("demo") or ["0"])[0] in ("1", "true"):
+                    try:
+                        import cover as cover_mod
+                        tmp = os.path.join(bili._data_dir(), "covers", "_preview.jpg")
+                        cover_mod.make_cover({
+                            "place": "能登半島沖", "mag": 6.1, "depth": 12,
+                            "inten": "震度5強", "src": "気象庁 緊急地震速報",
+                            "serial": 5, "jp": True,
+                        }, tmp, bg=pth if bili.cfg().get("cover_overlay", True) else None)
+                        with open(tmp, "rb") as f:
+                            raw = f.read()
+                        self.send_response(200)
+                        self.send_header("Content-Type", "image/jpeg")
+                        self.send_header("Content-Length", str(len(raw)))
+                        self.send_header("Cache-Control", "no-store")
+                        self.end_headers()
+                        self.wfile.write(raw)
+                        return
+                    except Exception:
+                        pass
                 with open(pth, "rb") as f:
                     raw = f.read()
                 self.send_response(200)
@@ -2812,6 +2833,11 @@ class Handler(SimpleHTTPRequestHandler):
                 "title_tpl": str(body.get("title_tpl") or cfg.get("title_tpl") or ""),
                 "desc_tpl": str(body.get("desc_tpl") or cfg.get("desc_tpl") or ""),
                 "min_mag": float(body.get("min_mag") or cfg.get("min_mag") or 0),
+                # 自定义底图时是否把事件信息叠上去（默认叠，不然一场地震套一张死图）
+                "cover_overlay": bool(body.get("cover_overlay",
+                                             cfg.get("cover_overlay", True))),
+                # 保存表单时别把封面模式洗掉，否则点一次保存就退回「自动封面」
+                "cover_mode": cfg.get("cover_mode") or "auto",
             }
             if path == "/api/bili/test":
                 if not new["sessdata"]:

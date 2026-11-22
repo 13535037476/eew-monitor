@@ -6787,12 +6787,14 @@
     qrNew: $('#btnBiliQrNew'),
     coverFile: $('#biliCoverFile'), coverClear: $('#biliCoverClear'),
     coverBox: $('#biliCoverBox'), coverPrev: $('#biliCoverPrev'),
+    coverOverlay: $('#biliCoverOverlay'), coverOverlayRow: $('#biliCoverOverlayRow'),
   };
   function biliCoverShow(custom) {
     if (!biliEls.coverBox) return;
     biliEls.coverBox.hidden = !custom;
+    if (biliEls.coverOverlayRow) biliEls.coverOverlayRow.hidden = !custom;
     if (custom && biliEls.coverPrev) {
-      biliEls.coverPrev.src = '/api/bili/cover.jpg?ts=' + Date.now();
+      biliEls.coverPrev.src = '/api/bili/cover.jpg?demo=1&ts=' + Date.now();
     }
   }
   let biliPollTimer = 0;
@@ -6805,6 +6807,7 @@
       dedeuserid: (biliEls.uid.value || '').trim(),
       tid: parseInt(biliEls.tid.value, 10) || 188,
       tags: (biliEls.tags.value || '').trim(),
+      cover_overlay: !!(biliEls.coverOverlay && biliEls.coverOverlay.checked),
     };
   }
   function biliSetAccount(uname, mid) {
@@ -6830,6 +6833,7 @@
       if (j.sessdata_set) biliEls.sess.placeholder = '已保存（留空不改）';
       if (j.uid_set) biliEls.uid.placeholder = '已保存（留空不改）';
       biliSetAccount(j.uname || '', j.mid || 0);
+      if (biliEls.coverOverlay) biliEls.coverOverlay.checked = j.cover_overlay !== false;
       biliCoverShow(j.cover_mode === 'custom');
       const rec = (j.recent || [])[0];
       biliEls.hint.textContent =
@@ -6923,6 +6927,15 @@
         biliEls.coverFile.value = '';
       };
       fr.readAsDataURL(f);
+    });
+    if (biliEls.coverOverlay) biliEls.coverOverlay.addEventListener('change', async () => {
+      try {
+        await fetch('/api/bili/save', { method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(biliPayload()) });
+        biliCoverShow(true);
+        toast(biliEls.coverOverlay.checked ? '已改为「底图 + 事件信息」' : '已改为固定封面（不加字）');
+      } catch (e) { toast('保存失败：' + e.message, 5000); }
     });
     if (biliEls.coverClear) biliEls.coverClear.addEventListener('click', async () => {
       try {

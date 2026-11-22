@@ -45,8 +45,32 @@ def _glow(base, xy, radius, color, alpha=70):
     base.alpha_composite(layer)
 
 
-def make_cover(meta, out_path):
-    """meta: place/mag/depth/inten/src/serial/est；返回生成的文件路径。"""
+def _bg_from_image(path):
+    """用户上传的底图：铺满 1146×717（居中裁），再压一层暗色，
+    保证白字和震度色块在任何照片上都读得清。"""
+    im = Image.open(path).convert("RGB")
+    scale = max(W / im.width, H / im.height)
+    nw, nh = max(W, int(im.width * scale + 0.5)), max(H, int(im.height * scale + 0.5))
+    im = im.resize((nw, nh), Image.LANCZOS)
+    left, top = (nw - W) // 2, (nh - H) // 2
+    im = im.crop((left, top, left + W, top + H)).convert("RGBA")
+    # 整体压暗 45%，左侧再多压一点（标题区）
+    im.alpha_composite(Image.new("RGBA", (W, H), (0, 0, 0, 115)))
+    left_scrim = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    d = ImageDraw.Draw(left_scrim)
+    for x in range(int(W * 0.62)):
+        a = int(120 * (1 - x / (W * 0.62)))
+        d.line([(x, 0), (x, H)], fill=(0, 0, 0, a))
+    im.alpha_composite(left_scrim)
+    return im
+
+
+def make_cover(meta, out_path, bg=None):
+    """meta: place/mag/depth/inten/src/serial/est；bg 传用户底图路径时叠在下面。
+
+    有底图时不再画渐变背景，而是「底图 + 压暗 + 同样的信息层」——
+    地点/震级/震度/深度/报次/数据源照样随每场地震变，不是一张死图。
+    """
     place = str(meta.get("place") or "地震")[:22]
     mag = meta.get("mag")
     mag_s = ("%.1f" % float(mag)) if mag not in (None, "", "?") else "—"
@@ -57,8 +81,15 @@ def make_cover(meta, out_path):
     serial = meta.get("serial")
     est = bool(meta.get("est"))
 
-    img = Image.new("RGBA", (W, H))
-    img.paste(_grad((W, H), (9, 17, 28), (5, 9, 15)), (0, 0))
+    if bg and os.path.isfile(bg):
+        try:
+            img = _bg_from_image(bg)
+        except Exception:
+            img = Image.new("RGBA", (W, H))
+            img.paste(_grad((W, H), (9, 17, 28), (5, 9, 15)), (0, 0))
+    else:
+        img = Image.new("RGBA", (W, H))
+        img.paste(_grad((W, H), (9, 17, 28), (5, 9, 15)), (0, 0))
     _glow(img, (W * 0.25, H * 0.42), 330, RED, 70)
     d = ImageDraw.Draw(img)
     for x in range(0, W, 48):

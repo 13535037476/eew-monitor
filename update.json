@@ -1,8 +1,8 @@
 {
-  "version": "1.39.2",
-  "url": "https://github.com/13535037476/eew-monitor/releases/latest/download/ZhenXianEEW-Setup-1.39.2.exe",
-  "size": 57354354,
-  "sha256": "1321789c8e7d2bc8974f755fc353d3e2b70d726ff689ab7204987e4aaf4af26b",
-  "notes": "· 打开软件时，上一场还在有效期里的 JMA 预报会被当成新事件弹一次——现在启动后先把已存在的旧事件记成「已见」（8 秒内的新震照常提醒），不再误弹\n· 设置→B站投稿 新增「投稿封面」：可上传自己的图，服务端自动裁成 1146×717；点「用自动」恢复 A 版速报卡按事件生成\n· 状态里会显示当前是自定义封面还是自动生成",
+  "version": "1.39.3",
+  "url": "https://github.com/13535037476/eew-monitor/releases/latest/download/ZhenXianEEW-Setup-1.39.3.exe",
+  "size": 57355885,
+  "sha256": "1c1a0fcc48af063c7d152950f44e47a1dbc8498fbe2b804bdcd57765a81b1b26",
+  "notes": "· 上传的图现在当底图：地点、M、震度、深度、第几报、数据源照样按每场地震叠上去（压暗处理保证可读）\n· 设置里可勾选「在底图上自动叠加事件信息」，不勾就纯固定图\n· 预览直接显示合成效果（样例事件），不是原始上传图\n· 修：保存一次投稿设置会把封面模式洗回「自动」，导致自定义封面失效",
   "published": "2026-11-22"
 }

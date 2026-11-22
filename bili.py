@@ -390,8 +390,16 @@ def upload_one(path, meta, c=None):
     try:
         # 先出封面（A 版「速报卡」），传上去拿到 URL；失败就退回平台自动取帧
         try:
-            if has_cover_custom():
-                cp = cover_custom_path()          # 用户自己传的封面
+            if has_cover_custom() and c.get("cover_overlay", True):
+                # 自定义底图 + 事件信息：地点/震级/震度每场都不同，不能套死图
+                import cover as cover_mod
+                cp = os.path.join(_data_dir(), "covers", os.path.splitext(name)[0] + ".jpg")
+                m3 = dict(meta)
+                m3["jp"] = not any(k in str(meta.get("src") or "")
+                                   for k in ("中国", "CENC", "台网"))
+                cover_mod.make_cover(m3, cp, bg=cover_custom_path())
+            elif has_cover_custom():
+                cp = cover_custom_path()          # 用户选择「不叠加」：就用原图
             else:
                 import cover as cover_mod
                 cp = os.path.join(_data_dir(), "covers", os.path.splitext(name)[0] + ".jpg")
@@ -460,6 +468,7 @@ def status():
         "has_login": bool(cfg().get("sessdata")),
         "tid": cfg().get("tid") or 188,
         "cover_mode": "custom" if has_cover_custom() else "auto",
+        "cover_overlay": bool(c0.get("cover_overlay", True)),
         "tags": cfg().get("tags") or "",
         "recent": [{"name": k, **v} for k, v in items],
         "ok_count": sum(1 for v in L.values() if v.get("state") == "ok"),

@@ -620,6 +620,13 @@ try{if(localStorage.getItem('eew.theme')==='light')document.documentElement.clas
           <input type="file" id="biliCoverFile" class="input" accept="image/*" style="flex:1;padding:3px">
           <button type="button" class="btn" id="biliCoverClear">用自动</button>
         </div>
+        <div class="row" id="biliCoverOverlayRow" hidden>
+          <label style="flex:none;width:76px"></label>
+          <label class="hint" style="margin:0;display:flex;gap:6px;align-items:center">
+            <input type="checkbox" id="biliCoverOverlay" checked style="width:15px;height:15px">
+            在底图上自动叠加事件信息（地点 / 震级 / 震度 / 深度 / 报次）
+          </label>
+        </div>
         <div class="row" id="biliCoverBox" hidden>
           <img id="biliCoverPrev" alt="自定义封面"
                style="width:200px;border-radius:8px;border:1px solid rgba(255,255,255,.12)">
